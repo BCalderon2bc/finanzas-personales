@@ -10,10 +10,18 @@ class DashboardSummary {
   final List<Map<String, dynamic>> recent;
   final Map<String, String> accountNames;
   final DateTime month;
+
+
   factory DashboardSummary.calculate(List<Map<String, dynamic>> accounts,
-      List<Map<String, dynamic>> transactions, DateTime now) {
+      List<Map<String, dynamic>> transactions, DateTime now, {
+        List<Map<String, dynamic>> cardExpenses = const [],
+        List<Map<String, dynamic>> cardPayments = const [],
+        List<Map<String, dynamic>> debtPayments = const [],
+      }) {
     final totals = {'NIO': CurrencySummary(), 'USD': CurrencySummary()};
-    final balances = calculateBalances(accounts, transactions);
+    final balances = calculateBalances(
+      accounts, transactions, cardPayments: cardPayments, debtPayments: debtPayments,
+    );
     final names = <String, String>{};
     for (final account in accounts) {
       final id = account['id'].toString();
@@ -33,6 +41,22 @@ class DashboardSummary {
       if (total == null) continue;
       if (tx['transaction_type'] == 'income') total.income += moneyCents(tx['amount']);
       if (tx['transaction_type'] == 'expense') total.expense += moneyCents(tx['amount']);
+    }
+    for (final expense in cardExpenses) {
+      final date = DateTime.tryParse('${expense['transaction_date']}')?.toLocal();
+      if (date == null) throw FormatException('Un movimiento de tarjeta tiene una fecha inválida.');
+      if (date.year != now.year || date.month != now.month) continue;
+      final total = totals[expense['currency']];
+      if (total != null) total.expense += moneyCents(expense['amount']);
+    }
+    for (final payment in debtPayments) {
+      final date = DateTime.tryParse('${payment['payment_date']}')?.toLocal();
+      if (date == null) throw FormatException('Un abono tiene una fecha inválida.');
+      if (date.year != now.year || date.month != now.month) continue;
+      final total = totals[payment['currency']];
+      if (total != null) {
+        total.expense += moneyCents(payment['interest_amount']) + moneyCents(payment['fee_amount']);
+      }
     }
     dated.sort((a, b) {
       final byDate = b.key.compareTo(a.key);

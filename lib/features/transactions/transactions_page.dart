@@ -8,6 +8,8 @@ import 'transaction_form_dialog.dart';
 import 'transaction_filter.dart';
 import 'transaction_filters_bar.dart';
 import 'transaction_details_dialog.dart';
+import '../../data/credit_card_repository.dart';
+import '../../data/debt_payment_repository.dart';
 
 class TransactionsPage extends StatefulWidget {
   const TransactionsPage({super.key});
@@ -26,6 +28,8 @@ class _TransactionsPageState extends State<TransactionsPage> {
   List<Map<String, dynamic>> accounts = [];
   List<Map<String, dynamic>> categories = [];
   List<Map<String, dynamic>> transactions = [];
+  List<Map<String, dynamic>> cardPayments = [];
+  List<Map<String, dynamic>> debtPayments = [];
 
   @override
   void initState() {
@@ -57,13 +61,20 @@ class _TransactionsPageState extends State<TransactionsPage> {
           .order('name');
 
       final transactionRows = await loadUserTransactions(user.id);
-      calculateBalances(List<Map<String, dynamic>>.from(accountRows), transactionRows);
+      final paymentRows = await loadUserCardPayments(user.id);
+      final debtPaymentRows = await loadUserDebtPayments(user.id);
+      calculateBalances(
+        List<Map<String, dynamic>>.from(accountRows), transactionRows,
+        cardPayments: paymentRows, debtPayments: debtPaymentRows,
+      );
 
       if (!mounted) return;
       setState(() {
         accounts = List<Map<String, dynamic>>.from(accountRows);
         categories = List<Map<String, dynamic>>.from(categoryRows);
         transactions = List<Map<String, dynamic>>.from(transactionRows);
+        cardPayments = paymentRows;
+        debtPayments = debtPaymentRows;
         loading = false;
       });
     } catch (e) {
@@ -90,6 +101,10 @@ class _TransactionsPageState extends State<TransactionsPage> {
         return 'Depósito';
       case 'withdrawal':
         return 'Retiro';
+      case 'card_payment':
+        return 'Pago de tarjeta';
+      case 'debt_payment':
+        return 'Abono de deuda';
       default:
         return type ?? 'Movimiento';
     }
@@ -113,48 +128,70 @@ class _TransactionsPageState extends State<TransactionsPage> {
     return '';
   }
 
-  Future<void> addTransaction() async {
+  Future<void> addTransaction([Map<String, dynamic>? transaction]) async {
     if (saving || loading) return;
-    final activeAccounts = accounts.where((a) => a['is_active'] == true).toList();
-    if (activeAccounts.isEmpty) {
+    final editing = transaction != null;
+    if (editing && !['income', 'expense', 'transfer'].contains(transaction['transaction_type'])) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Primero crea una cuenta.')),
+        const SnackBar(content: Text('La edición está disponible para ingresos, gastos y transferencias.')),
       );
       return;
     }
-
+    final availableAccounts = accounts.where((a) =>
+    a['is_active'] == true || (editing &&
+        (a['id'].toString() == transaction['account_id']?.toString() ||
+            a['id'].toString() == transaction['destination_account_id']?.toString()))
+    ).toList();
+    if (availableAccounts.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Primero crea una cuenta activa.')),
+      );
+      return;
+    }
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (_) => TransactionFormDialog(
-        accounts: activeAccounts,
-        categories: categories.where((c) => c['is_active'] == true).toList(),
+        transaction: transaction,
+        accounts: availableAccounts,
+        categories: categories.where((c) => c['is_active'] == true ||
+            (editing && c['id'].toString() == transaction['category_id']?.toString())).toList(),
       ),
     );
-
     if (result == null || !mounted) return;
-
     final user = supabase.auth.currentUser;
     if (user == null) return;
     setState(() => saving = true);
     try {
-      await supabase.from('transactions').insert({
-        ...result,
-        'user_id': user.id,
-      });
-
+      if (transaction == null) {
+        await supabase.from('transactions').insert({...result, 'user_id': user.id});
+      } else {
+        final changes = <String, dynamic>{
+          for (final key in ['amount', 'category_id', 'description', 'reference']) key: result[key],
+        };
+        final originalDate = DateTime.parse(transaction['transaction_date'].toString()).toLocal();
+        final selectedDate = DateTime.parse(result['transaction_date'].toString()).toLocal();
+        if (originalDate.year != selectedDate.year || originalDate.month != selectedDate.month ||
+            originalDate.day != selectedDate.day) {
+          changes['transaction_date'] = result['transaction_date'];
+        }
+        final updated = await supabase.from('transactions').update(changes)
+            .eq('id', transaction['id']).eq('user_id', user.id)
+            .eq('is_reconciled', false).select('id');
+        if (updated.isEmpty) {
+          throw StateError('No se actualizó: puede estar conciliado, ya no existir o faltar permisos.');
+        }
+      }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Movimiento guardado correctamente.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(editing ? 'Movimiento actualizado.' : 'Movimiento guardado correctamente.'),
+      ));
       await loadData();
     } on PostgrestException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error de base de datos: ${e.message}')),
       );
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('No se pudo guardar: $e')),
       );
     } finally {
@@ -209,9 +246,96 @@ class _TransactionsPageState extends State<TransactionsPage> {
     }
   }
 
+  List<Map<String, dynamic>> get allMovements {
+    final rows = [
+      ...transactions,
+      ...cardPayments.map((payment) {
+        final card = payment['credit_cards'];
+        final name = card is Map ? card['name']?.toString() ?? '' : '';
+        return <String, dynamic>{
+          ...payment,
+          'transaction_type': 'card_payment',
+          'description': name.isEmpty ? 'Pago de tarjeta' : 'Pago de tarjeta: $name',
+          'source': 'credit_card_payment',
+
+        };
+      }),
+      ...debtPayments.where((p) => p['account_id'] != null).map((payment) {
+        final debt = payment['debts'];
+        final name = debt is Map ? debt['description']?.toString() ?? '' : '';
+        return <String, dynamic>{
+          ...payment,
+          'transaction_type': 'debt_payment',
+          'transaction_date': payment['payment_date'],
+          'amount': debtPaymentTotalCents(payment) / 100,
+          'description': name.isEmpty ? 'Abono de deuda' : 'Abono de deuda: $name',
+          'source': 'debt_payment',
+        };
+      }),
+    ];
+    rows.sort((a, b) {
+      final first = DateTime.tryParse('${a['transaction_date']}');
+      final second = DateTime.tryParse('${b['transaction_date']}');
+      if (first == null) return second == null ? 0 : 1;
+      if (second == null) return -1;
+      final byDate = second.compareTo(first);
+      return byDate != 0 ? byDate : a['id'].toString().compareTo(b['id'].toString());
+    });
+    return rows;
+  }
+
+  Future<void> toggleReconciliation(Map<String, dynamic> tx) async {
+    if (saving || loading ||
+        ['credit_card_payment', 'debt_payment'].contains(tx['source'])) return;
+    final reconciled = tx['is_reconciled'] == true;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(reconciled ? 'Quitar conciliación' : 'Conciliar movimiento'),
+        content: Text(reconciled
+            ? 'El movimiento volverá a permitir edición y eliminación.'
+            : 'Confirma que verificaste este movimiento contra tu estado de cuenta. Quedará protegido contra edición y eliminación.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(context, true),
+              child: const Text('Confirmar')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted || saving || loading) return;
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+    setState(() => saving = true);
+    try {
+      final updated = await supabase.from('transactions')
+          .update({'is_reconciled': !reconciled})
+          .eq('id', tx['id']).eq('user_id', user.id)
+          .eq('is_reconciled', reconciled).select('id');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(updated.isEmpty
+            ? 'No se actualizó. Revisa los permisos o si el registro cambió.'
+            : reconciled ? 'Conciliación retirada.' : 'Movimiento conciliado.'),
+      ));
+      await loadData();
+    } on PostgrestException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo actualizar: ${e.message}')),
+      );
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo actualizar: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final visibleTransactions = transactions.where(filter.matches).toList();
+    final movements = allMovements;
+    final visibleTransactions = movements.where(filter.matches).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -277,7 +401,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
                         key: ValueKey(filterVersion), accounts: accounts,
                         onChanged: (value) => setState(() => filter = value),
                       ),
-                      Text('${visibleTransactions.length} de ${transactions.length} movimientos'),
+                      Text('${visibleTransactions.length} de ${movements.length} movimientos'),
                       const SizedBox(height: 12),
                       if (visibleTransactions.isEmpty)
                         const Padding(
@@ -300,7 +424,9 @@ class _TransactionsPageState extends State<TransactionsPage> {
   }
 
   Widget _buildBalanceCards() {
-    final balances = calculateBalances(accounts, transactions);
+    final balances = calculateBalances(
+      accounts, transactions, cardPayments: cardPayments, debtPayments: debtPayments,
+    );
     int nioCents = 0;
     int usdCents = 0;
     for (final account in accounts.where((a) => a['is_active'] == true)) {
@@ -366,7 +492,9 @@ class _TransactionsPageState extends State<TransactionsPage> {
         : '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
     final description = tx['description']?.toString().trim() ?? '';
     final isIncome = type == 'income' || type == 'deposit';
-    final isExpense = type == 'expense' || type == 'withdrawal';
+    final isExpense = ['expense', 'withdrawal', 'card_payment', 'debt_payment'].contains(type);
+    final isExternalPayment = ['credit_card_payment', 'debt_payment'].contains(tx['source']);
+    final isReconciled = tx['is_reconciled'] == true;
 
     return Card(
       child: ListTile(
@@ -377,20 +505,28 @@ class _TransactionsPageState extends State<TransactionsPage> {
             account: accountName(tx['account_id']?.toString()),
             destination: accountName(tx['destination_account_id']?.toString()),
             category: categoryName(tx['category_id']?.toString()),
-            onDelete: () {
+            onEdit: isExternalPayment || isReconciled ? null : () {
+              Navigator.pop(context);
+              addTransaction(tx);
+            },
+            onDelete: isExternalPayment || isReconciled ? null : () {
               Navigator.pop(context);
               deleteTransaction(tx);
             },
+            onReconcile: isExternalPayment ? null : () {
+              Navigator.pop(context);
+              toggleReconciliation(tx);
+            },
           ),
         ),
-        leading: CircleAvatar(
-          child: Icon(
-            isIncome
-                ? Icons.arrow_downward
-                : isExpense
-                    ? Icons.arrow_upward
-                    : Icons.swap_horiz,
-          ),
+        leading: Tooltip(
+          message: isExternalPayment ? 'Pago vinculado'
+              : isReconciled ? 'Conciliado' : 'Pendiente de conciliar',
+          child: CircleAvatar(child: Icon(
+            isReconciled ? Icons.verified_outlined
+                : isIncome ? Icons.arrow_downward
+                : isExpense ? Icons.arrow_upward : Icons.swap_horiz,
+          )),
         ),
         title: Text(
           description.isEmpty ? typeLabel(type) : description,

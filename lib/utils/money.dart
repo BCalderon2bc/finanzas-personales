@@ -7,9 +7,11 @@ int moneyCents(dynamic value) {
 }
 
 Map<String, int> calculateBalances(
-  List<Map<String, dynamic>> accounts,
-  List<Map<String, dynamic>> transactions,
-) {
+    List<Map<String, dynamic>> accounts,
+    List<Map<String, dynamic>> transactions, {
+    List<Map<String, dynamic>> cardPayments = const [],
+    List<Map<String, dynamic>> debtPayments = const [],
+    }) {
   final balances = <String, int>{
     for (final a in accounts) a['id'].toString(): moneyCents(a['opening_balance']),
   };
@@ -41,5 +43,30 @@ Map<String, int> calculateBalances(
       balances[destination!] = balances[destination]! + amount;
     }
   }
+  final currencies = {
+    for (final account in accounts)
+      account['id'].toString(): account['currency'],
+  };
+  for (final payment in cardPayments) {
+    final accountId = payment['account_id']?.toString();
+    if (!balances.containsKey(accountId)) continue;
+    if (currencies[accountId] != payment['currency']) {
+      throw StateError('Un pago de tarjeta tiene una moneda diferente a su cuenta.');
+    }
+    balances[accountId!] = balances[accountId]! - moneyCents(payment['amount']);
+  }
+  for (final payment in debtPayments) {
+    final accountId = payment['account_id']?.toString();
+    if (!balances.containsKey(accountId)) continue;
+    if (currencies[accountId] != payment['currency']) {
+      throw StateError('Un abono de deuda tiene una moneda diferente a su cuenta.');
+    }
+    balances[accountId!] = balances[accountId]! - debtPaymentTotalCents(payment);
+  }
   return balances;
 }
+
+int debtPaymentTotalCents(Map<String, dynamic> payment) =>
+    moneyCents(payment['principal_amount']) +
+        moneyCents(payment['interest_amount']) +
+        moneyCents(payment['fee_amount']);

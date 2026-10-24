@@ -9,11 +9,15 @@ class TransactionDetailsDialog extends StatelessWidget {
     required this.destination,
     required this.category,
     this.onDelete,
+    this.onEdit,
+    this.onReconcile,
   });
 
   final Map<String, dynamic> transaction;
   final String account, destination, category;
   final VoidCallback? onDelete;
+  final VoidCallback? onEdit;
+  final VoidCallback? onReconcile;
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +30,8 @@ class TransactionDetailsDialog extends StatelessWidget {
       'deposit': 'Depósito',
       'withdrawal': 'Retiro',
       'adjustment': 'Ajuste',
+      'card_payment': 'Pago de tarjeta',
+      'debt_payment': 'Abono de deuda',
     };
     final date = DateTime.tryParse('${tx['transaction_date']}')?.toLocal();
     final dateText = date == null
@@ -49,6 +55,9 @@ class TransactionDetailsDialog extends StatelessWidget {
                   style: Theme.of(context).textTheme.headlineSmall),
               const Divider(height: 24),
               _detail('Fecha', dateText),
+              if (onReconcile != null)
+                _detail('Conciliación',
+                    tx['is_reconciled'] == true ? 'Conciliado' : 'Pendiente'),
               _detail(type == 'transfer' ? 'Cuenta de origen' : 'Cuenta', account),
               if (type == 'transfer') _detail('Cuenta de destino', destination),
               _detail('Categoría', category),
@@ -59,6 +68,13 @@ class TransactionDetailsDialog extends StatelessWidget {
         ),
       ),
       actions: [
+        if (onReconcile != null)
+          TextButton.icon(
+            onPressed: onReconcile,
+            icon: const Icon(Icons.fact_check_outlined),
+            label: Text(tx['is_reconciled'] == true
+                ? 'Quitar conciliación' : 'Conciliar'),
+          ),
         if (onDelete != null)
           TextButton.icon(
             onPressed: onDelete,
@@ -70,6 +86,13 @@ class TransactionDetailsDialog extends StatelessWidget {
           ),
         TextButton(onPressed: () => Navigator.pop(context),
             child: const Text('Cerrar')),
+
+        if (onEdit != null)
+          TextButton.icon(
+            onPressed: onEdit,
+            icon: const Icon(Icons.edit_outlined),
+            label: const Text('Editar'),
+          ),
       ],
     );
   }

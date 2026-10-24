@@ -5,10 +5,12 @@ class TransactionFormDialog extends StatefulWidget {
     super.key,
     required this.accounts,
     required this.categories,
+    this.transaction,
   });
 
   final List<Map<String, dynamic>> accounts;
   final List<Map<String, dynamic>> categories;
+  final Map<String, dynamic>? transaction;
 
   @override
   State<TransactionFormDialog> createState() => _TransactionFormDialogState();
@@ -19,6 +21,7 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
   final amountController = TextEditingController();
   final descriptionController = TextEditingController();
   final referenceController = TextEditingController();
+  bool get editing => widget.transaction != null;
 
   String transactionType = 'expense';
   String? accountId;
@@ -29,7 +32,19 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
   @override
   void initState() {
     super.initState();
-    if (widget.accounts.isNotEmpty) accountId = widget.accounts.first['id'].toString();
+    final tx = widget.transaction;
+    if (tx == null) {
+      if (widget.accounts.isNotEmpty) accountId = widget.accounts.first['id'].toString();
+      return;
+    }
+    transactionType = tx['transaction_type'].toString();
+    accountId = tx['account_id'].toString();
+    destinationAccountId = tx['destination_account_id']?.toString();
+    categoryId = tx['category_id']?.toString();
+    amountController.text = tx['amount'].toString();
+    descriptionController.text = tx['description']?.toString() ?? '';
+    referenceController.text = tx['reference']?.toString() ?? '';
+    transactionDate = DateTime.parse(tx['transaction_date'].toString()).toLocal();
   }
 
   @override
@@ -94,7 +109,7 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Nuevo movimiento'),
+      title: Text(editing ? 'Editar movimiento' : 'Nuevo movimiento'),
       content: SizedBox(
         width: 460,
         child: SingleChildScrollView(
@@ -111,7 +126,7 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
                     DropdownMenuItem(value: 'expense', child: Text('Gasto')),
                     DropdownMenuItem(value: 'transfer', child: Text('Transferencia')),
                   ],
-                  onChanged: (value) {
+                  onChanged: editing ? null : (value) {
                     if (value == null) return;
                     setState(() {
                       transactionType = value;
@@ -129,7 +144,7 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
                     value: a['id'].toString(),
                     child: Text('${a['name']} (${a['currency'] == 'USD' ? 'US\$' : 'C\$'})'),
                   )).toList(),
-                  onChanged: (value) => setState(() {
+                  onChanged: editing ? null : (value) => setState(() {
                     accountId = value;
                     destinationAccountId = null;
                   }),
@@ -147,7 +162,7 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
                       value: a['id'].toString(),
                       child: Text(a['name'].toString()),
                     )).toList(),
-                    onChanged: (value) => setState(() => destinationAccountId = value),
+                    onChanged: editing ? null : (value) => setState(() => destinationAccountId = value),
                     validator: (value) => value == null ? 'Selecciona la cuenta destino' : null,
                   ),
                   if (availableDestinations.isEmpty)

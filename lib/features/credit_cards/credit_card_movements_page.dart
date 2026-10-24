@@ -1,0 +1,357 @@
+import 'package:flutter/material.dart';
+import '../../core/supabase_client.dart';
+import '../../utils/money.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'credit_card_movement_dialog.dart';
+import '../../widgets/void_payment_dialog.dart';
+
+class CreditCardMovementsPage extends StatefulWidget {
+  const CreditCardMovementsPage({super.key, required this.cardId});
+  final String cardId;
+  @override
+  State<CreditCardMovementsPage> createState() => _CreditCardMovementsPageState();
+}
+class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
+  List<Map<String, dynamic>> movements = [];
+  String name = '', currency = '', filter = 'all';
+  bool loading = true;
+  String? error;
+  int requestId = 0;
+  bool saving = false;
+
+  static const types = {
+    'purchase': 'Compra', 'payment': 'Pago', 'interest': 'Intereses',
+    'fee': 'Comisión', 'refund': 'Devolución', 'adjustment': 'Ajuste',
+  };
+  int openingBalance = 0;
+
+  String statusFilter = 'valid';
+
+  @override
+  void initState() { super.initState(); loadData(); }
+
+  Future<void> deleteMovement(Map<String, dynamic> tx) async {
+    if (loading || saving ||
+        !['purchase', 'interest', 'fee', 'refund'].contains(tx['transaction_type'])) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar movimiento'),
+        content: const Text(
+          'Se actualizarán la deuda de la tarjeta y los reportes relacionados. Esta acción no se puede deshacer.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(context, true),
+              child: const Text('Eliminar')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted || loading || saving) return;
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+    setState(() => saving = true);
+    try {
+      final deleted = await supabase.from('credit_card_transactions').delete()
+          .eq('id', tx['id']).eq('user_id', user.id)
+          .eq('credit_card_id', widget.cardId)
+          .eq('transaction_type', tx['transaction_type'])
+          .inFilter('transaction_type', ['purchase', 'interest', 'fee', 'refund'])
+          .select('id');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(deleted.isEmpty
+            ? 'No se eliminó. Revisa los permisos o si el registro cambió.'
+            : 'Movimiento eliminado.'),
+      ));
+      await loadData();
+    } on PostgrestException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo eliminar: ${e.message}')),
+      );
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo eliminar: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  Future<void> editMovement(Map<String, dynamic> tx) async {
+    if (loading || saving ||
+        !['purchase', 'interest', 'fee', 'refund'].contains(tx['transaction_type'])) return;
+    setState(() => saving = true);
+    try {
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
+      final categories = <Map<String, dynamic>>[];
+      for (var offset = 0; ; offset += 500) {
+        final result = await supabase.from('categories')
+            .select('id, name, category_type, is_active')
+            .eq('user_id', user.id).order('id').range(offset, offset + 499);
+        final page = List<Map<String, dynamic>>.from(result);
+        categories.addAll(page);
+        if (page.length < 500) break;
+      }
+      final available = categories.where((c) =>
+      (c['category_type'] == 'expense' && c['is_active'] == true) ||
+          c['id'].toString() == tx['category_id']?.toString()).toList()
+        ..sort((a, b) => a['name'].toString().compareTo(b['name'].toString()));
+      if (!mounted) return;
+      final data = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (_) => CreditCardMovementDialog(
+          currency: tx['currency'].toString(),
+          categories: available, movement: tx,
+        ),
+      );
+      if (data == null || !mounted) return;
+      final changes = <String, dynamic>{
+        for (final key in ['amount', 'category_id', 'description', 'reference']) key: data[key],
+      };
+      final originalDate = DateTime.parse(tx['transaction_date'].toString()).toLocal();
+      final selectedDate = DateTime.parse(data['transaction_date'].toString()).toLocal();
+      if (originalDate.year != selectedDate.year || originalDate.month != selectedDate.month ||
+          originalDate.day != selectedDate.day) {
+        changes['transaction_date'] = data['transaction_date'];
+      }
+      final updated = await supabase.from('credit_card_transactions').update(changes)
+          .eq('id', tx['id']).eq('user_id', user.id)
+          .eq('credit_card_id', widget.cardId)
+          .eq('transaction_type', tx['transaction_type']).select('id');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(updated.isEmpty
+            ? 'No se actualizó. Revisa los permisos o si el registro cambió.'
+            : 'Movimiento actualizado.'),
+      ));
+      await loadData();
+    } on PostgrestException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo guardar: ${e.message}')),
+      );
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo guardar: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  Future<void> loadData() async {
+    final request = ++requestId;
+    setState(() { loading = true; error = null; });
+    try {
+      final user = supabase.auth.currentUser;
+      if (user == null) throw Exception('Debes iniciar sesión nuevamente.');
+      final card = await supabase.from('credit_cards').select('name, currency, opening_balance')
+          .eq('id', widget.cardId).eq('user_id', user.id).single();
+      final rows = <Map<String, dynamic>>[];
+      for (var offset = 0; ; offset += 500) {
+        final result = await supabase.from('credit_card_transactions')
+            .select('id, transaction_type, amount, currency, transaction_date, '
+            'description, reference, account_id, category_id, is_voided, void_reason, voided_at, accounts(name), categories(name)')
+            .eq('credit_card_id', widget.cardId).eq('user_id', user.id)
+            .order('transaction_date', ascending: false).order('id')
+            .range(offset, offset + 499);
+        final page = List<Map<String, dynamic>>.from(result);
+        rows.addAll(page);
+        if (page.length < 500) break;
+      }
+      if (!mounted || request != requestId) return;
+      setState(() {
+        name = card['name'].toString();
+        currency = card['currency'].toString();
+        movements = rows;
+        loading = false;
+        openingBalance = moneyCents(card['opening_balance'] ?? 0);
+      });
+    } catch (e) {
+      if (mounted && request == requestId) {
+        setState(() { error = e.toString(); loading = false; });
+      }
+    }
+  }
+
+  Future<void> voidPayment(Map<String, dynamic> tx) async {
+    if (loading || saving || tx['transaction_type'] != 'payment' || tx['is_voided'] == true) return;
+    final reason = await showDialog<String>(
+      context: context, builder: (_) => const VoidPaymentDialog(),
+    );
+    if (reason == null || !mounted || loading || saving) return;
+    setState(() => saving = true);
+    try {
+      await supabase.rpc('void_credit_card_payment', params: {
+        'p_card_id': widget.cardId,
+        'p_payment_id': tx['id'],
+        'p_reason': reason,
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pago anulado.')),
+      );
+      await loadData();
+    } on PostgrestException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo anular: ${e.message}')),
+      );
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo anular: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  String relatedName(dynamic value) =>
+      value is Map ? value['name']?.toString() ?? '' : '';
+
+  Widget movementCard(Map<String, dynamic> tx) {
+    final type = tx['transaction_type'].toString();
+    final increases = ['purchase', 'interest', 'fee'].contains(type);
+    final decreases = ['payment', 'refund'].contains(type);
+    final date = DateTime.tryParse('${tx['transaction_date']}')?.toLocal();
+    final dateText = date == null ? 'Fecha no disponible'
+        : '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+    final txCurrency = tx['currency'].toString();
+    final symbol = txCurrency == 'USD' ? 'US\$' : 'C\$';
+    final amount = moneyCents(tx['amount']) / 100;
+    final description = tx['description']?.toString().trim() ?? '';
+    final reference = tx['reference']?.toString().trim() ?? '';
+    final account = relatedName(tx['accounts']);
+    final category = relatedName(tx['categories']);
+
+    final voided = tx['is_voided'] == true;
+    final voidedAt = DateTime.tryParse('${tx['voided_at']}')?.toLocal();
+
+    return Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: [
+        Expanded(child: Text('${types[type] ?? type}${voided ? ' · Anulado' : ''}',
+            style: Theme.of(context).textTheme.titleMedium)),
+        const SizedBox(width: 8),
+        Flexible(child: Text(
+          '${voided ? '' : increases ? '+' : decreases ? '−' : ''}$symbol ${amount.toStringAsFixed(2)}',
+          textAlign: TextAlign.right,
+          style: TextStyle(fontWeight: FontWeight.bold,
+              color: increases ? Theme.of(context).colorScheme.error
+                  : decreases ? Colors.green : null),
+        )),
+        if (['purchase', 'interest', 'fee', 'refund'].contains(type))
+          Wrap(alignment: WrapAlignment.end, spacing: 8, children: [
+            TextButton.icon(
+              onPressed: saving ? null : () => editMovement(tx),
+              icon: const Icon(Icons.edit_outlined),
+              label: const Text('Editar'),
+            ),
+            TextButton.icon(
+              onPressed: saving ? null : () => deleteMovement(tx),
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Eliminar'),
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.error,
+              ),
+            ),
+          ]),
+
+      ]),
+      Text(dateText),
+      if (description.isNotEmpty) Text(description),
+      if (type == 'payment') Text('Cuenta: ${account.isEmpty ? 'No disponible' : account}'),
+      if (category.isNotEmpty) Text('Categoría: $category'),
+      if (reference.isNotEmpty) ...[
+        const SizedBox(height: 6),
+        SelectableText('Referencia: $reference'),
+      ],
+      if (type == 'adjustment') const Text('El efecto de este ajuste sobre la deuda está pendiente de definir.'),
+      if (txCurrency != currency)
+        Text('La moneda no coincide con la tarjeta.',
+            style: TextStyle(color: Theme.of(context).colorScheme.error)),
+      if (voided)
+        Text('Sin efecto en saldos. Motivo: ${tx['void_reason'] ?? 'No especificado'}'),
+      if (voided && voidedAt != null)
+        Text('Anulado el ${voidedAt.day.toString().padLeft(2, '0')}/'
+            '${voidedAt.month.toString().padLeft(2, '0')}/${voidedAt.year} '
+            '${voidedAt.hour.toString().padLeft(2, '0')}:'
+            '${voidedAt.minute.toString().padLeft(2, '0')}'),
+      if (type == 'payment' && !voided)
+        Align(alignment: Alignment.centerRight, child: TextButton.icon(
+          onPressed: saving ? null : () => voidPayment(tx),
+          icon: const Icon(Icons.cancel_outlined),
+          label: const Text('Anular pago'),
+          style: TextButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.error,
+          ),
+        )),
+    ],
+    )));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = movements.where((tx) {
+      if (filter != 'all' && tx['transaction_type'] != filter) return false;
+      final voided = tx['is_voided'] == true;
+      if (statusFilter == 'valid' && voided) return false;
+      if (statusFilter == 'voided' && !voided) return false;
+      return true;
+    }).toList();
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Movimientos de tarjeta'), actions: [
+        IconButton(tooltip: 'Actualizar', onPressed: loading || saving ? null : loadData,
+            icon: const Icon(Icons.refresh)),
+      ]),
+      body: loading ? const Center(child: CircularProgressIndicator())
+          : error != null ? Center(child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('No se pudo cargar el historial.'),
+          SelectableText(error!),
+          TextButton(onPressed: loadData, child: const Text('Reintentar')),
+        ]),
+      ))
+          : RefreshIndicator(onRefresh: loadData, child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16), children: [
+        Text(name, style: Theme.of(context).textTheme.headlineSmall),
+        Text('Deuda inicial: ${currency == 'USD' ? 'US\$' : 'C\$'} ${(openingBalance / 100).toStringAsFixed(2)}'),
+        const Padding(padding: EdgeInsets.symmetric(vertical: 12),
+            child: Text('+ aumenta la deuda · − reduce la deuda')),
+        DropdownButtonFormField<String>(
+          value: statusFilter,
+          decoration: const InputDecoration(labelText: 'Estado del registro'),
+          items: const [
+            DropdownMenuItem(value: 'valid', child: Text('Vigentes')),
+            DropdownMenuItem(value: 'voided', child: Text('Anulados')),
+            DropdownMenuItem(value: 'all', child: Text('Todos')),
+          ],
+          onChanged: (value) {
+            if (value != null) setState(() => statusFilter = value);
+          },
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          value: filter, decoration: const InputDecoration(labelText: 'Tipo de movimiento'),
+          items: [
+            const DropdownMenuItem(value: 'all', child: Text('Todos')),
+            ...types.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))),
+          ],
+          onChanged: (value) {
+            if (value != null) setState(() => filter = value);
+          },
+        ),
+        const SizedBox(height: 12),
+        Text('${visible.length} de ${movements.length} movimientos'),
+        if (visible.isEmpty) const Padding(padding: EdgeInsets.all(24),
+            child: Text('No hay movimientos para este filtro.', textAlign: TextAlign.center)),
+        ...visible.map(movementCard),
+      ],
+      )),
+    );
+  }
+}

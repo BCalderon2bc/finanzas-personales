@@ -4,6 +4,8 @@ import '../../core/supabase_client.dart';
 import '../../data/transaction_repository.dart';
 import '../../utils/money.dart';
 import 'account_form_dialog.dart';
+import '../../data/credit_card_repository.dart';
+import '../../data/debt_payment_repository.dart';
 
 class AccountsPage extends StatefulWidget {
   const AccountsPage({super.key});
@@ -52,8 +54,11 @@ class _AccountsPageState extends State<AccountsPage> {
           .order('created_at', ascending: false);
 
       final rows = await loadUserTransactions(user.id);
+      final payments = await loadUserCardPayments(user.id);
+      final debtPayments = await loadUserDebtPayments(user.id);
       final balances = calculateBalances(
         List<Map<String, dynamic>>.from(result), rows,
+        cardPayments: payments, debtPayments: debtPayments,
       );
       if (!mounted) return;
 

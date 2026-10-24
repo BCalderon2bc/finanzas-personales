@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'core/app_theme.dart';
 import 'features/auth/auth_gate.dart';
+import 'core/app_theme.dart';
 
 class FinanzasApp extends StatelessWidget {
   const FinanzasApp({super.key});
@@ -10,16 +11,7 @@ class FinanzasApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Mis Finanzas',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: primaryColor),
-        useMaterial3: true,
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(),
-        ),
-        cardTheme: const CardThemeData(
-          clipBehavior: Clip.antiAlias,
-        ),
-      ),
+      theme: createAppTheme(),
       home: const AuthGate(),
     );
   }

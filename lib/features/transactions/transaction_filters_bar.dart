@@ -13,15 +13,27 @@ class _TransactionFiltersBarState extends State<TransactionFiltersBar> {
   String type = 'all';
   String? accountId;
   DateTimeRange? range;
+  String reconciliation = 'all';
+
   @override
   void dispose() { searchController.dispose(); super.dispose(); }
-  TransactionFilter get filter => TransactionFilter(type: type, accountId: accountId,
-    query: searchController.text, start: range?.start, end: range?.end);
+
+  TransactionFilter get filter => TransactionFilter(
+    type: type, accountId: accountId, query: searchController.text,
+    start: range?.start, end: range?.end,
+    reconciled: reconciliation == 'all' ? null : reconciliation == 'reconciled',
+  );
+
   void notify() => widget.onChanged(filter);
+
   void clear() {
-    setState(() { type = 'all'; accountId = null; range = null; searchController.clear(); });
+    setState(() {
+      type = 'all'; accountId = null; range = null;
+      reconciliation = 'all'; searchController.clear();
+    });
     notify();
   }
+
   Future<void> chooseDates() async {
     final selected = await showDateRangePicker(context: context,
       firstDate: DateTime(2000), lastDate: DateTime(2100, 12, 31), initialDateRange: range);
@@ -46,6 +58,8 @@ class _TransactionFiltersBarState extends State<TransactionFiltersBar> {
         DropdownMenuItem(value: 'transfer', child: Text('Transferencias')),
         DropdownMenuItem(value: 'deposit', child: Text('Depósitos')),
         DropdownMenuItem(value: 'withdrawal', child: Text('Retiros')),
+        DropdownMenuItem(value: 'card_payment', child: Text('Pagos de tarjeta')),
+        DropdownMenuItem(value: 'debt_payment', child: Text('Abonos de deudas')),
       ],
       onChanged: (value) { if (value != null) { setState(() => type = value); notify(); } },
     ),
@@ -59,6 +73,24 @@ class _TransactionFiltersBarState extends State<TransactionFiltersBar> {
           child: Text('${a['name']} (${a['currency']})${a['is_active'] == true ? '' : ' · Inactiva'}', overflow: TextOverflow.ellipsis))),
       ],
       onChanged: (value) { setState(() => accountId = value == 'all' ? null : value); notify(); },
+    ),
+    const SizedBox(height: 8),
+
+    DropdownButtonFormField<String>(
+      key: ValueKey('reconciliation-$reconciliation'),
+      value: reconciliation, isExpanded: true,
+      decoration: const InputDecoration(labelText: 'Conciliación'),
+      items: const [
+        DropdownMenuItem(value: 'all', child: Text('Todos los estados')),
+        DropdownMenuItem(value: 'pending', child: Text('Pendientes de conciliar')),
+        DropdownMenuItem(value: 'reconciled', child: Text('Conciliados')),
+      ],
+      onChanged: (value) {
+        if (value != null) {
+          setState(() => reconciliation = value);
+          notify();
+        }
+      },
     ),
     const SizedBox(height: 8),
     Wrap(spacing: 8, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
