@@ -5,6 +5,9 @@ import '../../data/transaction_repository.dart';
 import '../../utils/money.dart';
 import '../categories/categories_page.dart';
 import 'transaction_form_dialog.dart';
+import 'transaction_filter.dart';
+import 'transaction_filters_bar.dart';
+import 'transaction_details_dialog.dart';
 
 class TransactionsPage extends StatefulWidget {
   const TransactionsPage({super.key});
@@ -17,7 +20,8 @@ class _TransactionsPageState extends State<TransactionsPage> {
   bool loading = true;
   bool saving = false;
   String? error;
-  String filter = 'all';
+  TransactionFilter filter = const TransactionFilter();
+  int filterVersion = 0;
 
   List<Map<String, dynamic>> accounts = [];
   List<Map<String, dynamic>> categories = [];
@@ -33,6 +37,8 @@ class _TransactionsPageState extends State<TransactionsPage> {
     setState(() {
       loading = true;
       error = null;
+      filter = const TransactionFilter();
+      filterVersion++;
     });
 
     try {
@@ -156,12 +162,56 @@ class _TransactionsPageState extends State<TransactionsPage> {
     }
   }
 
+  Future<void> deleteTransaction(Map<String, dynamic> tx) async {
+    if (saving || loading) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar movimiento'),
+        content: const Text(
+          '¿Eliminar este movimiento? Se actualizarán los saldos de las cuentas involucradas. Esta acción no se puede deshacer.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(context, true),
+              child: const Text('Eliminar')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted || saving || loading) return;
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+    setState(() => saving = true);
+    try {
+      final deleted = await supabase.from('transactions').delete()
+          .eq('id', tx['id'])
+          .eq('user_id', user.id)
+          .eq('is_reconciled', false)
+          .select('id');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(deleted.isEmpty
+            ? 'No se eliminó: puede estar conciliado, ya no existir o faltar permisos.'
+            : 'Movimiento eliminado.'),
+      ));
+      await loadData();
+    } on PostgrestException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo eliminar: ${e.message}')),
+      );
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo eliminar: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final visibleTransactions = transactions.where((tx) {
-      if (filter == 'all') return true;
-      return tx['transaction_type'] == filter;
-    }).toList();
+    final visibleTransactions = transactions.where(filter.matches).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -218,26 +268,16 @@ class _TransactionsPageState extends State<TransactionsPage> {
               : RefreshIndicator(
                   onRefresh: loadData,
                   child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
                     children: [
                       _buildBalanceCards(),
                       const SizedBox(height: 16),
-                      DropdownButtonFormField<String>(
-                        value: filter,
-                        decoration: const InputDecoration(
-                          labelText: 'Filtrar movimientos',
-                          border: OutlineInputBorder(),
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: 'all', child: Text('Todos')),
-                          DropdownMenuItem(value: 'income', child: Text('Ingresos')),
-                          DropdownMenuItem(value: 'expense', child: Text('Gastos')),
-                          DropdownMenuItem(value: 'transfer', child: Text('Transferencias')),
-                        ],
-                        onChanged: (value) {
-                          if (value != null) setState(() => filter = value);
-                        },
+                      TransactionFiltersBar(
+                        key: ValueKey(filterVersion), accounts: accounts,
+                        onChanged: (value) => setState(() => filter = value),
                       ),
+                      Text('${visibleTransactions.length} de ${transactions.length} movimientos'),
                       const SizedBox(height: 12),
                       if (visibleTransactions.isEmpty)
                         const Padding(
@@ -246,8 +286,8 @@ class _TransactionsPageState extends State<TransactionsPage> {
                             children: [
                               Icon(Icons.receipt_long_outlined, size: 48),
                               SizedBox(height: 12),
-                              Text('Todavía no hay movimientos.'),
-                              Text('Pulsa “Nuevo movimiento” para comenzar.'),
+                              Text('No hay movimientos para mostrar.'),
+                              Text('Revisa los filtros o registra un movimiento.'),
                             ],
                           ),
                         )
@@ -330,6 +370,19 @@ class _TransactionsPageState extends State<TransactionsPage> {
 
     return Card(
       child: ListTile(
+        onTap: () => showDialog<void>(
+          context: context,
+          builder: (_) => TransactionDetailsDialog(
+            transaction: tx,
+            account: accountName(tx['account_id']?.toString()),
+            destination: accountName(tx['destination_account_id']?.toString()),
+            category: categoryName(tx['category_id']?.toString()),
+            onDelete: () {
+              Navigator.pop(context);
+              deleteTransaction(tx);
+            },
+          ),
+        ),
         leading: CircleAvatar(
           child: Icon(
             isIncome

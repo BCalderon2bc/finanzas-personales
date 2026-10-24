@@ -72,12 +72,12 @@ class _AccountsPageState extends State<AccountsPage> {
     }
   }
 
-  Future<void> addAccount() async {
-    if (saving) return;
+  Future<void> addAccount([Map<String, dynamic>? account]) async {
+    if (saving || loading) return;
 
     final data = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (_) => const AccountFormDialog(),
+      builder: (_) => AccountFormDialog(account: account),
     );
 
     if (data == null || !mounted) return;
@@ -92,14 +92,19 @@ class _AccountsPageState extends State<AccountsPage> {
     setState(() => saving = true);
 
     try {
-      await supabase.from('accounts').insert({
-        ...data,
-        'user_id': user.id,
-      });
+      if (account == null) {
+        await supabase.from('accounts').insert({...data, 'user_id': user.id});
+      } else {
+        final changes = <String, dynamic>{
+          for (final key in ['name', 'institution_id', 'account_reference', 'notes']) key: data[key],
+        };
+        await supabase.from('accounts').update(changes).eq('id', account['id'])
+            .eq('user_id', user.id).select('id').single();
+      }
 
       if (!mounted) return;
 
-      showMessage('Cuenta guardada correctamente.');
+      showMessage(account == null ? 'Cuenta creada correctamente.' : 'Cuenta actualizada correctamente.');
 
       await loadAccounts();
     } on PostgrestException catch (e) {
@@ -110,6 +115,36 @@ class _AccountsPageState extends State<AccountsPage> {
       if (!mounted) return;
 
       showMessage('No se pudo guardar la cuenta: $e');
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  Future<void> toggleAccount(Map<String, dynamic> account) async {
+    if (saving || loading) return;
+    final active = account['is_active'] != true;
+    if (!active) {
+      final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Desactivar cuenta'),
+        content: Text('¿Desactivar "${account['name']}"? Se conserva su historial. No aparecerá para nuevos movimientos ni en los totales de cuentas activas.'),
+        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Desactivar'))],
+      ));
+      if (confirmed != true || !mounted) return;
+    }
+    final user = supabase.auth.currentUser;
+    if (user == null) { showMessage('Debes iniciar sesión nuevamente.'); return; }
+    setState(() => saving = true);
+    try {
+      await supabase.from('accounts').update({'is_active': active}).eq('id', account['id'])
+          .eq('user_id', user.id).select('id').single();
+      if (!mounted) return;
+      showMessage(active ? 'Cuenta activada.' : 'Cuenta desactivada.');
+      await loadAccounts();
+    } on PostgrestException catch (e) {
+      if (mounted) showMessage('No se pudo actualizar: ${e.message}');
+    } catch (e) {
+      if (mounted) showMessage('No se pudo actualizar: $e');
     } finally {
       if (mounted) setState(() => saving = false);
     }
@@ -170,14 +205,14 @@ class _AccountsPageState extends State<AccountsPage> {
         title: const Text('Mis cuentas'),
         actions: [
           IconButton(
-            onPressed: loading ? null : loadAccounts,
+            onPressed: loading || saving ? null : loadAccounts,
             tooltip: 'Actualizar',
             icon: const Icon(Icons.refresh),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: saving ? null : addAccount,
+        onPressed: saving || loading ? null : () => addAccount(),
         icon: saving
             ? const SizedBox(
           width: 20,
@@ -252,7 +287,7 @@ class _AccountsPageState extends State<AccountsPage> {
               ),
               const SizedBox(height: 20),
               FilledButton.icon(
-                onPressed: saving ? null : addAccount,
+                onPressed: saving || loading ? null : () => addAccount(),
                 icon: const Icon(Icons.add),
                 label: const Text('Crear primera cuenta'),
               ),
@@ -290,6 +325,17 @@ class _AccountsPageState extends State<AccountsPage> {
 
           return Card(
             child: ListTile(
+              onTap: saving ? null : () => addAccount(account),
+              trailing: PopupMenuButton<String>(
+                enabled: !saving, tooltip: 'Opciones de la cuenta',
+                onSelected: (value) {
+                  if (value == 'edit') { addAccount(account); } else { toggleAccount(account); }
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(value: 'edit', child: Text('Editar')),
+                  PopupMenuItem(value: 'toggle', child: Text(isActive ? 'Desactivar' : 'Activar')),
+                ],
+              ),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 8,
@@ -308,6 +354,9 @@ class _AccountsPageState extends State<AccountsPage> {
                   if (institutionName != null)
                     Text(institutionName),
                   Text(isActive ? 'Activa' : 'Inactiva'),
+                  if ((account['account_reference']?.toString() ?? '').isNotEmpty)
+                    Text('Referencia: ${account['account_reference']}'),
+                  if ((account['notes']?.toString() ?? '').isNotEmpty) Text(account['notes'].toString()),
                   Text('Saldo inicial: $symbol $balance'),
                   Text(
                     'Saldo actual: $symbol '
