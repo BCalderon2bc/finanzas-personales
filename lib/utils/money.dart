@@ -1,0 +1,45 @@
+int moneyCents(dynamic value) {
+  final amount = num.tryParse('$value');
+  if (amount == null || !amount.isFinite) {
+    throw FormatException('Monto inválido: $value');
+  }
+  return (amount * 100).round();
+}
+
+Map<String, int> calculateBalances(
+  List<Map<String, dynamic>> accounts,
+  List<Map<String, dynamic>> transactions,
+) {
+  final balances = <String, int>{
+    for (final a in accounts) a['id'].toString(): moneyCents(a['opening_balance']),
+  };
+  for (final tx in transactions) {
+    final type = tx['transaction_type'];
+    // El esquema no indica la dirección de un ajuste; no inventar su efecto.
+    if (type == 'adjustment') {
+      throw StateError('Hay ajustes registrados. Debemos definir su efecto antes de calcular el saldo.');
+    }
+    final origin = tx['account_id'].toString();
+    final destination = tx['destination_account_id']?.toString();
+    final amount = moneyCents(tx['amount']);
+    if (balances.containsKey(origin)) {
+      switch (type) {
+        case 'income':
+        case 'deposit':
+          balances[origin] = balances[origin]! + amount;
+          break;
+        case 'expense':
+        case 'withdrawal':
+        case 'transfer':
+          balances[origin] = balances[origin]! - amount;
+          break;
+        default:
+          throw StateError('Tipo de movimiento desconocido: $type');
+      }
+    }
+    if (type == 'transfer' && balances.containsKey(destination)) {
+      balances[destination!] = balances[destination]! + amount;
+    }
+  }
+  return balances;
+}
