@@ -7,6 +7,8 @@ import 'credit_card_movement_dialog.dart';
 import 'credit_card_payment_dialog.dart';
 import 'credit_card_movements_page.dart';
 import 'credit_cards_summary.dart';
+import 'credit_card_face.dart';
+import 'credit_card_appearance_dialog.dart';
 
 class CreditCardsPage extends StatefulWidget {
   const CreditCardsPage({super.key});
@@ -129,7 +131,10 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
       final user = supabase.auth.currentUser;
       if (user == null) throw Exception('Debes iniciar sesión nuevamente.');
       final cardRows = await readRows('credit_cards',
-          'id, name, card_reference, currency, credit_limit, opening_balance, closing_day, payment_day, is_active', user.id);
+          'id, name, card_reference, currency, credit_limit, opening_balance, '
+              'closing_day, payment_day, is_active, institution_id, network, card_tier, '
+              'financial_institutions(name, code)', user.id);
+
       final transactionRows = await readRows('credit_card_transactions',
           'id, credit_card_id, transaction_type, amount, currency, is_voided', user.id);
       if (!mounted || request != requestId) return;
@@ -204,20 +209,39 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
 
   Future<void> addCard([Map<String, dynamic>? card]) async {
     if (loading || saving) return;
-    final data = await showDialog<Map<String, dynamic>>(
-      context: context, builder: (_) => CreditCardFormDialog(card: card),
-    );
-    if (data == null || !mounted) return;
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
     setState(() => saving = true);
     try {
+      final user = supabase.auth.currentUser;
+      if (user == null) throw StateError('Debes iniciar sesión nuevamente.');
+      final rows = <Map<String, dynamic>>[];
+      for (var offset = 0; ; offset += 500) {
+        final result = await supabase.from('financial_institutions')
+            .select('id, name, is_active').order('id').range(offset, offset + 499);
+        final page = List<Map<String, dynamic>>.from(result);
+        rows.addAll(page);
+        if (page.length < 500) break;
+      }
+      final institutions = rows.where((bank) =>
+      bank['is_active'] == true || bank['id'] == card?['institution_id']).toList()
+        ..sort((a, b) => a['name'].toString().compareTo(b['name'].toString()));
+      if (!mounted) return;
+      final data = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (_) => CreditCardFormDialog(
+            card: card, institutions: institutions),
+      );
+      if (data == null || !mounted) return;
+      if (supabase.auth.currentUser?.id != user.id) {
+        throw StateError('La sesión cambió. Abre nuevamente el formulario.');
+      }
       if (card == null) {
         await supabase.from('credit_cards').insert({...data, 'user_id': user.id});
       } else {
         final changes = <String, dynamic>{
-          for (final key in ['name', 'card_reference', 'credit_limit', 'closing_day', 'payment_day'])
-            key: data[key],
+          for (final key in [
+            'name', 'card_reference', 'credit_limit', 'closing_day',
+            'payment_day', 'institution_id', 'network', 'card_tier',
+          ]) key: data[key],
         };
         await supabase.from('credit_cards').update(changes)
             .eq('id', card['id']).eq('user_id', user.id).select('id').single();
@@ -233,75 +257,208 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
       if (mounted) setState(() => saving = false);
     }
   }
-
   Widget cardTile(Map<String, dynamic> card) {
     final currency = card['currency'].toString();
     final limit = moneyCents(card['credit_limit']);
     final balance = balanceFor(card);
-    final reference = card['card_reference']?.toString().trim() ?? '';
-    final available = balance == null ? null
-        : (limit - (balance > 0 ? balance : 0)).clamp(0, limit).toInt();
-    return Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Row(children: [
-        Expanded(child: Text(card['name'].toString(),
-            style: Theme.of(context).textTheme.titleMedium)),
-        IconButton(
-          tooltip: 'Editar tarjeta',
-          onPressed: saving ? null : () => addCard(card),
-          icon: const Icon(Icons.edit_outlined),
-        ),
-        IconButton(
-          tooltip: card['is_active'] == true ? 'Desactivar tarjeta' : 'Activar tarjeta',
-          onPressed: saving ? null : () => toggleCard(card),
-          icon: Icon(card['is_active'] == true
-              ? Icons.pause_circle_outline : Icons.play_circle_outline),
-        ),
-      ]),
-      if (reference.isNotEmpty) Text('Referencia: $reference'),
-      Text(card['is_active'] == true ? 'Activa' : 'Inactiva'),
-      const Divider(height: 20),
-      Text('Límite: ${money(limit, currency)}'),
-      Text('Deuda inicial: ${money(moneyCents(card['opening_balance'] ?? 0), currency)}'),
-      if (balance == null)
-        const Text('Saldo no disponible: revisa ajustes, tipos de movimiento o monedas.')
-      else ...[
-        Text(balance < 0
-            ? 'Saldo a favor registrado: ${money(-balance, currency)}'
-            : 'Deuda registrada: ${money(balance, currency)}',
-            style: const TextStyle(fontWeight: FontWeight.bold)),
-        Text('Disponible según registros: ${money(available!, currency)}'),
-        if (balance > limit)
-          Text('Exceso del límite: ${money(balance - limit, currency)}',
-              style: TextStyle(color: Theme.of(context).colorScheme.error)),
-      ],
-      const SizedBox(height: 8),
-      if (card['closing_day'] != null) Text('Día de corte: ${card['closing_day']}'),
-      if (card['payment_day'] != null) Text('Día de pago: ${card['payment_day']}'),
-      Align(alignment: Alignment.centerRight, child: TextButton.icon(
-        icon: const Icon(Icons.history),
-        label: const Text('Ver movimientos'),
-        onPressed: saving ? null : () async {
-          await Navigator.push(context, MaterialPageRoute<void>(
-            builder: (_) => CreditCardMovementsPage(cardId: card['id'].toString()),
-          ));
-          if (mounted) await loadData();
-        },
-      )),
-      if (card['is_active'] == true)
-        Align(alignment: Alignment.centerRight, child: TextButton.icon(
-          onPressed: saving ? null : () => addMovement(card),
-          icon: const Icon(Icons.add_card),
-          label: const Text('Registrar movimiento'),
-        )),
+    final debt = balance == null ? null : balance > 0 ? balance : 0;
+    final available = debt == null ? null : (limit - debt).clamp(0, limit).toInt();
+    final ratio = debt == null || limit <= 0 ? null : debt / limit;
+    final exceeded = debt != null && debt > limit;
+    final color = exceeded ? const Color(0xFFB42318)
+        : ratio != null && ratio >= 0.8 ? const Color(0xFFB45309)
+        : const Color(0xFF2563EB);
+    final active = card['is_active'] == true;
 
-      Align(alignment: Alignment.centerRight, child: TextButton.icon(
-        onPressed: saving ? null : () => payCard(card),
-        icon: const Icon(Icons.payments_outlined),
-        label: const Text('Pagar tarjeta'),
-      )),
-    ],
-    )));
+    Widget detail(String label, String value) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(children: [
+        Expanded(child: Text(label,
+            style: const TextStyle(color: Color(0xFF64748B), fontSize: 13))),
+        const SizedBox(width: 12),
+        Flexible(child: Text(value, textAlign: TextAlign.right,
+            style: const TextStyle(fontWeight: FontWeight.w600))),
+      ]),
+    );
+
+    final summary = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(balance != null && balance < 0 ? 'SALDO A FAVOR' : 'DEUDA REGISTRADA',
+            style: const TextStyle(color: Color(0xFF64748B),
+                fontSize: 11, letterSpacing: 1.2, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        FittedBox(
+          fit: BoxFit.scaleDown, alignment: Alignment.centerLeft,
+          child: Text(balance == null ? 'Por revisar'
+              : money(balance < 0 ? -balance : balance, currency),
+              style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800,
+                  letterSpacing: -1,
+                  color: balance != null && balance < 0
+                      ? const Color(0xFF087F5B) : const Color(0xFF172033))),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            detail('Disponible según registros',
+                available == null ? 'Por revisar' : money(available, currency)),
+            detail('Límite de crédito', money(limit, currency)),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: debt == null ? 0
+                    : limit > 0 ? (debt / limit).clamp(0.0, 1.0).toDouble()
+                    : debt > 0 ? 1 : 0,
+                minHeight: 8, color: color,
+                backgroundColor: const Color(0xFFE2E8F0),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(balance == null ? 'Saldo pendiente de revisión'
+                : ratio == null ? 'Sin límite asignado'
+                : '${(ratio * 100).toStringAsFixed(0)}% del límite utilizado',
+                style: TextStyle(color: color, fontSize: 12,
+                    fontWeight: FontWeight.w600)),
+            if (exceeded) Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text('Exceso: ${money(debt - limit, currency)}',
+                    style: const TextStyle(color: Color(0xFFB42318), fontSize: 12))),
+          ]),
+        ),
+        const SizedBox(height: 12),
+        detail('Deuda inicial',
+            money(moneyCents(card['opening_balance'] ?? 0), currency)),
+        detail('Día de corte', card['closing_day']?.toString() ?? 'Sin definir'),
+        detail('Día de pago', card['payment_day']?.toString() ?? 'Sin definir'),
+        if (balance == null)
+          const Text('Revisa las monedas o ajustes de los movimientos.',
+              style: TextStyle(color: Color(0xFFB42318), fontSize: 12)),
+      ],
+    );
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 20),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: Color(0xFFE2E8F0))),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            Expanded(child: Text(card['name'].toString(),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: active ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(active ? 'Activa' : 'Inactiva',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                      color: active ? const Color(0xFF087F5B) : const Color(0xFF64748B))),
+            ),
+            PopupMenuButton<String>(
+              enabled: !saving,
+              tooltip: 'Opciones',
+              onSelected: (value) {
+                if (value == 'appearance') customizeCard(card);
+                if (value == 'edit') addCard(card);
+                if (value == 'toggle') toggleCard(card);
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem(value: 'appearance', child: Text('Banco y diseño')),
+                const PopupMenuItem(value: 'edit', child: Text('Editar tarjeta')),
+                PopupMenuItem(value: 'toggle',
+                    child: Text(active ? 'Desactivar tarjeta' : 'Activar tarjeta')),
+              ],
+            ),
+          ]),
+          const SizedBox(height: 16),
+          LayoutBuilder(builder: (context, box) {
+            if (box.maxWidth < 740) {
+              return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Center(child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 400),
+                    child: CreditCardFace(card: card))),
+                const SizedBox(height: 24),
+                summary,
+              ]);
+            }
+            return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              SizedBox(width: 350, child: CreditCardFace(card: card)),
+              const SizedBox(width: 28),
+              Expanded(child: summary),
+            ]);
+          }),
+          const Divider(height: 32),
+          Wrap(alignment: WrapAlignment.end, spacing: 8, runSpacing: 10, children: [
+            TextButton.icon(
+              onPressed: saving ? null : () async {
+                await Navigator.push(context, MaterialPageRoute<void>(
+                    builder: (_) => CreditCardMovementsPage(cardId: card['id'].toString())));
+                if (mounted) await loadData();
+              },
+              icon: const Icon(Icons.history_rounded),
+              label: const Text('Historial'),
+            ),
+            if (active) OutlinedButton.icon(
+              onPressed: saving ? null : () => addMovement(card),
+              icon: const Icon(Icons.add_card_outlined),
+              label: const Text('Movimiento'),
+            ),
+            FilledButton.icon(
+              onPressed: saving ? null : () => payCard(card),
+              icon: const Icon(Icons.payments_outlined),
+              label: const Text('Pagar tarjeta'),
+            ),
+          ]),
+        ]),
+      ),
+    );
+  }
+
+  Future<void> customizeCard(Map<String, dynamic> card) async {
+    if (loading || saving) return;
+    setState(() => saving = true);
+    try {
+      final user = supabase.auth.currentUser;
+      if (user == null) throw StateError('Debes iniciar sesión nuevamente.');
+      final rows = <Map<String, dynamic>>[];
+      for (var offset = 0; ; offset += 500) {
+        final result = await supabase.from('financial_institutions')
+            .select('id, name, is_active').order('id').range(offset, offset + 499);
+        final page = List<Map<String, dynamic>>.from(result);
+        rows.addAll(page);
+        if (page.length < 500) break;
+      }
+      final institutions = rows.where((b) =>
+      b['is_active'] == true || b['id'] == card['institution_id']).toList()
+        ..sort((a, b) => a['name'].toString().compareTo(b['name'].toString()));
+      if (!mounted) return;
+      final data = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (_) => CreditCardAppearanceDialog(
+            card: card, institutions: institutions),
+      );
+      if (data == null || !mounted) return;
+      await supabase.from('credit_cards').update(data)
+          .eq('id', card['id']).eq('user_id', user.id).select('id').single();
+      if (!mounted) return;
+      message('Diseño actualizado.');
+      await loadData();
+    } catch (e) {
+      if (mounted) message('No se pudo actualizar: $e');
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
   }
 
   @override

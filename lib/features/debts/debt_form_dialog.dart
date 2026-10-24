@@ -46,7 +46,7 @@ class _DebtFormDialogState extends State<DebtFormDialog> {
             decoration: const InputDecoration(labelText: '¿A quién le debes? (opcional)')),
         const SizedBox(height: 12),
         DropdownButtonFormField<String>(
-          value: currency, decoration: const InputDecoration(labelText: 'Moneda'),
+          initialValue: currency, decoration: const InputDecoration(labelText: 'Moneda'),
           items: const [
             DropdownMenuItem(value: 'NIO', child: Text('Córdobas (C\$)')),
             DropdownMenuItem(value: 'USD', child: Text('Dólares (US\$)')),

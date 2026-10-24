@@ -32,7 +32,9 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
 
   Future<void> deleteMovement(Map<String, dynamic> tx) async {
     if (loading || saving ||
-        !['purchase', 'interest', 'fee', 'refund'].contains(tx['transaction_type'])) return;
+        !['purchase', 'interest', 'fee', 'refund'].contains(tx['transaction_type'])) {
+      return;
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -67,13 +69,17 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
       ));
       await loadData();
     } on PostgrestException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('No se pudo eliminar: ${e.message}')),
       );
+      }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('No se pudo eliminar: $e')),
       );
+      }
     } finally {
       if (mounted) setState(() => saving = false);
     }
@@ -81,7 +87,9 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
 
   Future<void> editMovement(Map<String, dynamic> tx) async {
     if (loading || saving ||
-        !['purchase', 'interest', 'fee', 'refund'].contains(tx['transaction_type'])) return;
+        !['purchase', 'interest', 'fee', 'refund'].contains(tx['transaction_type'])) {
+      return;
+    }
     setState(() => saving = true);
     try {
       final user = supabase.auth.currentUser;
@@ -129,13 +137,17 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
       ));
       await loadData();
     } on PostgrestException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('No se pudo guardar: ${e.message}')),
       );
+      }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('No se pudo guardar: $e')),
       );
+      }
     } finally {
       if (mounted) setState(() => saving = false);
     }
@@ -195,13 +207,17 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
       );
       await loadData();
     } on PostgrestException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('No se pudo anular: ${e.message}')),
       );
+      }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('No se pudo anular: $e')),
       );
+      }
     } finally {
       if (mounted) setState(() => saving = false);
     }
@@ -323,7 +339,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
         const Padding(padding: EdgeInsets.symmetric(vertical: 12),
             child: Text('+ aumenta la deuda · − reduce la deuda')),
         DropdownButtonFormField<String>(
-          value: statusFilter,
+          initialValue: statusFilter,
           decoration: const InputDecoration(labelText: 'Estado del registro'),
           items: const [
             DropdownMenuItem(value: 'valid', child: Text('Vigentes')),
@@ -336,7 +352,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
         ),
         const SizedBox(height: 12),
         DropdownButtonFormField<String>(
-          value: filter, decoration: const InputDecoration(labelText: 'Tipo de movimiento'),
+          initialValue: filter, decoration: const InputDecoration(labelText: 'Tipo de movimiento'),
           items: [
             const DropdownMenuItem(value: 'all', child: Text('Todos')),
             ...types.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))),

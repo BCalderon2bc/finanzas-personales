@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/supabase_client.dart';
 import '../../utils/money.dart';
+import 'debt_card.dart';
 import 'debt_form_dialog.dart';
 import 'debt_payment_dialog.dart';
 import 'debt_payments_page.dart';
@@ -207,83 +208,28 @@ class _DebtsPageState extends State<DebtsPage> {
   }
 
   Widget debtCard(Map<String, dynamic> debt) {
-    final currency = debt['currency'].toString();
-    final original = moneyCents(debt['original_amount']);
     final paid = principalPaid[debt['id'].toString()] ?? 0;
-    final creditor = debt['creditor_name']?.toString().trim() ?? '';
-    final status = debt['status']?.toString() ?? '';
-    const labels = {
-      'active': 'Activa', 'overdue': 'Vencida', 'paused': 'Pausada',
-      'paid': 'Pagada', 'cancelled': 'Cancelada',
-    };
-    final dueDate = DateTime.tryParse('${debt['due_date']}');
-    final dueStatus = debtDueStatus(debt, paid, DateTime.now());
-
-    return Card(child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(children: [
-          Expanded(child: Text(debt['description'].toString(),
-              style: Theme.of(context).textTheme.titleMedium)),
-          IconButton(
-            tooltip: 'Editar deuda',
-            onPressed: saving ? null : () => editDebt(debt),
-            icon: const Icon(Icons.edit_outlined),
-          ),
-        ]),
-        if (creditor.isNotEmpty) Text('Acreedor: $creditor'),
-        Text('Estado: ${labels[status] ?? status}'),
-        if (dueStatus != DebtDueStatus.none)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Text(
-              dueStatus == DebtDueStatus.overdue ? 'Capital vencido' : 'El capital vence hoy',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.error,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        if (dueDate != null)
-          Text('Vence: ${dueDate.day.toString().padLeft(2, '0')}/'
-              '${dueDate.month.toString().padLeft(2, '0')}/${dueDate.year}'),
-        const Divider(height: 20),
-        Text('Capital original: ${money(original, currency)}'),
-        Text('Abonado a capital: ${money(paid, currency)}'),
-        Text('Capital pendiente: ${money(original - paid, currency)}',
-            style: const TextStyle(fontWeight: FontWeight.bold)),
-        Align(alignment: Alignment.centerRight, child: TextButton.icon(
-          icon: const Icon(Icons.history),
-          label: const Text('Ver abonos'),
-          onPressed: saving ? null : () async {
-            await Navigator.push(context, MaterialPageRoute<void>(
-              builder: (_) => DebtPaymentsPage(debtId: debt['id'].toString()),
-            ));
-            if (mounted) await loadData();
-          },
-        )),
-        if (['active', 'overdue'].contains(status))
-          Align(alignment: Alignment.centerRight, child: TextButton.icon(
-            onPressed: saving ? null : () => addPayment(debt),
-            icon: const Icon(Icons.payments_outlined),
-            label: const Text('Registrar abono'),
-          )),
-
-        if (original - paid > 0 && status != 'cancelled')
-          Align(alignment: Alignment.centerRight, child: TextButton.icon(
-            icon: const Icon(Icons.calculate_outlined),
-            label: const Text('Simular cuotas'),
-            onPressed: saving ? null : () => showDialog<void>(
-              context: context,
-              builder: (_) => LoanSimulatorDialog(
-                principalCents: original - paid, currency: currency,
-              ),
-            ),
-          )),
-      ]),
-    ));
+    final pending = moneyCents(debt['original_amount']) - paid;
+    return DebtCard(
+      debt: debt,
+      paidCents: paid,
+      onEdit: saving ? null : () => editDebt(debt),
+      onPayment: saving ? null : () => addPayment(debt),
+      onHistory: saving ? null : () async {
+        await Navigator.push(context, MaterialPageRoute<void>(
+          builder: (_) => DebtPaymentsPage(debtId: debt['id'].toString()),
+        ));
+        if (mounted) await loadData();
+      },
+      onSimulate: saving ? null : () {
+        showDialog<void>(
+          context: context,
+          builder: (_) => LoanSimulatorDialog(
+              principalCents: pending, currency: debt['currency'].toString()),
+        );
+      },
+    );
   }
-
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Deudas y préstamos'), actions: [
@@ -327,7 +273,7 @@ class _DebtsPageState extends State<DebtsPage> {
         const SizedBox(height: 12),
 
         DropdownButtonFormField<String>(
-          value: filter,
+          initialValue: filter,
           decoration: const InputDecoration(labelText: 'Mostrar deudas'),
           items: const [
             DropdownMenuItem(value: 'all', child: Text('Todas')),

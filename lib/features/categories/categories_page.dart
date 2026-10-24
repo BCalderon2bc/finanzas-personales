@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/supabase_client.dart';
 import 'category_form_dialog.dart';
+import 'category_tile.dart';
 
 class CategoriesPage extends StatefulWidget {
   const CategoriesPage({super.key});
@@ -27,7 +28,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
       final rows = <Map<String, dynamic>>[];
       for (var offset = 0; ; offset += 500) {
         final result = await supabase.from('categories')
-            .select('id, name, category_type, is_active').eq('user_id', user.id)
+            .select('id, name, category_type, is_active, icon, color')
             .order('name').order('id').range(offset, offset + 499);
         final page = List<Map<String, dynamic>>.from(result);
         rows.addAll(page);
@@ -53,7 +54,11 @@ class _CategoriesPageState extends State<CategoriesPage> {
       if (category == null) {
         await supabase.from('categories').insert({...data, 'user_id': user.id});
       } else {
-        await supabase.from('categories').update({'name': data['name']})
+        await supabase.from('categories').update({
+          'name': data['name'],
+          'icon': data['icon'],
+          'color': data['color'],
+        })
             .eq('id', category['id']).eq('user_id', user.id).select('id').single();
       }
       if (!mounted) return;
@@ -110,7 +115,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 100), children: [
                 DropdownButtonFormField<String>(
-                  value: filter, decoration: const InputDecoration(labelText: 'Mostrar categorías'),
+                  initialValue: filter, decoration: const InputDecoration(labelText: 'Mostrar categorías'),
                   items: const [
                     DropdownMenuItem(value: 'all', child: Text('Todas')),
                     DropdownMenuItem(value: 'income', child: Text('Ingresos')),
@@ -122,26 +127,28 @@ class _CategoriesPageState extends State<CategoriesPage> {
                 if (visible.isEmpty) const Padding(padding: EdgeInsets.all(24), child: Text(
                   'No hay categorías. Crea una como Salario, Alimentación o Transporte.', textAlign: TextAlign.center,
                 )),
-                ...visible.map((category) {
-                  final income = category['category_type'] == 'income';
-                  final active = category['is_active'] == true;
-                  return Card(child: ListTile(
-                    leading: Icon(income ? Icons.arrow_downward : Icons.arrow_upward),
-                    title: Text(category['name'].toString()),
-                    subtitle: Text('${income ? 'Ingreso' : 'Gasto'} · ${active ? 'Activa' : 'Inactiva'}'),
-                    onTap: saving ? null : () => editCategory(category),
-                    trailing: PopupMenuButton<String>(
-                      enabled: !saving, tooltip: 'Opciones',
-                      onSelected: (value) {
-                        if (value == 'edit') { editCategory(category); } else { toggleCategory(category); }
-                      },
-                      itemBuilder: (_) => [
-                        const PopupMenuItem(value: 'edit', child: Text('Editar nombre')),
-                        PopupMenuItem(value: 'toggle', child: Text(active ? 'Desactivar' : 'Activar')),
-                      ],
-                    ),
-                  ));
-                }),
+
+        for (final type in ['income', 'expense'])
+          if (visible.any((c) => c['category_type'] == type)) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(2, 16, 2, 12),
+              child: Row(children: [
+                Icon(type == 'income' ? Icons.south_west_rounded : Icons.north_east_rounded,
+                    size: 18,
+                    color: type == 'income' ? const Color(0xFF047857) : const Color(0xFF2563EB)),
+                const SizedBox(width: 8),
+                Expanded(child: Text(type == 'income' ? 'Ingresos' : 'Gastos',
+                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700))),
+                Text('${visible.where((c) => c['category_type'] == type).length}',
+                    style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+              ]),
+            ),
+            ...visible.where((c) => c['category_type'] == type).map((category) => CategoryTile(
+              category: category,
+              onEdit: saving ? null : () => editCategory(category),
+              onToggle: saving ? null : () => toggleCategory(category),
+            )),
+          ],
               ],
             )),
     );

@@ -58,7 +58,7 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
         key: formKey, child: Column(mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             DropdownButtonFormField<String>(
-              value: type, decoration: const InputDecoration(labelText: 'Tipo'),
+              initialValue: type, decoration: const InputDecoration(labelText: 'Tipo'),
               items: const [
                 DropdownMenuItem(value: 'purchase', child: Text('Compra')),
                 DropdownMenuItem(value: 'interest', child: Text('Intereses')),
@@ -86,7 +86,7 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 key: ValueKey(type),
-                value: categoryId ?? 'none', isExpanded: true,
+                initialValue: categoryId ?? 'none', isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Categoría (opcional)'),
                 items: [
                   const DropdownMenuItem(value: 'none', child: Text('Sin categoría')),

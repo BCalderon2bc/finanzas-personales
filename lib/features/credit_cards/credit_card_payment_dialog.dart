@@ -30,7 +30,7 @@ class _CreditCardPaymentDialogState extends State<CreditCardPaymentDialog> {
     content: SizedBox(width: 420, child: SingleChildScrollView(child: Form(
       key: formKey, child: Column(mainAxisSize: MainAxisSize.min, children: [
       DropdownButtonFormField<String>(
-        value: accountId, isExpanded: true,
+        initialValue: accountId, isExpanded: true,
         decoration: const InputDecoration(labelText: 'Cuenta de donde sale el dinero'),
         items: widget.accounts.map((a) => DropdownMenuItem(
           value: a['id'].toString(),

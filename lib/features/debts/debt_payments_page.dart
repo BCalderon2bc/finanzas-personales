@@ -91,13 +91,17 @@ class _DebtPaymentsPageState extends State<DebtPaymentsPage> {
       );
       await loadData();
     } on PostgrestException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('No se pudo anular: ${e.message}')),
       );
+      }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('No se pudo anular: $e')),
       );
+      }
     } finally {
       if (mounted) setState(() => saving = false);
     }

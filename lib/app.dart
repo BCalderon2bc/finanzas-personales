@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'core/app_theme.dart';
 import 'features/auth/auth_gate.dart';
-import 'core/app_theme.dart';
 
 class FinanzasApp extends StatelessWidget {
   const FinanzasApp({super.key});

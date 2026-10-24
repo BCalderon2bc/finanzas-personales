@@ -6,6 +6,7 @@ import '../../utils/money.dart';
 import 'budget_form_dialog.dart';
 import 'budget_summary.dart';
 import '../../data/credit_card_repository.dart';
+import 'budget_card.dart';
 
 class BudgetsPage extends StatefulWidget {
   const BudgetsPage({super.key});
@@ -40,7 +41,7 @@ class _BudgetsPageState extends State<BudgetsPage> {
       final categoryRows = <Map<String, dynamic>>[];
       for (var offset = 0; ; offset += 500) {
         final result = await supabase.from('categories')
-            .select('id, name, is_active').eq('user_id', user.id)
+            .select('id, name, is_active, icon, color').eq('user_id', user.id)
             .eq('category_type', 'expense').order('name').order('id')
             .range(offset, offset + 499);
         final page = List<Map<String, dynamic>>.from(result);
@@ -128,8 +129,10 @@ class _BudgetsPageState extends State<BudgetsPage> {
       message('Presupuesto guardado.');
       await loadData();
     } on PostgrestException catch (e) {
-      if (mounted) message(e.code == '23505'
+      if (mounted) {
+        message(e.code == '23505'
           ? 'Ya existe ese presupuesto este mes.' : 'No se pudo guardar: ${e.message}');
+      }
     } catch (e) {
       if (mounted) message('No se pudo guardar: $e');
     } finally {
@@ -173,42 +176,22 @@ class _BudgetsPageState extends State<BudgetsPage> {
   Widget budgetCard(Map<String, dynamic> budget) {
     final categoryId = budget['category_id'].toString();
     final currency = budget['currency'].toString();
-    final limit = moneyCents(budget['budget_amount']);
-    final used = spent['$categoryId|$currency'] ?? 0;
-    final remaining = limit - used;
-    var name = 'Categoría no disponible';
+    Map<String, dynamic>? categoryStyle;
     for (final category in categories) {
-      if (category['id'].toString() == categoryId) name = category['name'].toString();
+      if (category['id'].toString() == categoryId) {
+        categoryStyle = category;
+        break;
+      }
     }
-    return Card(child: InkWell(
-      onTap: saving ? null : () => editBudget(budget),
-      child: Padding(padding: const EdgeInsets.all(16), child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(children: [
-          Expanded(child: Text(name, style: Theme.of(context).textTheme.titleMedium)),
-          IconButton(
-            tooltip: 'Eliminar presupuesto',
-            onPressed: saving ? null : () => deleteBudget(budget),
-            icon: const Icon(Icons.delete_outline),
-          ),
-        ]),
-        const SizedBox(height: 8),
-        Text('Presupuesto: ${money(limit, currency)}'),
-        Text('Gastado: ${money(used, currency)}'),
-        const SizedBox(height: 8),
-        LinearProgressIndicator(
-          value: limit <= 0 ? 0 : (used / limit).clamp(0.0, 1.0).toDouble(),
-          color: remaining < 0 ? Theme.of(context).colorScheme.error : null,
-        ),
-        const SizedBox(height: 8),
-        Text(remaining < 0
-            ? 'Excedido: ${money(-remaining, currency)}'
-            : 'Disponible: ${money(remaining, currency)}',
-            style: TextStyle(fontWeight: FontWeight.bold,
-                color: remaining < 0 ? Theme.of(context).colorScheme.error : null)),
-      ],
-      )),
-    ));
+    return BudgetCard(
+      name: categoryStyle?['name']?.toString() ?? 'Categoría no disponible',
+      currency: currency,
+      categoryStyle: categoryStyle,
+      limitCents: moneyCents(budget['budget_amount']),
+      usedCents: spent['$categoryId|$currency'] ?? 0,
+      onEdit: saving ? null : () => editBudget(budget),
+      onDelete: saving ? null : () => deleteBudget(budget),
+    );
   }
 
   @override

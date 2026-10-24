@@ -53,7 +53,7 @@ class _LoanSimulatorDialogState extends State<LoanSimulatorDialog> {
             Text('Capital a simular: ${money(widget.principalCents)}'),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: method, isExpanded: true,
+              initialValue: method, isExpanded: true,
               decoration: const InputDecoration(labelText: 'Modelo estimado'),
               items: const [
                 DropdownMenuItem(value: 'reducing_balance', child: Text('Cuota fija sobre saldo')),

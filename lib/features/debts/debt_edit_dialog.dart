@@ -57,7 +57,7 @@ class _DebtEditDialogState extends State<DebtEditDialog> {
             const SizedBox(height: 12),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: status, decoration: const InputDecoration(labelText: 'Estado'),
+              initialValue: status, decoration: const InputDecoration(labelText: 'Estado'),
               items: const [
                 DropdownMenuItem(value: 'active', child: Text('Activa')),
                 DropdownMenuItem(value: 'overdue', child: Text('Vencida')),

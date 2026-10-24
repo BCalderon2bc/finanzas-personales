@@ -11,6 +11,9 @@ import '../credit_cards/credit_card_movements_page.dart';
 import '../reports/monthly_expenses_page.dart';
 import 'dashboard_overview.dart';
 import 'dashboard_components.dart';
+import 'dashboard_header.dart';
+import 'dashboard_monthly_balance.dart';
+import 'dashboard_navigation.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -27,7 +30,18 @@ class _DashboardPageState extends State<DashboardPage> {
   int requestId = 0;
 
   @override
-  void initState() { super.initState(); loadData(); }
+  void initState() {
+    super.initState();
+    scrollController.addListener(updateScrollButton);
+    loadData();
+  }
+
+  @override
+  void dispose() {
+    scrollController.removeListener(updateScrollButton);
+    scrollController.dispose();
+    super.dispose();
+  }
 
   Future<void> loadData() async {
     final request = ++requestId;
@@ -82,78 +96,65 @@ class _DashboardPageState extends State<DashboardPage> {
     try {
       await supabase.auth.signOut();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('No se pudo cerrar sesión: $e')),
       );
+      }
     }
+  }
+
+  final scrollController = ScrollController();
+  bool showBackToTop = false;
+
+  void updateScrollButton() {
+    final visible = scrollController.offset > 500;
+    if (visible != showBackToTop) setState(() => showBackToTop = visible);
   }
 
   @override
   Widget build(BuildContext context) {
     final current = data;
     return Scaffold(
+      drawer: DashboardNavigation(onOpen: openTarget),
       appBar: AppBar(title: const Text('Mis Finanzas'), actions: [
         IconButton(tooltip: 'Actualizar', onPressed: loading ? null : loadData,
             icon: const Icon(Icons.refresh_rounded)),
         IconButton(tooltip: 'Cerrar sesión', onPressed: logout,
             icon: const Icon(Icons.logout_rounded)),
       ]),
+      floatingActionButton: showBackToTop ? FloatingActionButton.small(
+        tooltip: 'Volver arriba',
+        onPressed: () => scrollController.animateTo(
+          0, duration: const Duration(milliseconds: 350),
+          curve: Curves.easeOutCubic,
+        ),
+        child: const Icon(Icons.keyboard_arrow_up_rounded),
+      ) : null,
       body: RefreshIndicator(
         onRefresh: loadData,
         child: SingleChildScrollView(
+          controller: scrollController,
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
           child: Center(child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 1240),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Text('Tu panorama financiero',
-                  style: Theme.of(context).textTheme.headlineMedium),
-              const SizedBox(height: 6),
-              const Text('Revisa tus saldos, el movimiento del mes y tus compromisos.',
-                  style: TextStyle(color: Color(0xFF64748B))),
-              const SizedBox(height: 20),
-              Wrap(spacing: 12, runSpacing: 12,
-                crossAxisAlignment: WrapCrossAlignment.center, children: [
-                  Container(
-                    decoration: BoxDecoration(
-                        color: Colors.white, borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFE2E8F0))),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      IconButton(tooltip: 'Mes anterior',
-                          onPressed: loading ? null : () => changeMonth(-1),
-                          icon: const Icon(Icons.chevron_left_rounded)),
-                      SizedBox(width: 148, child: Text(dashboardMonth(month),
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontWeight: FontWeight.w600))),
-                      IconButton(tooltip: 'Mes siguiente',
-                          onPressed: loading ? null : () => changeMonth(1),
-                          icon: const Icon(Icons.chevron_right_rounded)),
-                    ]),
-                  ),
-                  SegmentedButton<String>(
-                    showSelectedIcon: false,
-                    segments: const [
-                      ButtonSegment(value: 'NIO', label: Text('Córdobas')),
-                      ButtonSegment(value: 'USD', label: Text('Dólares')),
-                    ],
-                    selected: {currency},
-                    onSelectionChanged: (value) => setState(() => currency = value.first),
-                  ),
-                  TextButton.icon(
-                    onPressed: loading ? null : () async {
-                      final now = DateTime.now();
-                      setState(() => month = DateTime(now.year, now.month));
-                      await loadData();
-                    },
-                    icon: const Icon(Icons.today_outlined),
-                    label: const Text('Mes actual'),
-                  ),
-                ],
+
+              DashboardHeader(
+                monthLabel: dashboardMonth(month),
+                currency: currency,
+                loading: loading,
+                onPrevious: () => changeMonth(-1),
+                onNext: () => changeMonth(1),
+                onCurrencyChanged: (value) => setState(() => currency = value),
+                onCurrent: () async {
+                  final now = DateTime.now();
+                  setState(() => month = DateTime(now.year, now.month));
+                  await loadData();
+                },
               ),
-              const SizedBox(height: 18),
-              const Text('Ingresos, gastos y presupuestos corresponden al mes seleccionado. Los saldos y deudas muestran los registros vigentes.',
-                  style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               if (loading)
                 const Padding(padding: EdgeInsets.all(32),
                     child: Center(child: CircularProgressIndicator()))
@@ -185,6 +186,8 @@ class _DashboardPageState extends State<DashboardPage> {
               DashboardQuickActions(onOpen: openTarget),
               if (!loading && error == null && current != null) ...[
                 const SizedBox(height: 24),
+                DashboardMonthlyBalance(data: current, currency: currency),
+                const SizedBox(height: 20),
                 DashboardPanels(data: current, currency: currency,
                     onOpen: openTarget, onEvent: openEvent),
                 const SizedBox(height: 14),
@@ -197,6 +200,7 @@ class _DashboardPageState extends State<DashboardPage> {
           )),
         ),
       ),
+
     );
   }
 }

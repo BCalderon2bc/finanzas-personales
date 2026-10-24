@@ -68,7 +68,7 @@ class _DebtPaymentDialogState extends State<DebtPaymentDialog> {
         key: formKey, child: Column(mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             DropdownButtonFormField<String>(
-              value: accountId, isExpanded: true,
+              initialValue: accountId, isExpanded: true,
               decoration: const InputDecoration(labelText: 'Cuenta de origen'),
               items: widget.accounts.map((a) => DropdownMenuItem(
                 value: a['id'].toString(),

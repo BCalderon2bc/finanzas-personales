@@ -119,7 +119,7 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<String>(
-                  value: transactionType,
+                  initialValue: transactionType,
                   decoration: const InputDecoration(labelText: 'Tipo de movimiento'),
                   items: const [
                     DropdownMenuItem(value: 'income', child: Text('Ingreso')),
@@ -137,7 +137,7 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
                 ),
                 const SizedBox(height: 14),
                 DropdownButtonFormField<String>(
-                  value: accountId,
+                  initialValue: accountId,
                   isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Cuenta de origen'),
                   items: widget.accounts.map((a) => DropdownMenuItem(
@@ -153,7 +153,7 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
                 if (transactionType == 'transfer') ...[
                   const SizedBox(height: 14),
                   DropdownButtonFormField<String>(
-                    value: availableDestinations.any((a) => a['id'].toString() == destinationAccountId)
+                    initialValue: availableDestinations.any((a) => a['id'].toString() == destinationAccountId)
                         ? destinationAccountId
                         : null,
                     isExpanded: true,
@@ -173,7 +173,7 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
                 ] else if (filteredCategories.isNotEmpty) ...[
                   const SizedBox(height: 14),
                   DropdownButtonFormField<String>(
-                    value: filteredCategories.any((c) => c['id'].toString() == categoryId) ? categoryId : null,
+                    initialValue: filteredCategories.any((c) => c['id'].toString() == categoryId) ? categoryId : null,
                     isExpanded: true,
                     decoration: const InputDecoration(labelText: 'Categoría (opcional)'),
                     items: filteredCategories.map((c) => DropdownMenuItem(

@@ -42,7 +42,7 @@ class _BudgetFormDialogState extends State<BudgetFormDialog> {
     content: SizedBox(width: 420, child: SingleChildScrollView(child: Form(
       key: formKey, child: Column(mainAxisSize: MainAxisSize.min, children: [
       DropdownButtonFormField<String>(
-        value: categoryId, isExpanded: true,
+        initialValue: categoryId, isExpanded: true,
         decoration: const InputDecoration(labelText: 'Categoría de gasto'),
         items: widget.categories.map((c) => DropdownMenuItem(
           value: c['id'].toString(),
@@ -53,7 +53,7 @@ class _BudgetFormDialogState extends State<BudgetFormDialog> {
       ),
       const SizedBox(height: 12),
       DropdownButtonFormField<String>(
-        value: currency, decoration: const InputDecoration(labelText: 'Moneda'),
+        initialValue: currency, decoration: const InputDecoration(labelText: 'Moneda'),
         items: const [
           DropdownMenuItem(value: 'NIO', child: Text('Córdobas (C\$)')),
           DropdownMenuItem(value: 'USD', child: Text('Dólares (US\$)')),
