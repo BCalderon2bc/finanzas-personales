@@ -6,7 +6,8 @@ import '../../data/credit_card_repository.dart';
 import '../../data/debt_payment_repository.dart';
 import '../../utils/money.dart';
 import 'account_form_dialog.dart';
-import 'account_card.dart';
+import 'account_wallet.dart';
+import 'account_details.dart';
 
 class AccountsPage extends StatefulWidget {
   const AccountsPage({super.key});
@@ -20,6 +21,15 @@ class _AccountsPageState extends State<AccountsPage> {
   bool loading = true, saving = false;
   String? error;
   int requestId = 0;
+
+  String? selectedAccountId;
+
+  Map<String, dynamic>? get selectedAccount {
+    for (final account in accounts) {
+      if (account['id'].toString() == selectedAccountId) { return account; }
+    }
+    return null;
+  }
 
   @override
   void initState() {
@@ -48,11 +58,32 @@ class _AccountsPageState extends State<AccountsPage> {
         cardPayments: payments, debtPayments: debtPayments,
       );
       if (!mounted || request != requestId) return;
+
+      final sortedAccounts = List<Map<String, dynamic>>.from(result)
+        ..sort((a, b) {
+          final balanceA = balances[a['id'].toString()] ?? 0;
+          final balanceB = balances[b['id'].toString()] ?? 0;
+          final hasMoneyA = balanceA > 0;
+          final hasMoneyB = balanceB > 0;
+
+          if (hasMoneyA != hasMoneyB) {
+            return hasMoneyA ? -1 : 1;
+          }
+
+          return a['name'].toString().toLowerCase().compareTo(
+            b['name'].toString().toLowerCase(),
+          );
+        });
+
       setState(() {
-        accounts = accountRows;
+        accounts = sortedAccounts;
         currentBalances = balances;
+        if (!accounts.any((account) => account['id'].toString() == selectedAccountId)) {
+          selectedAccountId = accounts.isEmpty ? null : accounts.first['id'].toString();
+        }
         loading = false;
       });
+
     } catch (e) {
       if (!mounted || request != requestId) return;
       setState(() { error = e.toString(); loading = false; });
@@ -81,7 +112,8 @@ class _AccountsPageState extends State<AccountsPage> {
       } else {
         final changes = <String, dynamic>{
           for (final key in [
-            'name', 'institution_id', 'account_reference', 'notes', 'card_design',
+            'name', 'institution_id', 'account_reference', 'notes',
+            'card_design', 'opening_balance',
           ])
             if (data.containsKey(key)) key: data[key],
         };
@@ -155,7 +187,15 @@ class _AccountsPageState extends State<AccountsPage> {
         ),
       ],
     ),
-    floatingActionButton: FloatingActionButton.extended(
+    bottomNavigationBar: MediaQuery.sizeOf(context).width >= 650 ? null
+      : SafeArea(top: false, minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: FilledButton.icon(
+          style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+          onPressed: saving || loading || error != null ? null : () => addAccount(),
+          icon: saving ? const SizedBox(width: 18, height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.add),
+          label: Text(saving ? 'Guardando...' : 'Nueva cuenta'))),
+    floatingActionButton: MediaQuery.sizeOf(context).width < 650 ? null : FloatingActionButton.extended(
       onPressed: saving || loading || error != null ? null : () => addAccount(),
       icon: saving
           ? const SizedBox(width: 20, height: 20,
@@ -163,7 +203,7 @@ class _AccountsPageState extends State<AccountsPage> {
           : const Icon(Icons.add),
       label: Text(saving ? 'Guardando...' : 'Nueva cuenta'),
     ),
-    body: _buildBody(),
+    body: SafeArea(top: false, child: _buildBody()),
   );
 
   Widget _buildBody() {
@@ -210,24 +250,33 @@ class _AccountsPageState extends State<AccountsPage> {
         ]),
       ));
     }
+
+    final selected = selectedAccount;
     return Center(child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 900),
+      constraints: const BoxConstraints(maxWidth: 1100),
       child: RefreshIndicator(
         onRefresh: loadAccounts,
-        child: ListView.separated(
+        child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
-          itemCount: accounts.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 18),
-          itemBuilder: (context, index) {
-            final account = accounts[index];
-            return AccountCard(
-              account: account,
-              balanceCents: currentBalances[account['id'].toString()] ?? 0,
-              onEdit: saving ? null : () => addAccount(account),
-              onToggle: saving ? null : () => toggleAccount(account),
-            );
-          },
+          padding: EdgeInsets.fromLTRB(12, 16, 12,
+            MediaQuery.sizeOf(context).width < 650 ? 24 : 110),
+          children: [
+            AccountWallet(
+              accounts: accounts,
+              balances: currentBalances,
+              selectedId: selectedAccountId,
+              onSelected: saving ? null
+                  : (id) => setState(() => selectedAccountId = id),
+            ),
+            const SizedBox(height: 14),
+            if (selected != null)
+              AccountDetails(
+                account: selected,
+                balanceCents: currentBalances[selected['id'].toString()] ?? 0,
+                onEdit: saving ? null : () => addAccount(selected),
+                onToggle: saving ? null : () => toggleAccount(selected),
+              ),
+          ],
         ),
       ),
     ));

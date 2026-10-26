@@ -7,7 +7,7 @@ class BudgetSummary extends StatelessWidget {
   final Map<String, int> spent;
 
   String money(int cents, String currency) =>
-      '${currency == 'USD' ? 'US\$' : 'C\$'} ${(cents / 100).toStringAsFixed(2)}';
+      formatMoneyCents(cents, currency);
 
   Widget currencyCard(String currency) {
     final selected = budgets.where((b) => b['currency'] == currency).toList();

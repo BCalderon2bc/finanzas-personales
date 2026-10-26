@@ -39,8 +39,7 @@ class TransactionDetailsDialog extends StatelessWidget {
         : '${date.day.toString().padLeft(2, '0')}/'
         '${date.month.toString().padLeft(2, '0')}/${date.year}';
     final currency = tx['currency']?.toString() ?? 'NIO';
-    final symbol = currency == 'USD' ? 'US\$' : 'C\$';
-    final amount = moneyCents(tx['amount']) / 100;
+    final amount = moneyCents(tx['amount']);
 
     return AlertDialog(
       title: Text(labels[type] ?? 'Movimiento'),
@@ -51,7 +50,7 @@ class TransactionDetailsDialog extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('$symbol ${amount.toStringAsFixed(2)}',
+              Text(formatMoneyCents(amount, currency),
                   style: Theme.of(context).textTheme.headlineSmall),
               const Divider(height: 24),
               _detail('Fecha', dateText),

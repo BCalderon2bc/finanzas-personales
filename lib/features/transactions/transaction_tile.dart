@@ -36,10 +36,10 @@ class TransactionTile extends StatelessWidget {
     final type = transaction['transaction_type'];
     final income = ['income', 'deposit'].contains(type);
     final expense = ['expense', 'withdrawal', 'card_payment', 'debt_payment'].contains(type);
-    final external = ['credit_card_payment', 'debt_payment'].contains(transaction['source']);
+    final external = ['credit_card_payment', 'debt_payment', 'receivable_loan'].contains(transaction['source']);
     final reconciled = transaction['is_reconciled'] == true;
     final description = transaction['description']?.toString().trim() ?? '';
-    final currency = transaction['currency'] == 'USD' ? 'US\$' : 'C\$';
+    final currency = transaction['currency']?.toString() ?? 'NIO';
     final cents = moneyCents(transaction['amount']);
     final date = DateTime.tryParse('${transaction['transaction_date']}')?.toLocal();
     final color = income ? green : expense ? red : blue;
@@ -60,7 +60,7 @@ class TransactionTile extends StatelessWidget {
         ? categoryIcon(styledCategory?['icon']) : icon;
 
     Widget amount() => Text(
-      '${income ? '+' : expense ? '−' : ''}$currency ${(cents / 100).toStringAsFixed(2)}',
+      '${income ? '+' : expense ? '−' : ''}${formatMoneyCents(cents, currency)}',
       style: TextStyle(color: color, fontSize: 17, fontWeight: FontWeight.w800),
     );
 

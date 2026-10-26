@@ -8,6 +8,7 @@ Future<List<Map<String, dynamic>>> loadUserCardExpenses(String userId) async {
         .select('id, transaction_type, amount, currency, transaction_date, category_id, description, reference, credit_cards(name)')
         .eq('user_id', userId)
         .eq('is_voided', false)
+        .eq('is_receivable_funding', false)
         .inFilter('transaction_type', ['purchase', 'interest', 'fee', 'refund'])
         .order('id').range(offset, offset + 499);
     final page = List<Map<String, dynamic>>.from(result);

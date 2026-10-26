@@ -70,3 +70,23 @@ int debtPaymentTotalCents(Map<String, dynamic> payment) =>
     moneyCents(payment['principal_amount']) +
         moneyCents(payment['interest_amount']) +
         moneyCents(payment['fee_amount']);
+
+String formatAmountCents(int cents) {
+  final absolute = cents.abs();
+  final whole = (absolute ~/ 100).toString().replaceAllMapped(
+    RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+        (match) => '${match[1]},',
+  );
+  final decimals = (absolute % 100).toString().padLeft(2, '0');
+
+  return '${cents < 0 ? '-' : ''}$whole.$decimals';
+}
+
+String formatMoneyCents(int? cents, String currency) {
+  if (cents == null) {
+    return 'Por revisar';
+  }
+
+  final symbol = currency == 'USD' ? 'US\$' : 'C\$';
+  return '$symbol ${formatAmountCents(cents)}';
+}

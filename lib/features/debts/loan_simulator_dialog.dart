@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/money.dart';
 import 'loan_schedule.dart';
 
 class LoanSimulatorDialog extends StatefulWidget {
@@ -20,7 +21,7 @@ class _LoanSimulatorDialogState extends State<LoanSimulatorDialog> {
   void dispose() { rate.dispose(); months.dispose(); super.dispose(); }
 
   String money(int cents) =>
-      '${widget.currency == 'USD' ? 'US\$' : 'C\$'} ${(cents / 100).toStringAsFixed(2)}';
+      formatMoneyCents(cents, widget.currency);
   String dateText(DateTime date) =>
       '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
   void clearResult() => setState(() { schedule = []; error = null; });

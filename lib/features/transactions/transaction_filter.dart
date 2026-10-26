@@ -26,7 +26,7 @@ class TransactionFilter {
   );
 
   bool matches(Map<String, dynamic> tx) {
-    final external = ['credit_card_payment', 'debt_payment'].contains(tx['source']);
+    final external = ['credit_card_payment', 'debt_payment', 'receivable_loan'].contains(tx['source']);
     if (reconciled != null && (external || tx['is_reconciled'] != reconciled)) {
       return false;
     }

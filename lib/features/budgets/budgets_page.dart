@@ -27,7 +27,7 @@ class _BudgetsPageState extends State<BudgetsPage> {
   String monthDate(DateTime date) =>
       '${date.year}-${date.month.toString().padLeft(2, '0')}-01';
   String money(int cents, String currency) =>
-      '${currency == 'USD' ? 'US\$' : 'C\$'} ${(cents / 100).toStringAsFixed(2)}';
+      formatMoneyCents(cents, currency);
   void message(String text) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 

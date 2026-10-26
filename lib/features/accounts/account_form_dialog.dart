@@ -115,10 +115,11 @@ class _AccountFormDialogState extends State<AccountFormDialog> {
   }
 
   void save() {
-    if (!canSave || !formKey.currentState!.validate()) return;
+    if (!canSave || !formKey.currentState!.validate()) { return; }
     final data = <String, dynamic>{
       'name': nameController.text.trim(),
       'institution_id': institutionId,
+      'opening_balance': double.parse(balanceController.text.trim().replaceAll(',', '.')),
       'account_reference': referenceController.text.trim().isEmpty
           ? null : referenceController.text.trim(),
       'notes': notesController.text.trim().isEmpty ? null : notesController.text.trim(),
@@ -128,11 +129,7 @@ class _AccountFormDialogState extends State<AccountFormDialog> {
       },
     };
     if (!editing) {
-      data.addAll({
-        'account_type': accountType,
-        'currency': currency,
-        'opening_balance': double.parse(balanceController.text.trim().replaceAll(',', '.')),
-      });
+      data.addAll({'account_type': accountType, 'currency': currency});
     }
     Navigator.pop(context, data);
   }
@@ -235,12 +232,15 @@ class _AccountFormDialogState extends State<AccountFormDialog> {
             ),
             const SizedBox(height: 12),
             TextFormField(
-              controller: balanceController, readOnly: editing,
+              controller: balanceController,
               onChanged: (_) => setState(() {}),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Saldo inicial'),
+              decoration: const InputDecoration(
+                labelText: 'Saldo inicial',
+                helperText: 'Saldo base de la cuenta, antes de los movimientos registrados.',
+                helperMaxLines: 2,
+              ),
               validator: (value) {
-                if (editing) return null;
                 final text = (value ?? '').trim();
                 final amount = double.tryParse(text.replaceAll(',', '.'));
                 if (amount == null || !amount.isFinite || amount < 0) {
@@ -254,7 +254,7 @@ class _AccountFormDialogState extends State<AccountFormDialog> {
             ),
             if (editing) const Padding(
               padding: EdgeInsets.only(top: 8),
-              child: Text('El tipo, la moneda y el saldo inicial se conservan al editar.',
+              child: Text('El tipo y la moneda se conservan al editar.',
                   style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
             ),
             const SizedBox(height: 12),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/supabase_client.dart';
 import '../../utils/money.dart';
+import 'credit_card_balances.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'credit_card_movement_dialog.dart';
 import '../../widgets/void_payment_dialog.dart';
@@ -13,7 +14,8 @@ class CreditCardMovementsPage extends StatefulWidget {
 }
 class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
   List<Map<String, dynamic>> movements = [];
-  String name = '', currency = '', filter = 'all';
+  String name = '', currencyFilter = 'all', filter = 'all';
+  Map<String, dynamic> cardData = {};
   bool loading = true;
   String? error;
   int requestId = 0;
@@ -23,7 +25,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
     'purchase': 'Compra', 'payment': 'Pago', 'interest': 'Intereses',
     'fee': 'Comisión', 'refund': 'Devolución', 'adjustment': 'Ajuste',
   };
-  int openingBalance = 0;
+
 
   String statusFilter = 'valid';
 
@@ -31,7 +33,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
   void initState() { super.initState(); loadData(); }
 
   Future<void> deleteMovement(Map<String, dynamic> tx) async {
-    if (loading || saving ||
+    if (loading || saving || tx['is_receivable_funding'] == true ||
         !['purchase', 'interest', 'fee', 'refund'].contains(tx['transaction_type'])) {
       return;
     }
@@ -86,7 +88,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
   }
 
   Future<void> editMovement(Map<String, dynamic> tx) async {
-    if (loading || saving ||
+    if (loading || saving || tx['is_receivable_funding'] == true ||
         !['purchase', 'interest', 'fee', 'refund'].contains(tx['transaction_type'])) {
       return;
     }
@@ -117,7 +119,15 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
       );
       if (data == null || !mounted) return;
       final changes = <String, dynamic>{
-        for (final key in ['amount', 'category_id', 'description', 'reference']) key: data[key],
+        for (final key in [
+          'transaction_type',
+          'currency',
+          'amount',
+          'category_id',
+          'description',
+          'reference',
+        ])
+          key: data[key],
       };
       final originalDate = DateTime.parse(tx['transaction_date'].toString()).toLocal();
       final selectedDate = DateTime.parse(data['transaction_date'].toString()).toLocal();
@@ -159,13 +169,13 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
     try {
       final user = supabase.auth.currentUser;
       if (user == null) throw Exception('Debes iniciar sesión nuevamente.');
-      final card = await supabase.from('credit_cards').select('name, currency, opening_balance')
+      final card = await supabase.from('credit_cards').select('id, name, currency, opening_balance, opening_balance_nio, opening_balance_usd')
           .eq('id', widget.cardId).eq('user_id', user.id).single();
       final rows = <Map<String, dynamic>>[];
       for (var offset = 0; ; offset += 500) {
         final result = await supabase.from('credit_card_transactions')
             .select('id, transaction_type, amount, currency, transaction_date, '
-            'description, reference, account_id, category_id, is_voided, void_reason, voided_at, accounts(name), categories(name)')
+            'description, reference, account_id, category_id, is_voided, is_receivable_funding, void_reason, voided_at, accounts(name), categories(name)')
             .eq('credit_card_id', widget.cardId).eq('user_id', user.id)
             .order('transaction_date', ascending: false).order('id')
             .range(offset, offset + 499);
@@ -176,10 +186,10 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
       if (!mounted || request != requestId) return;
       setState(() {
         name = card['name'].toString();
-        currency = card['currency'].toString();
+        cardData = card;
         movements = rows;
         loading = false;
-        openingBalance = moneyCents(card['opening_balance'] ?? 0);
+
       });
     } catch (e) {
       if (mounted && request == requestId) {
@@ -234,8 +244,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
     final dateText = date == null ? 'Fecha no disponible'
         : '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
     final txCurrency = tx['currency'].toString();
-    final symbol = txCurrency == 'USD' ? 'US\$' : 'C\$';
-    final amount = moneyCents(tx['amount']) / 100;
+    final amount = moneyCents(tx['amount']);
     final description = tx['description']?.toString().trim() ?? '';
     final reference = tx['reference']?.toString().trim() ?? '';
     final account = relatedName(tx['accounts']);
@@ -251,13 +260,13 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
             style: Theme.of(context).textTheme.titleMedium)),
         const SizedBox(width: 8),
         Flexible(child: Text(
-          '${voided ? '' : increases ? '+' : decreases ? '−' : ''}$symbol ${amount.toStringAsFixed(2)}',
+          '${voided ? '' : increases ? '+' : decreases ? '−' : ''}${formatMoneyCents(amount, txCurrency)}',
           textAlign: TextAlign.right,
           style: TextStyle(fontWeight: FontWeight.bold,
               color: increases ? Theme.of(context).colorScheme.error
                   : decreases ? Colors.green : null),
         )),
-        if (['purchase', 'interest', 'fee', 'refund'].contains(type))
+        if (tx['is_receivable_funding'] != true && ['purchase', 'interest', 'fee', 'refund'].contains(type))
           Wrap(alignment: WrapAlignment.end, spacing: 8, children: [
             TextButton.icon(
               onPressed: saving ? null : () => editMovement(tx),
@@ -283,10 +292,9 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
         const SizedBox(height: 6),
         SelectableText('Referencia: $reference'),
       ],
+      if (tx['is_receivable_funding'] == true)
+        const Text('Cargo vinculado a un prestamo. Administralo desde Prestamos por cobrar.'),
       if (type == 'adjustment') const Text('El efecto de este ajuste sobre la deuda está pendiente de definir.'),
-      if (txCurrency != currency)
-        Text('La moneda no coincide con la tarjeta.',
-            style: TextStyle(color: Theme.of(context).colorScheme.error)),
       if (voided)
         Text('Sin efecto en saldos. Motivo: ${tx['void_reason'] ?? 'No especificado'}'),
       if (voided && voidedAt != null)
@@ -310,6 +318,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
   @override
   Widget build(BuildContext context) {
     final visible = movements.where((tx) {
+      if (currencyFilter != 'all' && tx['currency'] != currencyFilter) { return false; }
       if (filter != 'all' && tx['transaction_type'] != filter) return false;
       final voided = tx['is_voided'] == true;
       if (statusFilter == 'valid' && voided) return false;
@@ -335,7 +344,24 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16), children: [
         Text(name, style: Theme.of(context).textTheme.headlineSmall),
-        Text('Deuda inicial: ${currency == 'USD' ? 'US\$' : 'C\$'} ${(openingBalance / 100).toStringAsFixed(2)}'),
+        for (final c in cardCurrencies) Card(child: Padding(
+          padding: const EdgeInsets.all(14), child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Text(c == 'USD' ? 'Dólares' : 'Córdobas', style: const TextStyle(fontWeight: FontWeight.w700)),
+              Text('Inicial: ${cardMoney(cardOpening(cardData, c), c)}'),
+              Builder(builder: (context) {
+                final balance = cardBalance(cardData,
+                  movements.map((tx) => {...tx, 'credit_card_id': widget.cardId}), c);
+                return Text('${balance != null && balance < 0 ? 'A favor' : 'Deuda'}: ${cardMoney(balance?.abs(), c)}');
+              }),
+            ]))),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(initialValue: currencyFilter,
+          decoration: const InputDecoration(labelText: 'Moneda'),
+          items: const [DropdownMenuItem(value: 'all', child: Text('Ambas monedas')),
+            DropdownMenuItem(value: 'NIO', child: Text('Córdobas')),
+            DropdownMenuItem(value: 'USD', child: Text('Dólares'))],
+          onChanged: (v) { if (v != null) { setState(() => currencyFilter = v); } }),
         const Padding(padding: EdgeInsets.symmetric(vertical: 12),
             child: Text('+ aumenta la deuda · − reduce la deuda')),
         DropdownButtonFormField<String>(

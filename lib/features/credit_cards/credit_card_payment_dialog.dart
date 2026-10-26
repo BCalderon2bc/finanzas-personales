@@ -1,16 +1,27 @@
 import 'package:flutter/material.dart';
+import '../../data/card_statement_logic.dart';
 
 class CreditCardPaymentDialog extends StatefulWidget {
-  const CreditCardPaymentDialog({super.key, required this.accounts, required this.currency});
+  const CreditCardPaymentDialog({super.key, required this.accounts, required this.currency, this.statements = const [], this.initialStatementId, this.initialAmountCents});
   final List<Map<String, dynamic>> accounts;
   final String currency;
+  final List<Map<String,dynamic>> statements;
+  final String? initialStatementId;
+  final int? initialAmountCents;
   @override
   State<CreditCardPaymentDialog> createState() => _CreditCardPaymentDialogState();
 }
 class _CreditCardPaymentDialogState extends State<CreditCardPaymentDialog> {
   final formKey = GlobalKey<FormState>();
   final amount = TextEditingController(), reference = TextEditingController();
-  String? accountId;
+  String? accountId, statementId;
+
+  @override
+  void initState() {
+    super.initState();
+    if(widget.initialAmountCents != null) { amount.text=(widget.initialAmountCents!/100).toStringAsFixed(2); }
+    statementId=widget.initialStatementId ?? (widget.statements.length==1?'${widget.statements.first['id']}':null);
+  }
 
   @override
   void dispose() { amount.dispose(); reference.dispose(); super.dispose(); }
@@ -19,6 +30,7 @@ class _CreditCardPaymentDialogState extends State<CreditCardPaymentDialog> {
     if (!formKey.currentState!.validate()) return;
     Navigator.pop(context, <String, dynamic>{
       'account_id': accountId,
+      'statement_id': statementId,
       'amount': double.parse(amount.text.trim().replaceAll(',', '.')),
       'reference': reference.text.trim().isEmpty ? null : reference.text.trim(),
     });
@@ -51,6 +63,18 @@ class _CreditCardPaymentDialogState extends State<CreditCardPaymentDialog> {
             return null;
           }),
       const SizedBox(height: 12),
+      if(widget.statements.isNotEmpty) ...[
+        DropdownButtonFormField<String>(initialValue:statementId??'none',isExpanded:true,
+          decoration:const InputDecoration(labelText:'Aplicar al estado de cuenta'),
+          items:[const DropdownMenuItem(value:'none',child:Text('Sin asignar a un corte')),
+            ...widget.statements.map((s)=>DropdownMenuItem(value:'${s['id']}',
+              child:Text('Corte ${shortStatementDate(s['closing_date'])}',overflow:TextOverflow.ellipsis)))],
+          onChanged:(v)=>setState(()=>statementId=v=='none'?null:v)),
+        const SizedBox(height:8),
+        const Text('Asigna solo pagos que no estén descontados del saldo al corte registrado.',
+          style:TextStyle(fontSize:12,color:Color(0xFF64748B))),
+        const SizedBox(height:12),
+      ],
       TextFormField(controller: reference,
           decoration: const InputDecoration(labelText: 'Referencia (opcional)')),
     ]),

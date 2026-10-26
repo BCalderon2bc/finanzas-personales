@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/money.dart';
 
 class TransactionBalances extends StatelessWidget {
   const TransactionBalances({
@@ -31,7 +32,7 @@ class TransactionBalances extends StatelessWidget {
         const SizedBox(height: 18),
         FittedBox(
             fit: BoxFit.scaleDown, alignment: Alignment.centerLeft,
-            child: Text('${usd ? 'US\$' : 'C\$'} ${(cents / 100).toStringAsFixed(2)}',
+            child: Text(formatMoneyCents(cents, currency),
                 style: const TextStyle(color: Colors.white,
                     fontSize: 29, fontWeight: FontWeight.w800, letterSpacing: -0.6))),
         const SizedBox(height: 8),

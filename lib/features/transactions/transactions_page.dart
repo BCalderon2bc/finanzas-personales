@@ -246,7 +246,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
 
   Future<void> toggleReconciliation(Map<String, dynamic> tx) async {
     if (saving || loading ||
-        ['credit_card_payment', 'debt_payment'].contains(tx['source'])) { return; }
+        ['credit_card_payment', 'debt_payment', 'receivable_loan'].contains(tx['source'])) { return; }
     final reconciled = tx['is_reconciled'] == true;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -305,7 +305,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
   }
 
   Widget _transactionCard(Map<String, dynamic> tx) {
-    final external = ['credit_card_payment', 'debt_payment'].contains(tx['source']);
+    final external = ['credit_card_payment', 'debt_payment', 'receivable_loan'].contains(tx['source']);
     final reconciled = tx['is_reconciled'] == true;
     return TransactionTile(
       transaction: tx,

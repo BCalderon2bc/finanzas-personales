@@ -9,7 +9,7 @@ class FinanzasApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Mis Finanzas',
+      title: 'Mi Billete',
       theme: createAppTheme(),
       home: const AuthGate(),
     );

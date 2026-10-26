@@ -23,7 +23,7 @@ class _DebtPaymentsPageState extends State<DebtPaymentsPage> {
   void initState() { super.initState(); loadData(); }
 
   String money(int cents) =>
-      '${currency == 'USD' ? 'US\$' : 'C\$'} ${(cents / 100).toStringAsFixed(2)}';
+      formatMoneyCents(cents, currency);
 
   Future<void> loadData() async {
     final request = ++requestId;

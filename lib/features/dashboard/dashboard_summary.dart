@@ -65,4 +65,4 @@ class DashboardSummary {
     return DashboardSummary(totals, dated.take(5).map((e) => e.value).toList(), names, DateTime(now.year, now.month));
   }
 }
-String formatMoney(int cents, String currency) => '${currency == 'USD' ? 'US\$' : 'C\$'} ${(cents / 100).toStringAsFixed(2)}';
+String formatMoney(int cents, String currency) => formatMoneyCents(cents, currency);

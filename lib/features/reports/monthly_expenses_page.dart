@@ -32,7 +32,7 @@ class _MonthlyExpensesPageState extends State<MonthlyExpensesPage> {
   }
 
   String money(int cents) =>
-      '${currency == 'USD' ? 'US\$' : 'C\$'} ${(cents / 100).toStringAsFixed(2)}';
+      formatMoneyCents(cents, currency);
 
   String categoryName(String key) => key == 'uncategorized'
       ? 'Sin categoría' : categoryNames[key] ?? 'Categoría no disponible';

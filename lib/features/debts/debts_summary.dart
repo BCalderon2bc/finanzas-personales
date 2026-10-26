@@ -8,7 +8,7 @@ class DebtsSummary extends StatelessWidget {
   final Map<String, int> principalPaid;
 
   String money(int cents, String currency) =>
-      '${currency == 'USD' ? 'US\$' : 'C\$'} ${(cents / 100).toStringAsFixed(2)}';
+      formatMoneyCents(cents, currency);
 
   Widget currencyCard(BuildContext context, String currency, DateTime now) {
     int pending = 0, overdue = 0, today = 0, count = 0;

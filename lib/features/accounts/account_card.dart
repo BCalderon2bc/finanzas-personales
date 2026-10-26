@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/money.dart';
 import '../../widgets/bank_brand.dart';
 
 const debitDesignLabels = {
@@ -34,7 +35,7 @@ class AccountCard extends StatelessWidget {
     final network = design['network']?.toString() ?? '';
     final digits = design['last_four']?.toString() ?? '';
     final ending = RegExp(r'^\d{4}$').hasMatch(digits) ? digits : '••••';
-    final currency = account['currency'] == 'USD' ? 'US\$' : 'C\$';
+    final currency = account['currency']?.toString() ?? 'NIO';
     final reference = account['account_reference']?.toString().trim() ?? '';
     final notes = account['notes']?.toString().trim() ?? '';
     const types = {
@@ -55,7 +56,7 @@ class AccountCard extends StatelessWidget {
     };
 
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(colors: colors,
             begin: Alignment.topLeft, end: Alignment.bottomRight),
@@ -84,27 +85,27 @@ class AccountCard extends StatelessWidget {
                 style: const TextStyle(color: Colors.white, fontSize: 11)),
           ),
         ]),
-        const SizedBox(height: 18),
+        const SizedBox(height: 12),
         Text(account['name']?.toString() ?? 'Mi cuenta',
             style: const TextStyle(color: Colors.white,
                 fontSize: 20, fontWeight: FontWeight.w700)),
         const SizedBox(height: 5),
         Text(bank.isEmpty ? types[type] ?? 'Cuenta' : '$bank · ${types[type] ?? 'Cuenta'}',
-            style: TextStyle(color: Colors.white.withAlpha(205), fontSize: 12)),
-        const SizedBox(height: 22),
+            style: TextStyle(color: Colors.white.withAlpha(205), fontSize: 13)),
+        const SizedBox(height: 14),
         Text(balanceLabel, style: TextStyle(
-            color: Colors.white.withAlpha(205), fontSize: 12)),
+            color: Colors.white.withAlpha(205), fontSize: 13)),
         const SizedBox(height: 5),
         FittedBox(
           fit: BoxFit.scaleDown, alignment: Alignment.centerLeft,
-          child: Text('$currency ${(balanceCents / 100).toStringAsFixed(2)}',
+          child: Text(formatMoneyCents(balanceCents, currency),
               style: const TextStyle(color: Colors.white,
                   fontSize: 32, fontWeight: FontWeight.w800, letterSpacing: -0.8)),
         ),
         if (debit) ...[
-          const SizedBox(height: 22),
+          const SizedBox(height: 14),
           Divider(color: Colors.white.withAlpha(40), height: 1),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           Row(children: [
             Expanded(child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -128,12 +129,12 @@ class AccountCard extends StatelessWidget {
         if (reference.isNotEmpty) ...[
           const SizedBox(height: 14),
           Text('Referencia: $reference',
-              style: TextStyle(color: Colors.white.withAlpha(210), fontSize: 12)),
+              style: TextStyle(color: Colors.white.withAlpha(210), fontSize: 13)),
         ],
         if (notes.isNotEmpty) ...[
           const SizedBox(height: 8),
           Text(notes, style: TextStyle(
-              color: Colors.white.withAlpha(190), fontSize: 12)),
+              color: Colors.white.withAlpha(190), fontSize: 13)),
         ],
         if (onEdit != null || onToggle != null) ...[
           const SizedBox(height: 12),

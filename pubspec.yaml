@@ -3,7 +3,7 @@ description: "A new Flutter project."
 
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
-version: 1.0.0+1
+version: 1.0.4+2
 
 environment:
   sdk: ^3.10.4
@@ -13,13 +13,14 @@ dependencies:
     sdk: flutter
 
   cupertino_icons: ^1.0.8
-  firebase_core: ^5.0.0
-  firebase_auth: ^7.0.0
-  cloud_firestore: ^7.0.0
   intl: ^0.20.3
   fl_chart: ^1.3.0
   supabase_flutter: ^2.18.3
   flutter_svg: ^2.3.0
+  package_info_plus: ^10.2.2
+  excel: 4.0.6
+  pdf: 3.12.0
+  file_saver: 0.3.1
 
 dev_dependencies:
   flutter_test:
@@ -30,6 +31,7 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - assets/fonts/
     - assets/banks/
     - assets/banks/atlantida.png
     - assets/banks/avanz.svg
@@ -37,9 +39,75 @@ flutter:
     - assets/banks/bdf.svg
     - assets/banks/bfp.svg
     - assets/banks/ficohsa.svg
+    - assets/branding/
+    - assets/branding/mi_billete.png
+    - assets/branding/mi_billete_logo.png
     - assets/cards/
     - assets/cards/bac_visa_platinum.webp
     - assets/cards/banpro_mastercard_platinum.webp
+    - assets/cards/physical_avanz_visa_business.png
+    - assets/cards/physical_avanz_visa_classic.png
+    - assets/cards/physical_avanz_visa_gold.png
+    - assets/cards/physical_avanz_visa_signature.png
+    - assets/cards/physical_bac_amex_black.webp
+    - assets/cards/physical_bac_amex_classic.webp
+    - assets/cards/physical_bac_amex_gold.webp
+    - assets/cards/physical_bac_amex_platinum.webp
+    - assets/cards/physical_bac_gascard.webp
+    - assets/cards/physical_bac_la_colonia.webp
+    - assets/cards/physical_bac_mastercard_black.webp
+    - assets/cards/physical_bac_mastercard_classic.webp
+    - assets/cards/physical_bac_mastercard_gold.webp
+    - assets/cards/physical_bac_mastercard_platinum.webp
+    - assets/cards/physical_bac_pricesmart_classic.webp
+    - assets/cards/physical_bac_pricesmart_platinum.webp
+    - assets/cards/physical_bac_visa_classic.webp
+    - assets/cards/physical_bac_visa_gold.webp
+    - assets/cards/physical_bac_visa_infinite.webp
+    - assets/cards/physical_bac_visa_platinum.webp
+    - assets/cards/physical_bac_visa_signature.webp
+    - assets/cards/physical_banpro_mastercard_black.webp
+    - assets/cards/physical_banpro_mastercard_gold.webp
+    - assets/cards/physical_banpro_mastercard_platinum.webp
+    - assets/cards/physical_banpro_uno.webp
+    - assets/cards/physical_banpro_visa_gold.webp
+    - assets/cards/physical_banpro_visa_infinite.webp
+    - assets/cards/physical_banpro_visa_platinum.webp
+    - assets/cards/physical_banpro_visa_signature.webp
+    - assets/cards/physical_banpro_walmart_classic.webp
+    - assets/cards/physical_banpro_walmart_gold.webp
+    - assets/cards/physical_banpro_walmart_platinum.webp
+    - assets/cards/physical_bdf_visa_classic.jpg
+    - assets/cards/physical_bdf_visa_gold.jpg
+    - assets/cards/physical_bdf_visa_infinite.jpg
+    - assets/cards/physical_bdf_visa_platinum.jpg
+    - assets/cards/physical_bdf_visa_signature.jpg
+    - assets/cards/physical_ficohsa_aadvantage_black.png
+    - assets/cards/physical_ficohsa_aadvantage_platinum.png
+    - assets/cards/physical_ficohsa_cashback_classic.png
+    - assets/cards/physical_ficohsa_cashback_one.png
+    - assets/cards/physical_ficohsa_cashback_signature.svg
+    - assets/cards/physical_ficohsa_lifemiles_gold.png
+    - assets/cards/physical_ficohsa_lifemiles_infinite.png
+    - assets/cards/physical_ficohsa_lifemiles_platinum.png
+    - assets/cards/physical_ficohsa_mastercard_black.png
+    - assets/cards/physical_ficohsa_visa_classic.png
+    - assets/cards/physical_ficohsa_visa_gold.png
+    - assets/cards/physical_ficohsa_visa_platinum.png
+    - assets/cards/physical_ficohsa_visa_signature.png
+    - assets/cards/physical_lafise_business_visa.webp
+    - assets/cards/physical_lafise_dtodo_visa.webp
+    - assets/cards/physical_lafise_fzt_visa.webp
+    - assets/cards/physical_lafise_mastercard_black.webp
+    - assets/cards/physical_lafise_mastercard_black_business.webp
+    - assets/cards/physical_lafise_mastercard_classic.webp
+    - assets/cards/physical_lafise_mastercard_gold.webp
+    - assets/cards/physical_lafise_mastercard_platinum.webp
+    - assets/cards/physical_lafise_visa_classic.webp
+    - assets/cards/physical_lafise_visa_gold.webp
+    - assets/cards/physical_lafise_visa_infinite.webp
+    - assets/cards/physical_lafise_visa_platinum.webp
+    - assets/cards/physical_lafise_visa_signature.webp
     - assets/networks/
     - assets/networks/mastercard.png
     - assets/networks/visa.png

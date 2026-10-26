@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/money.dart';
 import '../../widgets/category_style.dart';
 
 class BudgetCard extends StatelessWidget {
@@ -13,7 +14,7 @@ class BudgetCard extends StatelessWidget {
   final Map<String, dynamic>? categoryStyle;
 
   String money(int cents) =>
-      '${currency == 'USD' ? 'US\$' : 'C\$'} ${(cents / 100).toStringAsFixed(2)}';
+      formatMoneyCents(cents, currency);
 
   @override
   Widget build(BuildContext context) {

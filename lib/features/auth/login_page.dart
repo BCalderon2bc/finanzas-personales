@@ -90,14 +90,15 @@ class _LoginPageState extends State<LoginPage> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Icon(
-                        Icons.account_balance_wallet_rounded,
-                        size: 64,
-                        color: primaryColor,
-                      ),
+                      Center(child: ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: Image.asset('assets/branding/mi_billete.png',
+                          width: 80, height: 80, fit: BoxFit.contain,
+                          semanticLabel: 'Mi Billete'),
+                      )),
                       const SizedBox(height: 16),
                       const Text(
-                        'Mis Finanzas',
+                        'Mi Billete',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 29,
@@ -203,6 +204,13 @@ class _LoginPageState extends State<LoginPage> {
                               ? 'Ya tengo una cuenta. Iniciar sesión'
                               : 'No tengo cuenta. Registrarme',
                         ),
+                      ),
+
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: Text("Versión 1.0.4",
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
                       ),
                     ],
                   ),
