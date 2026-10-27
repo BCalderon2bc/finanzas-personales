@@ -1,3 +1,4 @@
+import 'zero_plans_agenda.dart';
 import 'package:flutter/material.dart';
 import '../../core/supabase_client.dart';
 import '../../data/card_statement_repository.dart';
@@ -273,7 +274,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 20),
               child: Text(
-                'No hay vencimientos pendientes ni cortes previstos para los próximos 7 días.',
+                'No hay otros vencimientos pendientes ni cortes previstos para los próximos 7 días.',
               ),
             )
           else ...[
@@ -286,6 +287,10 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
                 ),
               ),
           ],
+          ZeroPlansAgenda(
+            refreshToken: (widget.refreshToken, requestId),
+            onChanged: load,
+          ),
           ExpansionTile(
             tilePadding: EdgeInsets.zero,
             title: const Text(
