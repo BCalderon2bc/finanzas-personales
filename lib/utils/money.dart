@@ -7,19 +7,22 @@ int moneyCents(dynamic value) {
 }
 
 Map<String, int> calculateBalances(
-    List<Map<String, dynamic>> accounts,
-    List<Map<String, dynamic>> transactions, {
-    List<Map<String, dynamic>> cardPayments = const [],
-    List<Map<String, dynamic>> debtPayments = const [],
-    }) {
+  List<Map<String, dynamic>> accounts,
+  List<Map<String, dynamic>> transactions, {
+  List<Map<String, dynamic>> cardPayments = const [],
+  List<Map<String, dynamic>> debtPayments = const [],
+}) {
   final balances = <String, int>{
-    for (final a in accounts) a['id'].toString(): moneyCents(a['opening_balance']),
+    for (final a in accounts)
+      a['id'].toString(): moneyCents(a['opening_balance']),
   };
   for (final tx in transactions) {
     final type = tx['transaction_type'];
     // El esquema no indica la dirección de un ajuste; no inventar su efecto.
     if (type == 'adjustment') {
-      throw StateError('Hay ajustes registrados. Debemos definir su efecto antes de calcular el saldo.');
+      throw StateError(
+        'Hay ajustes registrados. Debemos definir su efecto antes de calcular el saldo.',
+      );
     }
     final origin = tx['account_id'].toString();
     final destination = tx['destination_account_id']?.toString();
@@ -50,32 +53,40 @@ Map<String, int> calculateBalances(
   for (final payment in cardPayments) {
     final accountId = payment['account_id']?.toString();
     if (!balances.containsKey(accountId)) continue;
-    if (currencies[accountId] != payment['currency']) {
-      throw StateError('Un pago de tarjeta tiene una moneda diferente a su cuenta.');
+    if (currencies[accountId] !=
+        (payment['account_debit_currency'] ?? payment['currency'])) {
+      throw StateError(
+        'La moneda del débito del pago no coincide con su cuenta.',
+      );
     }
-    balances[accountId!] = balances[accountId]! - moneyCents(payment['amount']);
+    balances[accountId!] =
+        balances[accountId]! -
+        moneyCents(payment['account_debit_amount'] ?? payment['amount']);
   }
   for (final payment in debtPayments) {
     final accountId = payment['account_id']?.toString();
     if (!balances.containsKey(accountId)) continue;
     if (currencies[accountId] != payment['currency']) {
-      throw StateError('Un abono de deuda tiene una moneda diferente a su cuenta.');
+      throw StateError(
+        'Un abono de deuda tiene una moneda diferente a su cuenta.',
+      );
     }
-    balances[accountId!] = balances[accountId]! - debtPaymentTotalCents(payment);
+    balances[accountId!] =
+        balances[accountId]! - debtPaymentTotalCents(payment);
   }
   return balances;
 }
 
 int debtPaymentTotalCents(Map<String, dynamic> payment) =>
     moneyCents(payment['principal_amount']) +
-        moneyCents(payment['interest_amount']) +
-        moneyCents(payment['fee_amount']);
+    moneyCents(payment['interest_amount']) +
+    moneyCents(payment['fee_amount']);
 
 String formatAmountCents(int cents) {
   final absolute = cents.abs();
   final whole = (absolute ~/ 100).toString().replaceAllMapped(
     RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
-        (match) => '${match[1]},',
+    (match) => '${match[1]},',
   );
   final decimals = (absolute % 100).toString().padLeft(2, '0');
 

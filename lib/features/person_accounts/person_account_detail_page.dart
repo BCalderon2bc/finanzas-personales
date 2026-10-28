@@ -104,6 +104,138 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
     }
   }
 
+  Future<void> deleteAccount() async {
+    if (loading || saving) return;
+    final uid = supabase.auth.currentUser?.id;
+    if (uid == null) {
+      message('Debes iniciar sesión nuevamente.');
+      return;
+    }
+    final id = '${account['id']}';
+    var requested = false;
+    setState(() => saving = true);
+    void finish() {
+      if (!mounted) return;
+      ++requestId;
+      final messenger = ScaffoldMessenger.of(context);
+      Navigator.pop(context);
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Cuenta eliminada.')),
+      );
+    }
+
+    try {
+      final preview = Map<String, dynamic>.from(
+        await supabase.rpc(
+              'person_account_delete_preview',
+              params: {'p_account_id': id},
+            )
+            as Map,
+      );
+      checkPersonSession(uid);
+      if (!mounted) return;
+      final balance = moneyCents(preview['balance_nio']);
+      var confirmation = '';
+      final yes = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, dialogSetState) => AlertDialog(
+            title: const Text('Eliminar cuenta con persona'),
+            content: SizedBox(
+              width: 440,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      '${preview['name']}',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '${personBalanceLabel(balance)} · ${formatMoneyCents(balance.abs(), 'NIO')}',
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Se borrarán la cuenta, sus ${preview['entry_count']} movimientos (incluidos los anulados) '
+                      'y sus ${preview['closure_count']} cierres acordados.',
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Esta acción es permanente. Eliminar este registro no equivale a pagar ni a cobrar el saldo pendiente.',
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      decoration: const InputDecoration(
+                        labelText: 'Escribe ELIMINAR',
+                      ),
+                      onChanged: (v) => dialogSetState(() => confirmation = v),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancelar'),
+              ),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(dialogContext).colorScheme.error,
+                ),
+                onPressed: confirmation == 'ELIMINAR'
+                    ? () => Navigator.pop(dialogContext, true)
+                    : null,
+                icon: const Icon(Icons.delete_forever),
+                label: const Text('Eliminar definitivamente'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (yes != true || !mounted) return;
+      checkPersonSession(uid);
+      requested = true;
+      await supabase.rpc(
+        'delete_person_account',
+        params: {
+          'p_account_id': id,
+          'p_token': preview['token'],
+          'p_confirmation': 'ELIMINAR',
+        },
+      );
+      checkPersonSession(uid);
+      finish();
+    } catch (e) {
+      // Si se perdió la respuesta del servidor, verificar antes de mostrar un
+      // fallo de una cuenta que realmente ya fue eliminada.
+      if (requested && supabase.auth.currentUser?.id == uid) {
+        try {
+          final existing = await supabase
+              .from('person_accounts')
+              .select('id')
+              .eq('id', id)
+              .eq('user_id', uid)
+              .maybeSingle();
+          checkPersonSession(uid);
+          if (existing == null) {
+            finish();
+            return;
+          }
+        } catch (_) {
+          /* Se podrá actualizar o volver a intentar. */
+        }
+      }
+      message('No se pudo eliminar: $e');
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
   Future<void> editAccount() => run((uid) async {
     final data = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -473,6 +605,19 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
                             ),
                             trailing: const Icon(Icons.chevron_right),
                             onTap: saving ? null : openClosures,
+                          ),
+                        ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            style: TextButton.styleFrom(
+                              foregroundColor: Theme.of(
+                                context,
+                              ).colorScheme.error,
+                            ),
+                            onPressed: loading || saving ? null : deleteAccount,
+                            icon: const Icon(Icons.delete_outline),
+                            label: const Text('Eliminar cuenta'),
                           ),
                         ),
                         if ('${account['notes'] ?? ''}'.isNotEmpty)

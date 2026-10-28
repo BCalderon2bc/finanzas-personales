@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/app_theme.dart';
 import '../../core/supabase_client.dart';
+import '../../widgets/app_version_footer.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -206,12 +207,7 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
 
-                      Padding(
-                        padding: const EdgeInsets.only(top: 16),
-                        child: Text("Versión 1.0.5",
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
-                      ),
+                      const AppVersionFooter(),
                     ],
                   ),
                 ),

@@ -2,6 +2,7 @@ import 'zero_plans_page.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/supabase_client.dart';
+import '../../utils/money.dart';
 import '../../data/card_statement_repository.dart';
 import 'credit_card_statements_page.dart';
 import 'credit_card_period_summary.dart';
@@ -342,19 +343,26 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
             'name',
             'card_reference',
             'credit_limit',
+            'currency',
             'closing_day',
             'payment_day',
             'institution_id',
             'network',
             'card_tier',
             'card_product',
-            'opening_balance',
-            'opening_balance_nio',
-            'opening_balance_usd',
             'limit_exchange_rate',
           ])
             if (data.containsKey(key)) key: data[key],
         };
+        // Los saldos sin cambios se conservan en la base de datos. El trigger
+        // sincroniza opening_balance con la moneda del límite seleccionada.
+        for (final c in cardCurrencies) {
+          final key = 'opening_balance_${c.toLowerCase()}';
+          if (data.containsKey(key) &&
+              moneyCents(data[key]) != cardOpening(card, c)) {
+            changes[key] = data[key];
+          }
+        }
         await supabase
             .from('credit_cards')
             .update(changes)

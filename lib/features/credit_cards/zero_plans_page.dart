@@ -17,7 +17,11 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
   final commands = ZeroCommands();
   ZeroPlanData? data;
   Map<String, dynamic>? card;
-  List<Map<String, dynamic>> accounts = [], categories = [], statements = [];
+  List<Map<String, dynamic>> accounts = [],
+      categories = [],
+      statements = [],
+      availableCards = [],
+      editHistory = [];
   bool loading = true, busy = false, showVoided = false;
   String? error;
   int request = 0;
@@ -55,6 +59,8 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
           'id,credit_card_id,currency,closing_date,due_date,is_archived,is_voided',
           uid,
         ),
+        statementRows('credit_cards', 'id,name,currency,is_active', uid),
+        statementRows('card_zero_plan_edits', '*', uid),
       ]);
       zeroSession(uid);
       if (!mounted || req != request) return;
@@ -64,6 +70,8 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
         accounts = rows[2] as List<Map<String, dynamic>>;
         categories = rows[3] as List<Map<String, dynamic>>;
         statements = rows[4] as List<Map<String, dynamic>>;
+        availableCards = rows[5] as List<Map<String, dynamic>>;
+        editHistory = rows[6] as List<Map<String, dynamic>>;
         loading = false;
       });
     } catch (e) {
@@ -254,6 +262,202 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
     await commands.run('zero_plan_create', {'p_data': v}, operation: true);
     message('Plan registrado sin duplicar cuotas ni pagos anteriores.');
   });
+  Future<void> editPlan(Map<String, dynamic> plan) => run(() async {
+    final sourceTx = data!.transactions
+        .where((t) => t['id'] == plan['source_transaction_id'])
+        .firstOrNull;
+    final v = await zeroForm(
+      context,
+      'Editar plan tasa cero',
+      [
+        ZeroField(
+          'credit_card_id',
+          'Tarjeta del plan',
+          type: 'choice',
+          options: {
+            for (final c in availableCards.where(
+              (c) =>
+                  c['is_active'] == true || c['id'] == plan['credit_card_id'],
+            ))
+              '${c['id']}': '${c['name']}',
+          },
+        ),
+        const ZeroField('description', 'Descripción de la compra'),
+        const ZeroField(
+          'entry_mode',
+          'Cómo está registrada la deuda',
+          type: 'choice',
+          options: {
+            'new': 'Compra nueva registrada como gasto',
+            'included': 'Pendiente YA incluido en la deuda de tarjeta',
+            'opening': 'Pendiente añadido a la deuda inicial',
+          },
+        ),
+        const ZeroField(
+          'currency',
+          'Moneda del plan',
+          type: 'choice',
+          options: {'NIO': 'Córdobas', 'USD': 'Dólares'},
+        ),
+        const ZeroField('original_amount', 'Monto original', type: 'money'),
+        const ZeroField(
+          'total_installments',
+          'Cantidad TOTAL de cuotas (1 a 120)',
+        ),
+        const ZeroField(
+          'historical_paid',
+          'Cuotas completas pagadas ANTES de ingresarlo',
+        ),
+        const ZeroField(
+          'monthly_amount',
+          'Cuota mensual del banco (vacío: recalcular)',
+          type: 'money',
+          required: false,
+        ),
+        const ZeroField('purchase_date', 'Fecha de compra', type: 'date'),
+        const ZeroField(
+          'first_due',
+          'Vencimiento de la PRIMERA cuota original',
+          type: 'date',
+        ),
+        ZeroField(
+          'category_id',
+          'Categoría (solo para compra nueva)',
+          type: 'choice',
+          required: false,
+          options: {
+            '': 'Sin categoría',
+            for (final c in categories.where(
+              (c) =>
+                  c['category_type'] == 'expense' &&
+                  (c['is_active'] == true ||
+                      c['id'] == sourceTx?['category_id']),
+            ))
+              '${c['id']}': '${c['name']}',
+          },
+        ),
+      ],
+      initial: {...plan, 'category_id': sourceTx?['category_id']},
+      info:
+          'Los pagos reales se conservan y no se convierten en cuotas históricas. Si usas Compra nueva, las cuotas históricas deben ser 0. Para cambiar moneda o tarjeta quita antes los vínculos de pagos y cortes. No se convierten monedas automáticamente.',
+    );
+    if (v == null || !mounted) return;
+    final n = int.tryParse('${v['total_installments']}'),
+        paid = int.tryParse('${v['historical_paid']}');
+    if (n == null || paid == null || paid < 0 || paid > n)
+      throw StateError('Revisa el total y las cuotas pagadas previamente.');
+    if (v['entry_mode'] == 'new' && paid != 0)
+      throw StateError(
+        'Compra nueva usa cero cuotas históricas. Conserva los pagos reales mediante sus vínculos.',
+      );
+    final split = zeroSplit(
+      moneyCents(v['original_amount']),
+      n,
+      monthly: v['monthly_amount'] == null
+          ? null
+          : moneyCents(v['monthly_amount']),
+    );
+    final pending = split.skip(paid).fold<int>(0, (sum, q) => sum + q),
+        curr = '${v['currency']}';
+    final purchase = DateTime.parse('${v['purchase_date']}'),
+        first = DateTime.parse('${v['first_due']}');
+    if (first.isBefore(purchase))
+      throw StateError('La primera cuota no puede vencer antes de la compra.');
+    final previousContribution = plan['entry_mode'] == 'new'
+        ? moneyCents(plan['original_amount'])
+        : plan['entry_mode'] == 'opening'
+        ? moneyCents(plan['initial_pending'])
+        : 0;
+    final nextContribution = v['entry_mode'] == 'new'
+        ? moneyCents(v['original_amount'])
+        : v['entry_mode'] == 'opening'
+        ? pending
+        : 0;
+    final oldName =
+        availableCards
+            .where((c) => c['id'] == plan['credit_card_id'])
+            .firstOrNull?['name'] ??
+        'Tarjeta original';
+    final newName =
+        availableCards
+            .where((c) => c['id'] == v['credit_card_id'])
+            .firstOrNull?['name'] ??
+        'Tarjeta seleccionada';
+    final same =
+        plan['credit_card_id'] == v['credit_card_id'] &&
+        plan['currency'] == curr;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Revisar cambios del plan'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('${plan['description']} → ${v['description']}'),
+              Text('Tarjeta: $newName'),
+              Text(
+                'Monto original: ${formatMoneyCents(moneyCents(v['original_amount']), curr)}',
+              ),
+              Text(
+                '$paid de $n cuotas históricas. El resto conserva sus pagos vinculados.',
+              ),
+              Text(
+                'Pendiente antes de restar pagos vinculados: ${formatMoneyCents(pending, curr)}',
+              ),
+              Text('Primera cuota: ${zeroDateLabel(first)}'),
+              const SizedBox(height: 12),
+              if (same)
+                Text(
+                  'Variación en la deuda total de tarjeta: ${formatMoneyCents(nextContribution - previousContribution, curr)}',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                )
+              else ...[
+                Text(
+                  'Se retira el aporte del plan en $oldName: ${formatMoneyCents(previousContribution, '${plan['currency']}')}',
+                ),
+                Text(
+                  'Se registra en $newName: ${formatMoneyCents(nextContribution, curr)}',
+                ),
+              ],
+              const SizedBox(height: 8),
+              const Text(
+                'YA incluido conserva la deuda que registraste por separado; debes comprobar que el pendiente esté dentro de ella. La edición no mueve ni convierte pagos bancarios, ni modifica los montos de cortes ya registrados. Una compra nueva corregida también actualiza el gasto y su fecha.',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Guardar cambios'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    v['total_installments'] = n;
+    v['historical_paid'] = paid;
+    v['confirmed'] = true;
+    v['purchase_timestamp'] = DateTime(
+      purchase.year,
+      purchase.month,
+      purchase.day,
+      12,
+    ).toUtc().toIso8601String();
+    await commands.run('zero_plan_edit', {
+      'p_plan_id': plan['id'],
+      'p_expected_revision': plan['revision'] ?? 0,
+      'p_data': v,
+    }, operation: true);
+    message('Plan actualizado. Los pagos bancarios se conservan.');
+  });
+
   Future<void> pay(
     Map<String, dynamic> p,
     Map<String, dynamic> i, {
@@ -592,6 +796,35 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
               title: const Text('Ver cuotas, pagos y cortes'),
               children: list.map((i) => installment(p, i)).toList(),
             ),
+            if (p['is_voided'] != true)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: busy ? null : () => editPlan(p),
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Editar plan'),
+                ),
+              ),
+            if (editHistory.any((e) => e['plan_id'] == p['id']))
+              ExpansionTile(
+                title: const Text('Historial de cambios'),
+                children: editHistory.where((e) => e['plan_id'] == p['id']).map((
+                  e,
+                ) {
+                  final before = Map<String, dynamic>.from(
+                        (e['before_data'] as Map)['plan'] as Map,
+                      ),
+                      after = Map<String, dynamic>.from(
+                        (e['after_data'] as Map)['plan'] as Map,
+                      );
+                  return ListTile(
+                    title: Text('Editado: ${zeroDateLabel(e['created_at'])}'),
+                    subtitle: Text(
+                      '${before['description']} → ${after['description']}\n${formatMoneyCents(moneyCents(before['original_amount']), '${before['currency']}')} → ${formatMoneyCents(moneyCents(after['original_amount']), '${after['currency']}')} · ${before['total_installments']} → ${after['total_installments']} cuotas',
+                    ),
+                  );
+                }).toList(),
+              ),
             if (p['is_voided'] != true)
               Align(
                 alignment: Alignment.centerRight,

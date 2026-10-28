@@ -26,7 +26,9 @@ class _AccountsPageState extends State<AccountsPage> {
 
   Map<String, dynamic>? get selectedAccount {
     for (final account in accounts) {
-      if (account['id'].toString() == selectedAccountId) { return account; }
+      if (account['id'].toString() == selectedAccountId) {
+        return account;
+      }
     }
     return null;
   }
@@ -40,22 +42,31 @@ class _AccountsPageState extends State<AccountsPage> {
   Future<void> loadAccounts() async {
     if (!mounted) return;
     final request = ++requestId;
-    setState(() { loading = true; error = null; });
+    setState(() {
+      loading = true;
+      error = null;
+    });
     try {
       final user = supabase.auth.currentUser;
       if (user == null) throw Exception('Debes iniciar sesión nuevamente.');
-      final result = await supabase.from('accounts').select(
-        'id, name, account_type, currency, opening_balance, '
-            'institution_id, account_reference, is_active, notes, card_design, '
-            'created_at, financial_institutions(name)',
-      ).eq('user_id', user.id).order('created_at', ascending: false);
+      final result = await supabase
+          .from('accounts')
+          .select(
+            'id, name, account_type, currency, opening_balance, '
+            'institution_id, account_reference, account_number, account_holder, account_iban, is_active, notes, card_design, '
+            'created_at, financial_institutions(name, code)',
+          )
+          .eq('user_id', user.id)
+          .order('created_at', ascending: false);
       final accountRows = List<Map<String, dynamic>>.from(result);
       final rows = await loadUserTransactions(user.id);
       final payments = await loadUserCardPayments(user.id);
       final debtPayments = await loadUserDebtPayments(user.id);
       final balances = calculateBalances(
-        accountRows, rows,
-        cardPayments: payments, debtPayments: debtPayments,
+        accountRows,
+        rows,
+        cardPayments: payments,
+        debtPayments: debtPayments,
       );
       if (!mounted || request != requestId) return;
 
@@ -78,15 +89,21 @@ class _AccountsPageState extends State<AccountsPage> {
       setState(() {
         accounts = sortedAccounts;
         currentBalances = balances;
-        if (!accounts.any((account) => account['id'].toString() == selectedAccountId)) {
-          selectedAccountId = accounts.isEmpty ? null : accounts.first['id'].toString();
+        if (!accounts.any(
+          (account) => account['id'].toString() == selectedAccountId,
+        )) {
+          selectedAccountId = accounts.isEmpty
+              ? null
+              : accounts.first['id'].toString();
         }
         loading = false;
       });
-
     } catch (e) {
       if (!mounted || request != requestId) return;
-      setState(() { error = e.toString(); loading = false; });
+      setState(() {
+        error = e.toString();
+        loading = false;
+      });
     }
   }
 
@@ -112,17 +129,32 @@ class _AccountsPageState extends State<AccountsPage> {
       } else {
         final changes = <String, dynamic>{
           for (final key in [
-            'name', 'institution_id', 'account_reference', 'notes',
-            'card_design', 'opening_balance',
+            'name',
+            'institution_id',
+            'account_reference',
+            'account_number',
+            'account_holder',
+            'account_iban',
+            'notes',
+            'card_design',
+            'opening_balance',
           ])
             if (data.containsKey(key)) key: data[key],
         };
-        await supabase.from('accounts').update(changes)
-            .eq('id', account['id']).eq('user_id', user.id).select('id').single();
+        await supabase
+            .from('accounts')
+            .update(changes)
+            .eq('id', account['id'])
+            .eq('user_id', user.id)
+            .select('id')
+            .single();
       }
       if (!mounted) return;
-      showMessage(account == null
-          ? 'Cuenta creada correctamente.' : 'Cuenta actualizada correctamente.');
+      showMessage(
+        account == null
+            ? 'Cuenta creada correctamente.'
+            : 'Cuenta actualizada correctamente.',
+      );
       await loadAccounts();
     } on PostgrestException catch (e) {
       if (mounted) showMessage('Error de base de datos: ${e.message}');
@@ -145,13 +177,17 @@ class _AccountsPageState extends State<AccountsPage> {
             title: const Text('Desactivar cuenta'),
             content: Text(
               '¿Desactivar "${account['name']}"? Se conserva su historial. '
-                  'No aparecerá para nuevos movimientos ni en los totales de cuentas activas.',
+              'No aparecerá para nuevos movimientos ni en los totales de cuentas activas.',
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancelar')),
-              FilledButton(onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Desactivar')),
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancelar'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Desactivar'),
+              ),
             ],
           ),
         );
@@ -159,8 +195,13 @@ class _AccountsPageState extends State<AccountsPage> {
       }
       final user = supabase.auth.currentUser;
       if (user == null) throw StateError('Debes iniciar sesión nuevamente.');
-      await supabase.from('accounts').update({'is_active': active})
-          .eq('id', account['id']).eq('user_id', user.id).select('id').single();
+      await supabase
+          .from('accounts')
+          .update({'is_active': active})
+          .eq('id', account['id'])
+          .eq('user_id', user.id)
+          .select('id')
+          .single();
       if (!mounted) return;
       showMessage(active ? 'Cuenta activada.' : 'Cuenta desactivada.');
       await loadAccounts();
@@ -183,102 +224,151 @@ class _AccountsPageState extends State<AccountsPage> {
       actions: [
         IconButton(
           onPressed: loading || saving ? null : loadAccounts,
-          tooltip: 'Actualizar', icon: const Icon(Icons.refresh),
+          tooltip: 'Actualizar',
+          icon: const Icon(Icons.refresh),
         ),
       ],
     ),
-    bottomNavigationBar: MediaQuery.sizeOf(context).width >= 650 ? null
-      : SafeArea(top: false, minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-        child: FilledButton.icon(
-          style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
-          onPressed: saving || loading || error != null ? null : () => addAccount(),
-          icon: saving ? const SizedBox(width: 18, height: 18,
-            child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.add),
-          label: Text(saving ? 'Guardando...' : 'Nueva cuenta'))),
-    floatingActionButton: MediaQuery.sizeOf(context).width < 650 ? null : FloatingActionButton.extended(
-      onPressed: saving || loading || error != null ? null : () => addAccount(),
-      icon: saving
-          ? const SizedBox(width: 20, height: 20,
-          child: CircularProgressIndicator(strokeWidth: 2))
-          : const Icon(Icons.add),
-      label: Text(saving ? 'Guardando...' : 'Nueva cuenta'),
-    ),
+    bottomNavigationBar: MediaQuery.sizeOf(context).width >= 650
+        ? null
+        : SafeArea(
+            top: false,
+            minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+              onPressed: saving || loading || error != null
+                  ? null
+                  : () => addAccount(),
+              icon: saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.add),
+              label: Text(saving ? 'Guardando...' : 'Nueva cuenta'),
+            ),
+          ),
+    floatingActionButton: MediaQuery.sizeOf(context).width < 650
+        ? null
+        : FloatingActionButton.extended(
+            onPressed: saving || loading || error != null
+                ? null
+                : () => addAccount(),
+            icon: saving
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.add),
+            label: Text(saving ? 'Guardando...' : 'Nueva cuenta'),
+          ),
     body: SafeArea(top: false, child: _buildBody()),
   );
 
   Widget _buildBody() {
     if (loading) return const Center(child: CircularProgressIndicator());
     if (error != null) {
-      return Center(child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 500),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.error_outline, size: 48),
-            const SizedBox(height: 12),
-            const Text('No se pudieron cargar las cuentas',
-                style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            SelectableText(error!),
-            const SizedBox(height: 16),
-            FilledButton(onPressed: loadAccounts, child: const Text('Reintentar')),
-          ]),
+      return Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 500),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, size: 48),
+                const SizedBox(height: 12),
+                const Text(
+                  'No se pudieron cargar las cuentas',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                SelectableText(error!),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: loadAccounts,
+                  child: const Text('Reintentar'),
+                ),
+              ],
+            ),
+          ),
         ),
-      ));
+      );
     }
     if (accounts.isEmpty) {
-      return Center(child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.account_balance_wallet_outlined,
-              size: 64, color: Color(0xFF2563EB)),
-          const SizedBox(height: 16),
-          const Text('Todavía no tienes cuentas',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          const Text(
-            'Registra tu banco, cuenta de ahorro o efectivo '
+      return Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.account_balance_wallet_outlined,
+                size: 64,
+                color: Color(0xFF2563EB),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Todavía no tienes cuentas',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Registra tu banco, cuenta de ahorro o efectivo '
                 'para empezar a controlar tu dinero.',
-            textAlign: TextAlign.center,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: saving ? null : () => addAccount(),
+                icon: const Icon(Icons.add),
+                label: const Text('Crear primera cuenta'),
+              ),
+            ],
           ),
-          const SizedBox(height: 20),
-          FilledButton.icon(
-            onPressed: saving ? null : () => addAccount(),
-            icon: const Icon(Icons.add),
-            label: const Text('Crear primera cuenta'),
-          ),
-        ]),
-      ));
+        ),
+      );
     }
 
     final selected = selectedAccount;
-    return Center(child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 1100),
-      child: RefreshIndicator(
-        onRefresh: loadAccounts,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.fromLTRB(12, 16, 12,
-            MediaQuery.sizeOf(context).width < 650 ? 24 : 110),
-          children: [
-            AccountWallet(
-              accounts: accounts,
-              balances: currentBalances,
-              selectedId: selectedAccountId,
-              onSelected: saving ? null
-                  : (id) => setState(() => selectedAccountId = id),
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1100),
+        child: RefreshIndicator(
+          onRefresh: loadAccounts,
+          child: ListView(
+            physics: const ClampingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
             ),
-            const SizedBox(height: 14),
-            if (selected != null)
-              AccountDetails(
-                account: selected,
-                balanceCents: currentBalances[selected['id'].toString()] ?? 0,
-                onEdit: saving ? null : () => addAccount(selected),
-                onToggle: saving ? null : () => toggleAccount(selected),
+            padding: EdgeInsets.fromLTRB(
+              12,
+              16,
+              12,
+              MediaQuery.sizeOf(context).width < 650 ? 24 : 110,
+            ),
+            children: [
+              AccountWallet(
+                accounts: accounts,
+                balances: currentBalances,
+                selectedId: selectedAccountId,
+                onSelected: saving
+                    ? null
+                    : (id) => setState(() => selectedAccountId = id),
               ),
-          ],
+              const SizedBox(height: 14),
+              if (selected != null)
+                AccountDetails(
+                  account: selected,
+                  balanceCents: currentBalances[selected['id'].toString()] ?? 0,
+                  onEdit: saving ? null : () => addAccount(selected),
+                  onToggle: saving ? null : () => toggleAccount(selected),
+                ),
+            ],
+          ),
         ),
       ),
-    ));
+    );
   }
 }

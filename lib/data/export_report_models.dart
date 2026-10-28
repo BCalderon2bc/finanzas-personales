@@ -188,6 +188,10 @@ List<ExportMovement> normalizeExportMovements({
       0,
       expense,
       unknown: !cardTypes.containsKey(type),
+      description: type == 'payment' && tx['account_debit_amount'] != null
+          ? '${tx['description'] ?? ''} · Débito de cuenta: ${formatMoneyCents(moneyCents(tx['account_debit_amount']), '${tx['account_debit_currency']}')}'
+                '${tx['payment_exchange_rate'] == null ? '' : ' · Tasa C\$ ${tx['payment_exchange_rate']} por US\$1'}'
+          : null,
     );
   }
   for (final p in debtPayments) {

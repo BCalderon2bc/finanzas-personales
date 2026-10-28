@@ -78,7 +78,7 @@ Future<DashboardOverview> loadDashboardOverview(
       'credit_card_transactions',
       'id, credit_card_id, account_id, category_id, '
           'transaction_type, amount, currency, transaction_date, '
-          'description, is_voided, is_receivable_funding',
+          'description, is_voided, is_receivable_funding, account_debit_amount, account_debit_currency, payment_exchange_rate',
       user.id,
     ),
   ]);

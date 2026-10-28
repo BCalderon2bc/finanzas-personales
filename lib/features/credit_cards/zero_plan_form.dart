@@ -189,7 +189,9 @@ class _ZeroFormState extends State<ZeroForm> {
       readOnly: f.readOnly,
       maxLength: f.type == 'money'
           ? null
-          : f.key == 'notes' || f.key == 'description'
+          : f.key == 'description'
+          ? 200
+          : f.key == 'notes'
           ? 1000
           : 120,
       maxLines: f.key == 'notes' || f.key == 'description' ? 2 : 1,
