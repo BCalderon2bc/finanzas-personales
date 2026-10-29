@@ -4,16 +4,49 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../utils/money.dart';
 import 'export_report_models.dart';
+import 'person_account_export_report.dart';
 
 Uint8List reportExcel(ExportReport report) {
   final excel = x.Excel.createExcel();
   excel.rename(excel.getDefaultSheet()!, 'Resumen');
   final summary = excel['Resumen'];
+  final person = report is PersonAccountExportReport ? report : null;
   summary.appendRow([x.TextCellValue('Mi Billete · ${report.title}')]);
   summary.appendRow([x.TextCellValue(report.period)]);
   summary.appendRow([
     x.TextCellValue('Generado: ${report.generatedAt.toIso8601String()}'),
   ]);
+  if (person != null) {
+    void highlighted(String value, {int fontSize = 12, double height = 30}) {
+      summary.appendRow([x.TextCellValue(value)]);
+      final row = summary.maxRows - 1;
+      summary.merge(
+        x.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row),
+        x.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row),
+      );
+      summary
+          .cell(x.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row))
+          .cellStyle = x.CellStyle(
+        bold: true,
+        fontSize: fontSize,
+        textWrapping: x.TextWrapping.WrapText,
+        fontColorHex: x.ExcelColor.fromHexString('#17493D'),
+        backgroundColorHex: x.ExcelColor.fromHexString('#EAF7F0'),
+      );
+      summary.setRowHeight(row, height);
+    }
+
+    highlighted('QUIÉN LE DEBE A QUIÉN');
+    highlighted(person.direction, fontSize: 18, height: 58);
+    highlighted('Pendiente: ${person.amountLabel}', fontSize: 22, height: 38);
+    highlighted('Titular: ${person.ownerName}', height: 34);
+    highlighted('Cuenta con: ${person.personName}', height: 34);
+    if (!person.settled) {
+      highlighted('Debe pagar: ${person.debtor}', height: 34);
+      highlighted('Debe recibir: ${person.creditor}', height: 34);
+    }
+    summary.appendRow([]);
+  }
   summary.appendRow([
     x.TextCellValue('Moneda'),
     x.TextCellValue('Concepto'),
@@ -25,6 +58,15 @@ Uint8List reportExcel(ExportReport report) {
       x.TextCellValue(total.label),
       x.DoubleCellValue(total.cents / 100),
     ]);
+    if (person != null) {
+      final row = summary.maxRows - 1;
+      summary
+          .cell(x.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row))
+          .cellStyle = x.CellStyle(
+        textWrapping: x.TextWrapping.WrapText,
+      );
+      summary.setRowHeight(row, 34);
+    }
     summary
         .cell(
           x.CellIndex.indexByColumnRow(
@@ -70,7 +112,10 @@ Uint8List reportExcel(ExportReport report) {
         col,
         table.columns[col] == 'Descripción'
             ? 45
-            : table.columns[col] == 'Tipo / signo'
+            : table.columns[col] == 'Quién debe después'
+            ? 48
+            : table.columns[col] == 'Movimiento' ||
+                  table.columns[col] == 'Tipo / signo'
             ? 32
             : 24,
       );
@@ -95,6 +140,47 @@ Uint8List reportExcel(ExportReport report) {
             )
             .toList(),
       );
+      if (person != null) {
+        for (var col = 0; col < row.length; col++) {
+          if (row[col] is! MoneyCell) {
+            sheet
+                .cell(
+                  x.CellIndex.indexByColumnRow(
+                    columnIndex: col,
+                    rowIndex: sheet.maxRows - 1,
+                  ),
+                )
+                .cellStyle = x.CellStyle(
+              textWrapping: x.TextWrapping.WrapText,
+            );
+          }
+        }
+        var lines = 1;
+        for (var col = 0; col < row.length; col++) {
+          final capacity = table.columns[col] == 'Descripción'
+              ? 42
+              : table.columns[col] == 'Quién debe después'
+              ? 45
+              : table.columns[col] == 'Movimiento'
+              ? 29
+              : 21;
+          final needed = reportCellText(row[col])
+              .split('\n')
+              .fold<int>(
+                0,
+                (n, line) =>
+                    n +
+                    ((line.runes.length + capacity - 1) ~/ capacity)
+                        .clamp(1, 1000)
+                        .toInt(),
+              );
+          if (needed > lines) lines = needed;
+        }
+        sheet.setRowHeight(
+          sheet.maxRows - 1,
+          (lines * 14.0 + 10).clamp(52, 400).toDouble(),
+        );
+      }
       for (var col = 0; col < row.length; col++) {
         if (row[col] is MoneyCell) {
           sheet
@@ -157,6 +243,7 @@ Future<Uint8List> reportPdf(
       'Para PDF usa un período menor: hay más de 5,000 filas. Excel conserva el detalle completo.',
     );
   }
+  final person = report is PersonAccountExportReport ? report : null;
   final pdf = pw.Document(
     title: 'Mi Billete · ${report.title}',
     author: 'Mi Billete',
@@ -168,7 +255,7 @@ Future<Uint8List> reportPdf(
   pdf.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4.landscape,
-      margin: const pw.EdgeInsets.all(28),
+      margin: pw.EdgeInsets.all(person == null ? 28 : 24),
       theme: theme,
       maxPages: 1000,
       header: (c) => pw.Column(
@@ -207,10 +294,73 @@ Future<Uint8List> reportPdf(
         ],
       ),
       build: (c) => [
+        if (person != null) ...[
+          pw.Container(
+            width: double.infinity,
+            padding: const pw.EdgeInsets.all(12),
+            decoration: pw.BoxDecoration(
+              color: PdfColor.fromInt(0xFFEAF7F0),
+              borderRadius: pw.BorderRadius.circular(8),
+            ),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'QUIÉN LE DEBE A QUIÉN',
+                  style: pw.TextStyle(
+                    fontSize: 10,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColor.fromInt(0xFF17493D),
+                  ),
+                ),
+                pw.SizedBox(height: 6),
+                pw.Text(
+                  person.direction,
+                  style: pw.TextStyle(
+                    fontSize: 17,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 5),
+                pw.Text(
+                  person.amountLabel,
+                  style: pw.TextStyle(
+                    fontSize: 22,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColor.fromInt(0xFF17493D),
+                  ),
+                ),
+                pw.SizedBox(height: 5),
+                if (person.settled)
+                  pw.Text(
+                    'Titular: ${person.ownerName}  |  Cuenta con: ${person.personName}',
+                    style: const pw.TextStyle(fontSize: 9),
+                  ),
+                if (!person.settled) ...[
+                  pw.SizedBox(height: 5),
+                  pw.Text(
+                    'Debe pagar: ${person.debtor}',
+                    style: const pw.TextStyle(fontSize: 10),
+                  ),
+                  pw.Text(
+                    'Debe recibir: ${person.creditor}',
+                    style: const pw.TextStyle(fontSize: 10),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 12),
+          pw.Text(
+            'Resumen del período',
+            style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 5),
+        ],
         for (final total in report.totals)
           pw.Text(
             '${total.currency} · ${total.label}: ${formatMoneyCents(total.cents, total.currency)}',
-            style: const pw.TextStyle(fontSize: 10),
+            style: pw.TextStyle(fontSize: person == null ? 10 : 9),
           ),
         pw.SizedBox(height: 10),
         for (final table in report.tables) ...[
@@ -228,7 +378,20 @@ Future<Uint8List> reportPdf(
               columnWidths: {
                 for (var n = 0; n < table.columns.length; n++)
                   n: pw.FlexColumnWidth(
-                    table.columns[n] == 'Descripción'
+                    person != null
+                        ? switch (table.columns[n]) {
+                            'Fecha' => 1.5,
+                            'Movimiento' => 2.7,
+                            'Descripción' => 3.2,
+                            'Moneda' => 1.1,
+                            'Importe original' => 1.5,
+                            'Tasa C\$/US\$' => 1.4,
+                            'Variación C\$' => 1.5,
+                            'Saldo C\$' => 1.4,
+                            'Quién debe después' => 3.0,
+                            _ => 1.6,
+                          }
+                        : table.columns[n] == 'Descripción'
                         ? 3.2
                         : table.columns[n] == 'Moneda'
                         ? 0.75
@@ -243,20 +406,20 @@ Future<Uint8List> reportPdf(
                     n: pw.Alignment.centerRight,
               },
               headerStyle: pw.TextStyle(
-                fontSize: 8,
+                fontSize: person == null ? 8 : 7.5,
                 fontWeight: pw.FontWeight.bold,
                 color: PdfColors.white,
               ),
               headerDecoration: const pw.BoxDecoration(
                 color: PdfColor.fromInt(0xFF005544),
               ),
-              cellStyle: const pw.TextStyle(fontSize: 8),
+              cellStyle: pw.TextStyle(fontSize: person == null ? 8 : 7.5),
               cellPadding: const pw.EdgeInsets.all(5),
               border: pw.TableBorder.all(color: PdfColors.grey300, width: .4),
             ),
           pw.SizedBox(height: 12),
         ],
-        for (final note in report.notes)
+        for (final note in report.notes.skip(person == null ? 0 : 2))
           pw.Padding(
             padding: const pw.EdgeInsets.only(bottom: 4),
             child: pw.Text(

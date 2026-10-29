@@ -1,4 +1,5 @@
 import 'zero_plans_agenda.dart';
+import '../../data/payment_agenda_labels.dart';
 import 'package:flutter/material.dart';
 import '../../core/supabase_client.dart';
 import '../../data/card_statement_repository.dart';
@@ -55,12 +56,12 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
         loadCardStatements(userId),
         statementRows(
           'credit_cards',
-          'id,name,currency,closing_day,payment_day,is_active',
+          'id,name,currency,closing_day,payment_day,is_active,card_reference,financial_institutions(name)',
           userId,
         ),
         statementRows(
           'debts',
-          'id,description,currency,original_amount,status,due_date',
+          'id,description,creditor_name,currency,original_amount,status,due_date',
           userId,
         ),
         statementRows(
@@ -164,15 +165,26 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        item.title,
+                        loan
+                            ? (item.title.trim().isEmpty
+                                  ? 'Préstamo sin descripción'
+                                  : item.title)
+                            : agendaCardLabel(item.entity),
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
+                      if (loan) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          agendaDebtCreditor(item.entity),
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ],
                       const SizedBox(height: 4),
                       Text(
-                        '$label · ${shortStatementDate(item.date.toIso8601String())}',
+                        '$label${item.currency == null ? '' : ' · ${item.currency}'} · ${shortStatementDate(item.date.toIso8601String())}',
                         style: const TextStyle(
                           color: Color(0xFF64748B),
                           fontSize: 12,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../data/payment_agenda_labels.dart';
 import '../../data/zero_plan_repository.dart';
 import '../../data/card_statement_repository.dart' show statementRows;
 import '../../utils/money.dart';
@@ -44,7 +45,11 @@ class _ZeroPlansAgendaState extends State<ZeroPlansAgenda> {
       final uid = zeroUser();
       final values = await Future.wait<Object>([
         loadZeroPlans(uid),
-        statementRows('credit_cards', 'id,name', uid),
+        statementRows(
+          'credit_cards',
+          'id,name,currency,is_active,card_reference,financial_institutions(name)',
+          uid,
+        ),
         statementRows(
           'credit_card_statements',
           'id,is_voided,is_archived',
@@ -132,7 +137,7 @@ class _ZeroPlansAgendaState extends State<ZeroPlansAgenda> {
                 '${p['description']} · cuota ${i['number']}/${p['total_installments']}',
               ),
               subtitle: Text(
-                '${card?['name'] ?? 'Tarjeta'} · ${zeroDateLabel(i['due_date'])}\nPendiente: ${formatMoneyCents(data!.remaining(i), '${p['currency']}')}',
+                '${agendaCardLabel(card)} · ${zeroDateLabel(i['due_date'])}\nPendiente: ${formatMoneyCents(data!.remaining(i), '${p['currency']}')}',
               ),
               trailing: const Icon(Icons.chevron_right),
               onTap: card == null
