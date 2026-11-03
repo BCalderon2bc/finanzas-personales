@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:file_saver/file_saver.dart';
-import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:pdfrx/pdfrx.dart';
@@ -12,6 +11,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/supabase_client.dart';
 import '../../data/person_account_repository.dart';
 import '../../widgets/adaptive_layout.dart';
+import 'receipt_file_picker.dart'
+if (dart.library.js_interop) 'receipt_file_picker_web.dart';
 
 const _types = {
   'jpg': 'image/jpeg',
@@ -128,7 +129,7 @@ class PendingReceipt {
   final Uint8List _bytes;
 
   static Future<PendingReceipt?> pick() async {
-    final file = await openFile();
+    final file = await pickReceiptFile();
     if (file == null) return null;
     final dot = file.name.lastIndexOf('.');
     final extension = dot < 0 ? '' : file.name.substring(dot + 1).toLowerCase();
