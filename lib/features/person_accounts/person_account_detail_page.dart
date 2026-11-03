@@ -1,3 +1,7 @@
+import 'receipt_history.dart';
+import 'receipt_draft_field.dart';
+import '../../widgets/adaptive_layout.dart';
+import '../help/app_help.dart';
 import 'person_closures_page.dart';
 import '../reports/export_reports_page.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +12,8 @@ import '../../data/exchange_rate.dart';
 import '../../utils/money.dart';
 import 'person_account_form_dialog.dart';
 import 'person_entry_dialog.dart';
+import 'person_share_dialog.dart';
+import 'person_receipts_dialog.dart';
 
 class PersonAccountDetailPage extends StatefulWidget {
   const PersonAccountDetailPage({super.key, required this.account});
@@ -22,7 +28,30 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
   List<Map<String, dynamic>> entries = [];
   List<Map<String, dynamic>> closures = [];
   bool loading = true, saving = false, showVoided = false;
-  String? error;
+  String? error, viewerId;
+  Map<String, dynamic>? access;
+  bool get isOwner => viewerId != null && account['user_id'] == viewerId;
+  bool get canAdd => isOwner || access?['can_add'] == true;
+  String get otherName => isOwner
+      ? '${account['name']}'
+      : '${access?['owner_email'] ?? 'Titular de la cuenta'}';
+
+  bool canEdit(Map<String, dynamic> entry) =>
+      isOwner ||
+      access?['can_edit_all'] == true ||
+      (access?['can_edit_own'] == true && entry['created_by'] == viewerId);
+
+  Map<String, dynamic> fromViewer(Map<String, dynamic> entry) => isOwner
+      ? entry
+      : {...entry, 'direction': -int.parse('${entry['direction']}')};
+
+  String entryAuthor(Map<String, dynamic> row) {
+    final author = row['created_by'] ?? row['user_id'];
+    if (author == viewerId) return 'Tú';
+    if (author == account['user_id']) return otherName;
+    return row['created_by_label'] as String? ?? 'Colaborador anterior';
+  }
+
   int requestId = 0;
   @override
   void initState() {
@@ -34,6 +63,31 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
   void message(String s) {
     if (mounted)
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s)));
+  }
+
+  ReceiptFilter receiptFilter = ReceiptFilter.all;
+  Map<String, int>? receiptCounts;
+  int receiptRequest = 0;
+
+  String receiptFolder(Map<String, dynamic> row) =>
+      '${account['id']}/${row['id']}';
+
+  Future<void> refreshReceiptCounts() async {
+    final request = ++receiptRequest;
+    final uid = viewerId;
+    if (uid == null) return;
+    try {
+      final counts = await loadReceiptCounts(
+        uid,
+        'person-receipts',
+        entries.map(receiptFolder),
+      );
+      if (mounted && request == receiptRequest)
+        setState(() => receiptCounts = counts);
+    } catch (_) {
+      if (mounted && request == receiptRequest)
+        setState(() => receiptCounts = null);
+    }
   }
 
   Future<void> load() async {
@@ -49,18 +103,20 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
             .from('person_accounts')
             .select()
             .eq('id', account['id'])
-            .eq('user_id', uid)
             .single(),
         personRows(
           'person_account_entries',
           uid,
           accountId: '${account['id']}',
+          includeShared: true,
         ),
         personRows(
           'person_account_closures',
           uid,
           accountId: '${account['id']}',
+          includeShared: true,
         ),
+        personShares(uid, accountId: '${account['id']}'),
       ]);
       checkPersonSession(uid);
       if (!mounted || req != requestId) return;
@@ -75,13 +131,16 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
       });
       personAccountBalance(rows);
       setState(() {
+        viewerId = uid;
         account = Map<String, dynamic>.from(results[0] as Map);
+        access = (results[3] as List<Map<String, dynamic>>).firstOrNull;
         entries = rows;
         closures = List<Map<String, dynamic>>.from(
           results[2] as List,
         )..sort((a, b) => '${b['until_date']}'.compareTo('${a['until_date']}'));
         loading = false;
       });
+      await refreshReceiptCounts();
     } catch (e) {
       if (mounted && req == requestId)
         setState(() {
@@ -285,7 +344,9 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
         .single();
   });
   Future<void> editEntry([Map<String, dynamic>? entry]) => run((uid) async {
-    if (account['is_active'] != true) return;
+    if (account['is_active'] != true ||
+        (entry == null ? !canAdd : !canEdit(entry)))
+      return;
     ExchangeRate? defaultRate;
     try {
       defaultRate = (await loadFinancialSettings())?.rate;
@@ -294,28 +355,46 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
     }
     checkPersonSession(uid);
     if (!mounted) return;
-    final data = await showDialog<Map<String, dynamic>>(
+    final draft = await showDialog<PersonEntryDraft>(
       context: context,
       builder: (_) => PersonEntryDialog(
-        personName: '${account['name']}',
-        entry: entry,
+        personName: otherName,
+        entry: entry == null ? null : fromViewer(entry),
         defaultRate: defaultRate,
       ),
     );
-    if (data == null || !mounted) return;
+    if (draft == null || !mounted) return;
     checkPersonSession(uid);
+    final values = fromViewer(draft.values);
     if (entry == null) {
-      await supabase.from('person_account_entries').insert({
-        ...data,
-        'user_id': uid,
-        'person_account_id': account['id'],
+      final accountId = '${account['id']}';
+      final insert = supabase.from('person_account_entries').insert({
+        ...values,
+        'user_id': account['user_id'],
+        'person_account_id': accountId,
       });
+      final receipt = draft.receipt;
+      if (receipt == null) {
+        await insert;
+      } else {
+        final saved = await insert.select('id').single();
+        if (!mounted) return;
+        final uploaded = await uploadSavedReceipt(
+          context,
+          receipt: receipt,
+          uid: uid,
+          folder: '$accountId/${saved['id']}',
+          person: true,
+        );
+        if (uploaded) message('Movimiento y comprobante guardados.');
+        return;
+      }
     } else {
       await supabase
           .from('person_account_entries')
-          .update(data)
+          .update(values)
           .eq('id', entry['id'])
-          .eq('user_id', uid)
+          .eq('user_id', account['user_id'])
           .eq('person_account_id', account['id'])
           .eq('is_voided', false)
           .select('id')
@@ -378,7 +457,8 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
   }
 
   Widget entryCard(Map<String, dynamic> row, int running) {
-    final plus = '${row['direction']}' == '1',
+    final visibleRow = fromViewer(row);
+    final plus = '${visibleRow['direction']}' == '1',
         voided = row['is_voided'] == true;
     final color = voided
         ? Theme.of(context).colorScheme.onSurfaceVariant
@@ -405,11 +485,14 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    personEntryLabel(row),
+                    personEntryLabel(visibleRow),
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
-                if (!voided && account['is_active'] == true && !isClosed(row))
+                if (!voided &&
+                    account['is_active'] == true &&
+                    !isClosed(row) &&
+                    canEdit(row))
                   PopupMenuButton<String>(
                     enabled: !saving,
                     onSelected: (v) {
@@ -418,9 +501,13 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
                       else
                         voidEntry(row);
                     },
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'edit', child: Text('Editar')),
-                      PopupMenuItem(value: 'void', child: Text('Anular')),
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(value: 'edit', child: Text('Editar')),
+                      if (isOwner)
+                        const PopupMenuItem(
+                          value: 'void',
+                          child: Text('Anular'),
+                        ),
                     ],
                   ),
               ],
@@ -433,6 +520,41 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
             const SizedBox(height: 6),
             Text(
               '${dateText(row['entry_date'])}${voided ? ' · ANULADO' : ''}${isClosed(row) ? ' · CERRADO' : ''}',
+            ),
+            Text('Registrado por: ${entryAuthor(row)}'),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                icon: const Icon(Icons.attach_file),
+                label: Text(
+                  (receiptCounts?[receiptFolder(row)] ?? 0) == 0
+                      ? 'Comprobantes'
+                      : 'Comprobantes (${receiptCounts![receiptFolder(row)]})',
+                ),
+                onPressed: saving
+                    ? null
+                    : () async {
+                        final writable =
+                            !voided &&
+                            account['is_active'] == true &&
+                            !isClosed(row);
+                        final editable = writable && canEdit(row);
+                        await showDialog<void>(
+                          context: context,
+                          builder: (_) => PersonReceiptsDialog(
+                            accountId: '${account['id']}',
+                            entryId: '${row['id']}',
+                            canAdd:
+                                editable ||
+                                (writable &&
+                                    canAdd &&
+                                    row['created_by'] == viewerId),
+                            canRemove: editable,
+                          ),
+                        );
+                        if (mounted) await refreshReceiptCounts();
+                      },
+              ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -462,13 +584,36 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
     );
   }
 
+  Future<void> shareAccount() => run((_) async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => PersonShareDialog(accountId: '${account['id']}'),
+    );
+  });
+
+  void exportAccount() {
+    Navigator.push<void>(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => ExportReportsPage(initialPersonId: '${account['id']}'),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final compact = compactLayout(context);
+    final gutter = pageGutter(context);
+    final label = saving ? 'Guardando...' : 'Nuevo movimiento';
+    final VoidCallback? add =
+        loading || saving || error != null || account['is_active'] != true
+        ? null
+        : () => editEntry();
     var balance = 0;
     final running = <String, int>{};
     // entries se ordena de reciente a antiguo; recorrer al revés da el saldo histórico.
     for (final row in entries.reversed) {
-      balance += personAccountBalance([row]);
+      balance += personAccountBalance([fromViewer(row)]);
       running['${row['id']}'] = balance;
     }
     final color = balance > 0
@@ -476,180 +621,260 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
         : balance < 0
         ? const Color(0xFF087F5B)
         : Theme.of(context).colorScheme.primary;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('${account['name']}'),
-        actions: [
-          IconButton(
-            tooltip: 'Exportar estado de cuenta',
-            icon: const Icon(Icons.file_download_outlined),
-            onPressed: loading || saving
-                ? null
-                : () => Navigator.push(
-                    context,
-                    MaterialPageRoute<void>(
-                      builder: (_) => ExportReportsPage(
-                        initialPersonId: '${account['id']}',
-                      ),
-                    ),
-                  ),
+    return GuideScope(
+      topic: 'person_detail',
+      ready: !loading && error == null,
+      excludedTargets: {if (!canAdd) 'add', if (!isOwner) 'closures'},
+      child: Scaffold(
+        appBar: AppBar(
+          title: GuideAnchor(
+            id: 'title',
+            child: Text(
+              otherName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-          IconButton(
-            tooltip: 'Actualizar',
-            onPressed: loading || saving ? null : load,
-            icon: const Icon(Icons.refresh),
-          ),
-          PopupMenuButton<String>(
-            enabled: !loading && !saving,
-            onSelected: (v) {
-              if (v == 'closures')
-                openClosures();
-              else if (v == 'edit')
-                editAccount();
-              else
-                toggle();
-            },
-            itemBuilder: (_) => [
-              const PopupMenuItem(
-                value: 'closures',
-                child: Text('Cierres acordados'),
+          actions: [
+            const AppHelpButton(topic: 'people'),
+            if (isOwner && !compact) ...[
+              IconButton(
+                tooltip: 'Compartir cuenta',
+                icon: const Icon(Icons.share_outlined),
+                onPressed: loading || saving || error != null
+                    ? null
+                    : shareAccount,
               ),
-              const PopupMenuItem(value: 'edit', child: Text('Editar persona')),
-              PopupMenuItem(
-                value: 'toggle',
-                child: Text(
-                  account['is_active'] == true
-                      ? 'Archivar cuenta'
-                      : 'Activar cuenta',
-                ),
+              IconButton(
+                tooltip: 'Exportar estado de cuenta',
+                icon: const Icon(Icons.file_download_outlined),
+                onPressed: loading || saving || error != null
+                    ? null
+                    : exportAccount,
               ),
             ],
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed:
-            loading || saving || error != null || account['is_active'] != true
-            ? null
-            : () => editEntry(),
-        icon: const Icon(Icons.add),
-        label: Text(saving ? 'Guardando...' : 'Nuevo movimiento'),
-      ),
-      body: SafeArea(
-        top: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 800),
-            child: loading
-                ? const Center(child: CircularProgressIndicator())
-                : error != null
-                ? ListView(
-                    padding: const EdgeInsets.all(24),
-                    children: [
-                      SelectableText(error!),
-                      TextButton(
-                        onPressed: load,
-                        child: const Text('Reintentar'),
-                      ),
-                    ],
-                  )
-                : RefreshIndicator(
-                    onRefresh: load,
-                    child: ListView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: color.withAlpha(16),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                personBalanceLabel(balance),
-                                style: TextStyle(fontSize: 18, color: color),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                formatMoneyCents(balance.abs(), 'NIO'),
-                                style: TextStyle(
-                                  fontSize: 30,
-                                  fontWeight: FontWeight.w800,
-                                  color: color,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                balance > 0
-                                    ? 'Tu saldo es positivo (+).'
-                                    : balance < 0
-                                    ? 'Tu saldo es negativo (−).'
-                                    : 'No hay saldo pendiente.',
-                              ),
-                              if (account['is_active'] != true)
-                                const Text('Cuenta archivada'),
-                            ],
-                          ),
-                        ),
-                        Card(
-                          child: ListTile(
-                            leading: const Icon(Icons.handshake_outlined),
-                            title: const Text('Cierres acordados'),
-                            subtitle: Text(
-                              closures.isEmpty
-                                  ? 'Revisar y acordar el saldo'
-                                  : 'Último: ${dateText(closures.first['until_date'])} · ${personBalanceLabel(moneyCents(closures.first['balance_nio']))} ${formatMoneyCents(moneyCents(closures.first['balance_nio']).abs(), 'NIO')}',
-                            ),
-                            trailing: const Icon(Icons.chevron_right),
-                            onTap: saving ? null : openClosures,
-                          ),
-                        ),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton.icon(
-                            style: TextButton.styleFrom(
-                              foregroundColor: Theme.of(
-                                context,
-                              ).colorScheme.error,
-                            ),
-                            onPressed: loading || saving ? null : deleteAccount,
-                            icon: const Icon(Icons.delete_outline),
-                            label: const Text('Eliminar cuenta'),
-                          ),
-                        ),
-                        if ('${account['notes'] ?? ''}'.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            child: Text('${account['notes']}'),
-                          ),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'Compras de la otra persona (+) · Compras tuyas (−). Pagos tuyos (−) · Pagos que recibes (+).',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Mostrar anulados'),
-                          value: showVoided,
-                          onChanged: (v) => setState(() => showVoided = v),
-                        ),
-                        if (entries.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.all(24),
-                            child: Text(
-                              'Registra la primera compra o el saldo anterior para comenzar.',
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ...entries
-                            .where((r) => showVoided || r['is_voided'] != true)
-                            .map((r) => entryCard(r, running['${r['id']}']!)),
-                      ],
+            IconButton(
+              tooltip: 'Actualizar',
+              onPressed: loading || saving ? null : load,
+              icon: const Icon(Icons.refresh),
+            ),
+            if (isOwner)
+              PopupMenuButton<String>(
+                enabled: !loading && !saving && error == null,
+                onSelected: (v) {
+                  if (v == 'share')
+                    shareAccount();
+                  else if (v == 'export')
+                    exportAccount();
+                  else if (v == 'closures')
+                    openClosures();
+                  else if (v == 'edit')
+                    editAccount();
+                  else
+                    toggle();
+                },
+                itemBuilder: (_) => [
+                  if (compact) ...[
+                    const PopupMenuItem(
+                      value: 'share',
+                      child: Text('Compartir cuenta'),
+                    ),
+                    const PopupMenuItem(
+                      value: 'export',
+                      child: Text('Exportar estado de cuenta'),
+                    ),
+                  ],
+                  const PopupMenuItem(
+                    value: 'closures',
+                    child: Text('Cierres acordados'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Text('Editar persona'),
+                  ),
+                  PopupMenuItem(
+                    value: 'toggle',
+                    child: Text(
+                      account['is_active'] == true
+                          ? 'Archivar cuenta'
+                          : 'Activar cuenta',
                     ),
                   ),
+                ],
+              ),
+          ],
+        ),
+        bottomNavigationBar: compact && canAdd
+            ? GuideAnchor(
+                id: 'add',
+                child: CompactActionBar(label: label, onPressed: add),
+              )
+            : null,
+        floatingActionButton: !compact && canAdd
+            ? GuideAnchor(
+                id: 'add',
+                child: FloatingActionButton.extended(
+                  onPressed: add,
+                  icon: const Icon(Icons.add),
+                  label: Text(label),
+                ),
+              )
+            : null,
+        body: SafeArea(
+          top: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 800),
+              child: loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : error != null
+                  ? ListView(
+                      padding: const EdgeInsets.all(24),
+                      children: [
+                        SelectableText(error!),
+                        TextButton(
+                          onPressed: load,
+                          child: const Text('Reintentar'),
+                        ),
+                      ],
+                    )
+                  : RefreshIndicator(
+                      onRefresh: load,
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: EdgeInsets.fromLTRB(
+                          gutter,
+                          16,
+                          gutter,
+                          compact ? 24 : 110,
+                        ),
+                        children: [
+                          GuideAnchor(
+                            id: 'balance',
+                            child: Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: color.withAlpha(16),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    personBalanceLabel(balance),
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      color: color,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    formatMoneyCents(balance.abs(), 'NIO'),
+                                    style: TextStyle(
+                                      fontSize: 30,
+                                      fontWeight: FontWeight.w800,
+                                      color: color,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    balance > 0
+                                        ? 'Tu saldo es positivo (+).'
+                                        : balance < 0
+                                        ? 'Tu saldo es negativo (−).'
+                                        : 'No hay saldo pendiente.',
+                                  ),
+                                  if (!isOwner)
+                                    Text(
+                                      canAdd ||
+                                              access?['can_edit_own'] == true ||
+                                              access?['can_edit_all'] == true
+                                          ? 'Cuenta compartida'
+                                          : 'Cuenta compartida · Solo ver',
+                                    ),
+                                  if (account['is_active'] != true)
+                                    const Text('Cuenta archivada'),
+                                ],
+                              ),
+                            ),
+                          ),
+                          if (isOwner)
+                            GuideAnchor(
+                              id: 'closures',
+                              child: Card(
+                                child: ListTile(
+                                  leading: const Icon(Icons.handshake_outlined),
+                                  title: const Text('Cierres acordados'),
+                                  subtitle: Text(
+                                    closures.isEmpty
+                                        ? 'Revisar y acordar el saldo'
+                                        : 'Último: ${dateText(closures.first['until_date'])} · ${personBalanceLabel(moneyCents(closures.first['balance_nio']))} ${formatMoneyCents(moneyCents(closures.first['balance_nio']).abs(), 'NIO')}',
+                                  ),
+                                  trailing: const Icon(Icons.chevron_right),
+                                  onTap: saving ? null : openClosures,
+                                ),
+                              ),
+                            ),
+                          if (isOwner)
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton.icon(
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Theme.of(
+                                    context,
+                                  ).colorScheme.error,
+                                ),
+                                onPressed: loading || saving
+                                    ? null
+                                    : deleteAccount,
+                                icon: const Icon(Icons.delete_outline),
+                                label: const Text('Eliminar cuenta'),
+                              ),
+                            ),
+                          if ('${account['notes'] ?? ''}'.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              child: Text('${account['notes']}'),
+                            ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Compras de la otra persona (+) · Compras tuyas (−). Pagos tuyos (−) · Pagos que recibes (+).',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Mostrar anulados'),
+                            value: showVoided,
+                            onChanged: (v) => setState(() => showVoided = v),
+                          ),
+                          if (receiptCounts != null)
+                            ReceiptFilterField(
+                              value: receiptFilter,
+                              onChanged: (value) =>
+                                  setState(() => receiptFilter = value),
+                            ),
+                          if (entries.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.all(24),
+                              child: Text(
+                                'Registra la primera compra o el saldo anterior para comenzar.',
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ...entries
+                              .where(
+                                (r) =>
+                                    (showVoided || r['is_voided'] != true) &&
+                                    (receiptCounts == null ||
+                                        receiptFilter.matches(
+                                          receiptCounts?[receiptFolder(r)] ?? 0,
+                                        )),
+                              )
+                              .map((r) => entryCard(r, running['${r['id']}']!)),
+                        ],
+                      ),
+                    ),
+            ),
           ),
         ),
       ),

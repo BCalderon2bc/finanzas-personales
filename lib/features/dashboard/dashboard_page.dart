@@ -1,3 +1,5 @@
+import '../../widgets/adaptive_layout.dart';
+import '../help/app_help.dart';
 import '../person_accounts/person_accounts_page.dart';
 import 'package:flutter/material.dart';
 import '../../core/supabase_client.dart';
@@ -129,13 +131,13 @@ class _DashboardPageState extends State<DashboardPage> {
     setState(() {
       period = from
           ? DashboardPeriod(
-              selected,
-              selected.isAfter(period.end) ? selected : period.end,
-            )
+        selected,
+        selected.isAfter(period.end) ? selected : period.end,
+      )
           : DashboardPeriod(
-              selected.isBefore(period.start) ? selected : period.start,
-              selected,
-            );
+        selected.isBefore(period.start) ? selected : period.start,
+        selected,
+      );
     });
     await loadData();
   }
@@ -223,248 +225,286 @@ class _DashboardPageState extends State<DashboardPage> {
         ? current
         : convertDashboard(current, currency, rate);
 
-    return Scaffold(
-      drawer: DashboardNavigation(
-        onOpen: openTarget,
-        onSettings: openSettings,
-        onExport: () => pushPage(const ExportReportsPage()),
-        onPersonAccounts: () => pushPage(const PersonAccountsPage()),
-        onChangePassword: () {
-          pushPage(const ChangePasswordPage());
-        },
-        onOpenReceivables: () {
-          openReceivableLoans();
-        },
-      ),
-      appBar: AppBar(
-        title: const Text('Mi Billete'),
-        actions: [
-          IconButton(
-            tooltip: 'Configuraciones',
-            onPressed: openSettings,
-            icon: const Icon(Icons.settings_outlined),
+    final gutter = pageGutter(context);
+    return GuideScope(
+      topic: 'dashboard',
+      ready: !loading && error == null,
+      welcome: true,
+      scrollController: scrollController,
+      child: Scaffold(
+        drawer: DashboardNavigation(
+          onOpen: openTarget,
+          onSettings: openSettings,
+          onExport: () => pushPage(const ExportReportsPage()),
+          onPersonAccounts: () => pushPage(const PersonAccountsPage()),
+          onChangePassword: () {
+            pushPage(const ChangePasswordPage());
+          },
+          onOpenReceivables: () {
+            openReceivableLoans();
+          },
+        ),
+        appBar: AppBar(
+          leading: GuideAnchor(
+            id: 'menu',
+            child: Builder(
+              builder: (ctx) => IconButton(
+                tooltip: 'Abrir menú',
+                onPressed: () => Scaffold.of(ctx).openDrawer(),
+                icon: const Icon(Icons.menu),
+              ),
+            ),
           ),
-          if (MediaQuery.sizeOf(context).width < 650)
-            PopupMenuButton<String>(
-              tooltip: 'Más opciones',
-              onSelected: (value) {
-                if (value == 'refresh') {
-                  loadData();
-                } else {
-                  logout();
-                }
-              },
-              itemBuilder: (_) => [
-                PopupMenuItem(
-                  value: 'refresh',
-                  enabled: !loading,
-                  child: const Text('Actualizar'),
-                ),
-                const PopupMenuItem(
-                  value: 'logout',
-                  child: Text('Cerrar sesión'),
-                ),
-              ],
-            )
-          else ...[
+          title: GuideAnchor(id: 'title', child: const Text('Mi Billete')),
+          actions: [
+            const AppHelpButton(topic: 'dashboard'),
             IconButton(
-              tooltip: 'Actualizar',
-              onPressed: loading ? null : loadData,
-              icon: const Icon(Icons.refresh_rounded),
+              tooltip: 'Configuraciones',
+              onPressed: openSettings,
+              icon: const Icon(Icons.settings_outlined),
             ),
-            IconButton(
-              tooltip: 'Cerrar sesión',
-              onPressed: logout,
-              icon: const Icon(Icons.logout_rounded),
-            ),
+            if (compactLayout(context))
+              PopupMenuButton<String>(
+                tooltip: 'Más opciones',
+                onSelected: (value) {
+                  if (value == 'refresh') {
+                    loadData();
+                  } else {
+                    logout();
+                  }
+                },
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: 'refresh',
+                    enabled: !loading,
+                    child: const Text('Actualizar'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'logout',
+                    child: Text('Cerrar sesión'),
+                  ),
+                ],
+              )
+            else ...[
+              IconButton(
+                tooltip: 'Actualizar',
+                onPressed: loading ? null : loadData,
+                icon: const Icon(Icons.refresh_rounded),
+              ),
+              IconButton(
+                tooltip: 'Cerrar sesión',
+                onPressed: logout,
+                icon: const Icon(Icons.logout_rounded),
+              ),
+            ],
           ],
-        ],
-      ),
-      floatingActionButton: showBackToTop
-          ? FloatingActionButton.small(
-              tooltip: 'Volver arriba',
-              onPressed: backToTop,
-              child: const Icon(Icons.keyboard_arrow_up_rounded),
-            )
-          : null,
-      body: SafeArea(
-        top: false,
-        child: RefreshIndicator(
-          onRefresh: loadData,
-          child: SingleChildScrollView(
-            controller: scrollController,
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1240),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    DashboardHeader(
-                      period: period,
-                      currency: currency,
-                      loading: loading,
-                      onFrom: () => chooseDate(true),
-                      onUntil: () => chooseDate(false),
-                      onCurrent: () {
-                        final now = DateTime.now();
-                        setState(() => period = DashboardPeriod.forMonth(now));
-                        loadData();
-                      },
-                      onCurrencyChanged: (value) =>
-                          setState(() => currency = value),
-                    ),
-                    const SizedBox(height: 12),
-                    if (!loading)
-                      Container(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 4, 8),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surface,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        floatingActionButton: showBackToTop
+            ? FloatingActionButton.small(
+          tooltip: 'Volver arriba',
+          onPressed: backToTop,
+          child: const Icon(Icons.keyboard_arrow_up_rounded),
+        )
+            : null,
+        body: SafeArea(
+          top: false,
+          child: RefreshIndicator(
+            onRefresh: loadData,
+            child: SingleChildScrollView(
+              controller: scrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.fromLTRB(gutter, 12, gutter, 80),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1240),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      GuideAnchor(
+                        id: 'period',
+                        child: DashboardHeader(
+                          period: period,
+                          currency: currency,
+                          loading: loading,
+                          onFrom: () => chooseDate(true),
+                          onUntil: () => chooseDate(false),
+                          onCurrent: () {
+                            final now = DateTime.now();
+                            setState(
+                                  () => period = DashboardPeriod.forMonth(now),
+                            );
+                            loadData();
+                          },
+                          onCurrencyChanged: (value) =>
+                              setState(() => currency = value),
                         ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Totales en ${currency == 'USD' ? 'dólares' : 'córdobas'}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 14,
+                      ),
+                      const SizedBox(height: 12),
+                      if (!loading)
+                        Container(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 4, 8),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surface,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Totales en ${currency == 'USD' ? 'dólares' : 'córdobas'}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 5),
-                                  Text(
-                                    rate == null
-                                        ? 'Configura la tasa para combinar NIO y USD.'
-                                        : '1 USD = C\$ ${rate.decimal} · Incluye ambas monedas',
-                                    style: const TextStyle(
-                                      color: Color(0xFF64748B),
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  if (settingsError != null)
-                                    const Text(
-                                      'No se pudo cargar la tasa.',
-                                      style: TextStyle(
-                                        color: Color(0xFFB42318),
+                                    const SizedBox(height: 5),
+                                    Text(
+                                      rate == null
+                                          ? 'Configura la tasa para combinar NIO y USD.'
+                                          : '1 USD = C\$ ${rate.decimal} · Incluye ambas monedas',
+                                      style: const TextStyle(
+                                        color: Color(0xFF64748B),
                                         fontSize: 12,
                                       ),
                                     ),
-                                ],
+                                    if (settingsError != null)
+                                      const Text(
+                                        'No se pudo cargar la tasa.',
+                                        style: TextStyle(
+                                          color: Color(0xFFB42318),
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                  ],
+                                ),
                               ),
-                            ),
-                            IconButton(
-                              tooltip: 'Configurar tasa de cambio',
-                              onPressed: openSettings,
-                              icon: const Icon(
-                                Icons.currency_exchange_rounded,
-                                color: Color(0xFF2563EB),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    if (loading)
-                      const Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Center(child: CircularProgressIndicator()),
-                      )
-                    else if (error != null)
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            children: [
-                              const Icon(Icons.error_outline_rounded, size: 38),
-                              const SizedBox(height: 12),
-                              const Text('No pudimos cargar el resumen.'),
-                              const SizedBox(height: 8),
-                              SelectableText(error!),
-                              TextButton(
-                                onPressed: loadData,
-                                child: const Text('Reintentar'),
+                              IconButton(
+                                tooltip: 'Configurar tasa de cambio',
+                                onPressed: openSettings,
+                                icon: const Icon(
+                                  Icons.currency_exchange_rounded,
+                                  color: Color(0xFF2563EB),
+                                ),
                               ),
                             ],
                           ),
                         ),
-                      ),
-                    if (!loading &&
-                        error == null &&
-                        current != null &&
-                        presented != null) ...[
-                      const SizedBox(height: 24),
-                      DashboardMetrics(data: presented, currency: currency),
-                      const SizedBox(height: 20),
-                      UpcomingPaymentsPanel(
-                        refreshToken: current.loadedAt,
-                        onInstallments: (debt) =>
-                            pushPage(DebtInstallmentsPage(debt: debt)),
-                        onCard: (card) =>
-                            pushPage(CreditCardStatementsPage(card: card)),
-                        onDebt: (debt) => pushPage(
-                          DebtsPage(
-                            initialSearch:
-                                debt['description']?.toString() ?? '',
+                      if (loading)
+                        const Padding(
+                          padding: EdgeInsets.all(32),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      else if (error != null)
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              children: [
+                                const Icon(
+                                  Icons.error_outline_rounded,
+                                  size: 38,
+                                ),
+                                const SizedBox(height: 12),
+                                const Text('No pudimos cargar el resumen.'),
+                                const SizedBox(height: 8),
+                                SelectableText(error!),
+                                TextButton(
+                                  onPressed: loadData,
+                                  child: const Text('Reintentar'),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 20),
-                      DashboardFinancialHealth(
-                        data: presented,
-                        currency: currency,
-                      ),
-                    ],
-                    const SizedBox(height: 22),
-                    Text(
-                      'Accesos rápidos',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 10),
-                    DashboardQuickActions(onOpen: openTarget),
-                    if (!loading &&
-                        error == null &&
-                        current != null &&
-                        presented != null) ...[
-                      const SizedBox(height: 20),
-                      ReceivableLoansDashboard(
-                        refreshToken: current.loadedAt,
-                        displayCurrency: rate == null ? null : currency,
-                        exchangeRate: rate,
-                        onChanged: () {
-                          loadData();
-                        },
-                      ),
-                      const SizedBox(height: 24),
-                      DashboardMonthlyBalance(
-                        data: presented,
-                        currency: currency,
-                      ),
-                      const SizedBox(height: 20),
-                      DashboardPanels(
-                        data: presented,
-                        currency: currency,
-                        onOpen: openTarget,
-                        onEvent: openEvent,
-                      ),
-                      const SizedBox(height: 14),
-                      Text(
-                        'Actualizado a las '
-                        '${current.loadedAt.hour.toString().padLeft(2, '0')}:'
-                        '${current.loadedAt.minute.toString().padLeft(2, '0')} · '
-                        '${presented.currencies[currency]!.movements} '
-                        'movimientos en el rango',
-                        style: const TextStyle(
-                          color: Color(0xFF64748B),
-                          fontSize: 12,
+                      if (!loading &&
+                          error == null &&
+                          current != null &&
+                          presented != null) ...[
+                        const SizedBox(height: 24),
+                        GuideAnchor(
+                          id: 'metrics',
+                          child: DashboardMetrics(
+                            data: presented,
+                            currency: currency,
+                          ),
                         ),
+                        const SizedBox(height: 20),
+                        GuideAnchor(
+                          id: 'upcoming',
+                          child: UpcomingPaymentsPanel(
+                            refreshToken: current.loadedAt,
+                            onInstallments: (debt) =>
+                                pushPage(DebtInstallmentsPage(debt: debt)),
+                            onCard: (card) =>
+                                pushPage(CreditCardStatementsPage(card: card)),
+                            onDebt: (debt) => pushPage(
+                              DebtsPage(
+                                initialSearch:
+                                debt['description']?.toString() ?? '',
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        DashboardFinancialHealth(
+                          data: presented,
+                          currency: currency,
+                        ),
+                      ],
+                      const SizedBox(height: 22),
+                      Text(
+                        'Accesos rápidos',
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
+                      const SizedBox(height: 10),
+                      GuideAnchor(
+                        id: 'quick',
+                        child: DashboardQuickActions(onOpen: openTarget),
+                      ),
+                      if (!loading &&
+                          error == null &&
+                          current != null &&
+                          presented != null) ...[
+                        const SizedBox(height: 20),
+                        ReceivableLoansDashboard(
+                          refreshToken: current.loadedAt,
+                          displayCurrency: rate == null ? null : currency,
+                          exchangeRate: rate,
+                          onChanged: () {
+                            loadData();
+                          },
+                        ),
+                        const SizedBox(height: 24),
+                        DashboardMonthlyBalance(
+                          data: presented,
+                          currency: currency,
+                        ),
+                        const SizedBox(height: 20),
+                        DashboardPanels(
+                          data: presented,
+                          currency: currency,
+                          onOpen: openTarget,
+                          onEvent: openEvent,
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          'Actualizado a las '
+                              '${current.loadedAt.hour.toString().padLeft(2, '0')}:'
+                              '${current.loadedAt.minute.toString().padLeft(2, '0')} · '
+                              '${presented.currencies[currency]!.movements} '
+                              'movimientos en el rango',
+                          style: const TextStyle(
+                            color: Color(0xFF64748B),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),

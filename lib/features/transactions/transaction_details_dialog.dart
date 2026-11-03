@@ -1,4 +1,6 @@
+import '../person_accounts/receipt_history.dart';
 import 'package:flutter/material.dart';
+import '../person_accounts/person_receipts_dialog.dart';
 import '../../utils/money.dart';
 
 class TransactionDetailsDialog extends StatelessWidget {
@@ -22,6 +24,7 @@ class TransactionDetailsDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tx = transaction;
+    final receipt = financialReceiptRef(tx);
     final type = tx['transaction_type']?.toString() ?? '';
     const labels = {
       'income': 'Ingreso',
@@ -37,7 +40,7 @@ class TransactionDetailsDialog extends StatelessWidget {
     final dateText = date == null
         ? 'Sin fecha'
         : '${date.day.toString().padLeft(2, '0')}/'
-        '${date.month.toString().padLeft(2, '0')}/${date.year}';
+              '${date.month.toString().padLeft(2, '0')}/${date.year}';
     final currency = tx['currency']?.toString() ?? 'NIO';
     final amount = moneyCents(tx['amount']);
 
@@ -50,18 +53,40 @@ class TransactionDetailsDialog extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(formatMoneyCents(amount, currency),
-                  style: Theme.of(context).textTheme.headlineSmall),
+              Text(
+                formatMoneyCents(amount, currency),
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
               const Divider(height: 24),
               _detail('Fecha', dateText),
               if (onReconcile != null)
-                _detail('Conciliación',
-                    tx['is_reconciled'] == true ? 'Conciliado' : 'Pendiente'),
-              _detail(type == 'transfer' ? 'Cuenta de origen' : 'Cuenta', account),
+                _detail(
+                  'Conciliación',
+                  tx['is_reconciled'] == true ? 'Conciliado' : 'Pendiente',
+                ),
+              _detail(
+                type == 'transfer' ? 'Cuenta de origen' : 'Cuenta',
+                account,
+              ),
               if (type == 'transfer') _detail('Cuenta de destino', destination),
+              if (tx['destination_amount'] != null) ...[
+                _detail(
+                  'Monto recibido',
+                  formatMoneyCents(
+                    moneyCents(tx['destination_amount']),
+                    '${tx['destination_currency']}',
+                  ),
+                ),
+                _detail('Tasa C\$ por US\$ 1', '${tx['exchange_rate']}'),
+              ],
               _detail('Categoría', category),
               _detail('Descripción', tx['description']?.toString()),
               _detail('Referencia', tx['reference']?.toString()),
+              if (receipt != null)
+                MovementReceiptsButton(
+                  table: receipt.table,
+                  record: {...tx, 'id': receipt.id},
+                ),
             ],
           ),
         ),
@@ -71,8 +96,9 @@ class TransactionDetailsDialog extends StatelessWidget {
           TextButton.icon(
             onPressed: onReconcile,
             icon: const Icon(Icons.fact_check_outlined),
-            label: Text(tx['is_reconciled'] == true
-                ? 'Quitar conciliación' : 'Conciliar'),
+            label: Text(
+              tx['is_reconciled'] == true ? 'Quitar conciliación' : 'Conciliar',
+            ),
           ),
         if (onDelete != null)
           TextButton.icon(
@@ -83,8 +109,10 @@ class TransactionDetailsDialog extends StatelessWidget {
               foregroundColor: Theme.of(context).colorScheme.error,
             ),
           ),
-        TextButton(onPressed: () => Navigator.pop(context),
-            child: const Text('Cerrar')),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cerrar'),
+        ),
 
         if (onEdit != null)
           TextButton.icon(
@@ -98,9 +126,14 @@ class TransactionDetailsDialog extends StatelessWidget {
 
   Widget _detail(String label, String? value) => Padding(
     padding: const EdgeInsets.only(bottom: 12),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-      SelectableText((value ?? '').trim().isEmpty ? 'Sin especificar' : value!.trim()),
-    ]),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+        SelectableText(
+          (value ?? '').trim().isEmpty ? 'Sin especificar' : value!.trim(),
+        ),
+      ],
+    ),
   );
 }

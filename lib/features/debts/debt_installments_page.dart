@@ -1,4 +1,6 @@
+import '../person_accounts/receipt_draft_field.dart';
 import 'package:flutter/material.dart';
+import '../person_accounts/person_receipts_dialog.dart';
 import '../../core/supabase_client.dart';
 import '../../utils/money.dart';
 import '../../data/debt_installment_repository.dart';
@@ -192,7 +194,8 @@ class _DebtInstallmentsPageState extends State<DebtInstallmentsPage> {
     }
     same(uid);
     final linked = v['installment_id'];
-    await supabase.rpc(
+    final receipt = v.remove(receiptDraftKey) as PendingReceipt?;
+    final saved = await supabase.rpc(
       linked == null
           ? 'register_debt_payment'
           : 'register_debt_payment_for_installment',
@@ -207,6 +210,14 @@ class _DebtInstallmentsPageState extends State<DebtInstallmentsPage> {
         if (linked != null) 'p_installment_id': linked,
       },
     );
+    if (mounted)
+      await attachFinancialReceipt(
+        context,
+        receipt,
+        uid,
+        'debt_payments',
+        saved,
+      );
     message('Abono registrado.');
   });
   Future<void> link(Map<String, dynamic> i) => run((uid) async {
@@ -377,6 +388,13 @@ class _DebtInstallmentsPageState extends State<DebtInstallmentsPage> {
                           ? 'Anulado'
                           : shortStatementDate(tx?['payment_date']),
                     ),
+                    leading: tx == null
+                        ? null
+                        : MovementReceiptsButton(
+                            table: 'debt_payments',
+                            record: tx,
+                            iconOnly: true,
+                          ),
                     trailing: IconButton(
                       tooltip: 'Quitar vínculo',
                       onPressed: saving

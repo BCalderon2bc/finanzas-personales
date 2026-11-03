@@ -7,7 +7,7 @@ Future<List<Map<String, dynamic>>> loadUserCardExpenses(String userId) async {
     final result = await supabase
         .from('credit_card_transactions')
         .select(
-          'id, transaction_type, amount, currency, transaction_date, category_id, description, reference, credit_cards(name)',
+          'id, transaction_type, amount, currency, transaction_date, created_at, category_id, description, reference, credit_cards(name)',
         )
         .eq('user_id', userId)
         .eq('is_voided', false)
@@ -24,6 +24,7 @@ Future<List<Map<String, dynamic>>> loadUserCardExpenses(String userId) async {
         'amount': (tx['transaction_type'] == 'refund' ? -amount : amount) / 100,
         'currency': tx['currency'],
         'transaction_date': tx['transaction_date'],
+        'created_at': tx['created_at'],
         'category_id': tx['category_id'],
         'description': tx['description'],
         'reference': tx['reference'],
@@ -45,7 +46,7 @@ Future<List<Map<String, dynamic>>> loadUserCardPayments(String userId) async {
     final result = await supabase
         .from('credit_card_transactions')
         .select(
-          'id, credit_card_id, account_id, amount, currency, account_debit_amount, account_debit_currency, payment_exchange_rate, transaction_date, reference, credit_cards(name)',
+          'id, credit_card_id, account_id, amount, currency, account_debit_amount, account_debit_currency, payment_exchange_rate, transaction_date, created_at, reference, credit_cards(name)',
         )
         .eq('user_id', userId)
         .eq('is_voided', false)

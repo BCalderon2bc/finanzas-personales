@@ -1,3 +1,6 @@
+import '../person_accounts/receipt_draft_field.dart';
+import '../../widgets/adaptive_layout.dart';
+import '../help/app_help.dart';
 import 'zero_plans_page.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -112,7 +115,10 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
         transactions = txRows;
         statementData = periods;
         if (!cards.any((c) => c['id'].toString() == selectedCardId)) {
-          selectedCardId = cards.isEmpty ? null : cards.first['id'].toString();
+          final visibleCards = orderedCards;
+          selectedCardId = visibleCards.isEmpty
+              ? null
+              : visibleCards.first['id'].toString();
         }
         loading = false;
       });
@@ -189,7 +195,8 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
       }
       checkSession(user.id);
       final statementId = data['statement_id'];
-      await supabase.rpc(
+      final receipt = data.remove(receiptDraftKey) as PendingReceipt?;
+      final saved = await supabase.rpc(
         statementId == null
             ? 'register_credit_card_payment'
             : 'register_credit_card_payment_for_statement',
@@ -201,6 +208,14 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
           if (statementId != null) 'p_statement_id': statementId,
         },
       );
+      if (mounted)
+        await attachFinancialReceipt(
+          context,
+          receipt,
+          user.id,
+          'credit_card_transactions',
+          saved,
+        );
       if (!mounted) {
         return;
       }
@@ -265,11 +280,20 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
       if (current['is_active'] != true) {
         throw StateError('La tarjeta ya no está activa.');
       }
-      await supabase.from('credit_card_transactions').insert({
-        ...data,
-        'credit_card_id': card['id'],
-        'user_id': user.id,
-      });
+      final receipt = data.remove(receiptDraftKey) as PendingReceipt?;
+      final saved = await supabase
+          .from('credit_card_transactions')
+          .insert({...data, 'credit_card_id': card['id'], 'user_id': user.id})
+          .select('id')
+          .single();
+      if (mounted)
+        await attachFinancialReceipt(
+          context,
+          receipt,
+          user.id,
+          'credit_card_transactions',
+          saved['id'],
+        );
       if (!mounted) {
         return;
       }
@@ -512,107 +536,116 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
   @override
   Widget build(BuildContext context) {
     final selected = selectedCard;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Tarjetas de crédito'),
-        actions: [
-          IconButton(
-            tooltip: 'Actualizar',
-            onPressed: loading || saving ? null : loadData,
-            icon: const Icon(Icons.refresh),
+    return GuideScope(
+      topic: 'cards',
+      ready: !loading && error == null,
+      excludedTargets: {
+        if (cards.isEmpty) ...['wallet', 'details', 'periods'],
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: GuideAnchor(
+            id: 'title',
+            child: const Text('Tarjetas de crédito'),
           ),
-        ],
-      ),
-      bottomNavigationBar: MediaQuery.sizeOf(context).width >= 650
-          ? null
-          : SafeArea(
-              top: false,
-              minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
-                onPressed: loading || saving || error != null
-                    ? null
-                    : () => addCard(),
-                icon: const Icon(Icons.add),
-                label: Text(saving ? 'Guardando...' : 'Nueva tarjeta'),
-              ),
+          actions: [
+            const AppHelpButton(topic: 'cards'),
+            IconButton(
+              tooltip: 'Actualizar',
+              onPressed: loading || saving ? null : loadData,
+              icon: const Icon(Icons.refresh),
             ),
-      floatingActionButton: MediaQuery.sizeOf(context).width < 650
-          ? null
-          : FloatingActionButton.extended(
-              onPressed: loading || saving || error != null
-                  ? null
-                  : () => addCard(),
-              icon: const Icon(Icons.add),
-              label: Text(saving ? 'Guardando...' : 'Nueva tarjeta'),
-            ),
-      body: SafeArea(
-        top: false,
-        child: loading
-            ? const Center(child: CircularProgressIndicator())
-            : error != null
-            ? Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('No se pudieron cargar las tarjetas.'),
-                      SelectableText(error!),
-                      TextButton(
-                        onPressed: loadData,
-                        child: const Text('Reintentar'),
-                      ),
-                    ],
+          ],
+        ),
+        bottomNavigationBar: !compactLayout(context)
+            ? null
+            : SafeArea(
+                top: false,
+                minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: GuideAnchor(
+                  id: 'add',
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 48),
+                    ),
+                    onPressed: loading || saving || error != null
+                        ? null
+                        : () => addCard(),
+                    icon: const Icon(Icons.add),
+                    label: Text(saving ? 'Guardando...' : 'Nueva tarjeta'),
                   ),
                 ),
-              )
-            : Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1100),
-                  child: RefreshIndicator(
-                    onRefresh: loadData,
-                    child: ListView(
-                      physics: const ClampingScrollPhysics(
-                        parent: AlwaysScrollableScrollPhysics(),
-                      ),
-                      padding: EdgeInsets.fromLTRB(
-                        12,
-                        16,
-                        12,
-                        MediaQuery.sizeOf(context).width < 650 ? 24 : 110,
-                      ),
+              ),
+        floatingActionButton: compactLayout(context)
+            ? null
+            : GuideAnchor(
+                id: 'add',
+                child: FloatingActionButton.extended(
+                  onPressed: loading || saving || error != null
+                      ? null
+                      : () => addCard(),
+                  icon: const Icon(Icons.add),
+                  label: Text(saving ? 'Guardando...' : 'Nueva tarjeta'),
+                ),
+              ),
+        body: SafeArea(
+          top: false,
+          child: loading
+              ? const Center(child: CircularProgressIndicator())
+              : error != null
+              ? Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (cards.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 40),
-                            child: Column(
+                        const Text('No se pudieron cargar las tarjetas.'),
+                        SelectableText(error!),
+                        TextButton(
+                          onPressed: loadData,
+                          child: const Text('Reintentar'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1100),
+                    child: RefreshIndicator(
+                      onRefresh: loadData,
+                      child: ListView(
+                        physics: const ClampingScrollPhysics(
+                          parent: AlwaysScrollableScrollPhysics(),
+                        ),
+                        padding: EdgeInsets.fromLTRB(
+                          12,
+                          16,
+                          12,
+                          compactLayout(context) ? 24 : 110,
+                        ),
+                        children: [
+                          if (cards.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 40),
+                              child: Column(
+                                children: [
+                                  const Icon(Icons.wallet_outlined, size: 60),
+                                  const SizedBox(height: 16),
+                                  const Text('Tu tarjetero está vacío'),
+                                  const SizedBox(height: 16),
+                                  FilledButton(
+                                    onPressed: saving ? null : () => addCard(),
+                                    child: const Text('Agregar tarjeta'),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else ...[
+                            AdaptiveColumns(
+                              minColumnWidth: 235,
                               children: [
-                                const Icon(Icons.wallet_outlined, size: 60),
-                                const SizedBox(height: 16),
-                                const Text('Tu tarjetero está vacío'),
-                                const SizedBox(height: 16),
-                                FilledButton(
-                                  onPressed: saving ? null : () => addCard(),
-                                  child: const Text('Agregar tarjeta'),
-                                ),
-                              ],
-                            ),
-                          )
-                        else ...[
-                          Wrap(
-                            spacing: 12,
-                            runSpacing: 12,
-                            children: [
-                              SizedBox(
-                                width: MediaQuery.sizeOf(context).width < 650
-                                    ? MediaQuery.sizeOf(context).width -
-                                          MediaQuery.paddingOf(
-                                            context,
-                                          ).horizontal -
-                                          24
-                                    : 240,
-                                child: DropdownButtonFormField<String>(
+                                DropdownButtonFormField<String>(
                                   initialValue: cardOrder,
                                   isExpanded: true,
                                   decoration: const InputDecoration(
@@ -639,17 +672,8 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
                                     }
                                   },
                                 ),
-                              ),
-                              if (cardOrder != 'name')
-                                SizedBox(
-                                  width: MediaQuery.sizeOf(context).width < 650
-                                      ? MediaQuery.sizeOf(context).width -
-                                            MediaQuery.paddingOf(
-                                              context,
-                                            ).horizontal -
-                                            24
-                                      : 200,
-                                  child: DropdownButtonFormField<String>(
+                                if (cardOrder != 'name')
+                                  DropdownButtonFormField<String>(
                                     initialValue: orderCurrency,
                                     isExpanded: true,
                                     decoration: const InputDecoration(
@@ -671,94 +695,106 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
                                       }
                                     },
                                   ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          CreditCardWallet(
-                            cards: orderedCards,
-                            selectedId: selectedCardId,
-                            balanceFor: balanceFor,
-                            onSelected: saving
-                                ? null
-                                : (id) => setState(() => selectedCardId = id),
-                          ),
-                          const SizedBox(height: 14),
-                          if (selected != null)
-                            CreditCardDetails(
-                              card: selected,
-                              balances: {
-                                for (final c in cardCurrencies)
-                                  c: balanceFor(selected, c),
-                              },
-                              onEdit: saving ? null : () => addCard(selected),
-                              onPlans: saving
-                                  ? null
-                                  : () async {
-                                      await Navigator.push(
-                                        context,
-                                        MaterialPageRoute<void>(
-                                          builder: (_) =>
-                                              ZeroPlansPage(card: selected),
-                                        ),
-                                      );
-                                      if (mounted) await loadData();
-                                    },
-                              onToggle: saving
-                                  ? null
-                                  : () => toggleCard(selected),
-                              onHistory: saving
-                                  ? null
-                                  : () => history(selected),
-                              onMovement: saving
-                                  ? null
-                                  : () => addMovement(selected),
-                              onPayment: saving
-                                  ? null
-                                  : () => payCard(selected),
+                              ],
                             ),
-                          if (selected != null && statementData != null) ...[
-                            const SizedBox(height: 12),
-                            CreditCardPeriodSummary(
-                              cardId: '${selected['id']}',
-                              data: statementData!,
-                              onManage: saving
-                                  ? null
-                                  : () async {
-                                      await Navigator.push(
-                                        context,
-                                        MaterialPageRoute<void>(
-                                          builder: (_) =>
-                                              CreditCardStatementsPage(
-                                                card: selected,
-                                              ),
-                                        ),
-                                      );
-                                      if (mounted) {
-                                        await loadData();
-                                      }
-                                    },
+                            const SizedBox(height: 16),
+                            GuideAnchor(
+                              id: 'wallet',
+                              child: CreditCardWallet(
+                                cards: orderedCards,
+                                selectedId: selectedCardId,
+                                balanceFor: balanceFor,
+                                onSelected: saving
+                                    ? null
+                                    : (id) =>
+                                          setState(() => selectedCardId = id),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            if (selected != null)
+                              GuideAnchor(
+                                id: 'details',
+                                child: CreditCardDetails(
+                                  card: selected,
+                                  balances: {
+                                    for (final c in cardCurrencies)
+                                      c: balanceFor(selected, c),
+                                  },
+                                  onEdit: saving
+                                      ? null
+                                      : () => addCard(selected),
+                                  onPlans: saving
+                                      ? null
+                                      : () async {
+                                          await Navigator.push(
+                                            context,
+                                            MaterialPageRoute<void>(
+                                              builder: (_) =>
+                                                  ZeroPlansPage(card: selected),
+                                            ),
+                                          );
+                                          if (mounted) await loadData();
+                                        },
+                                  onToggle: saving
+                                      ? null
+                                      : () => toggleCard(selected),
+                                  onHistory: saving
+                                      ? null
+                                      : () => history(selected),
+                                  onMovement: saving
+                                      ? null
+                                      : () => addMovement(selected),
+                                  onPayment: saving
+                                      ? null
+                                      : () => payCard(selected),
+                                ),
+                              ),
+                            if (selected != null && statementData != null) ...[
+                              const SizedBox(height: 12),
+                              GuideAnchor(
+                                id: 'periods',
+                                child: CreditCardPeriodSummary(
+                                  cardId: '${selected['id']}',
+                                  data: statementData!,
+                                  onManage: saving
+                                      ? null
+                                      : () async {
+                                          await Navigator.push(
+                                            context,
+                                            MaterialPageRoute<void>(
+                                              builder: (_) =>
+                                                  CreditCardStatementsPage(
+                                                    card: selected,
+                                                  ),
+                                            ),
+                                          );
+                                          if (mounted) {
+                                            await loadData();
+                                          }
+                                        },
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 26),
+                            const Text(
+                              'Resumen de todas tus tarjetas',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            CreditCardsSummary(
+                              cards: cards,
+                              balanceFor: balanceFor,
                             ),
                           ],
-                          const SizedBox(height: 26),
-                          const Text(
-                            'Resumen de todas tus tarjetas',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          CreditCardsSummary(
-                            cards: cards,
-                            balanceFor: balanceFor,
-                          ),
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 ),
-              ),
+        ),
       ),
     );
   }

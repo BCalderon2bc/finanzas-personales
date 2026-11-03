@@ -2,6 +2,7 @@ import '../utils/money.dart';
 import 'person_account_logic.dart';
 import 'export_report_models.dart';
 import 'person_account_export_report.dart';
+import 'exchange_rate.dart';
 
 /// Report from the ledger owner's perspective. Counterparty data stays scoped
 /// to a single person_account_id, including when the caller passes other rows.
@@ -10,6 +11,7 @@ ExportReport personAccountReport({
   required List<Map<String, dynamic>> entries,
   required DateTime generatedAt,
   String? ownerName,
+  ExchangeRate? settlementRate,
   DateTime? start,
   DateTime? end,
 }) {
@@ -17,11 +19,6 @@ ExportReport personAccountReport({
       ? 'Titular del registro'
       : ownerName!.trim();
   final name = '${account['name']}'.trim();
-  String whoOwes(int balance) => balance > 0
-      ? '$owner le debe a $name'
-      : balance < 0
-      ? '$name le debe a $owner'
-      : 'Ninguno le debe al otro';
   DateTime day(DateTime d) => DateTime(d.year, d.month, d.day);
   if ((start == null) != (end == null))
     throw ArgumentError('Selecciona ambas fechas.');
@@ -54,18 +51,23 @@ ExportReport personAccountReport({
           );
   });
   personAccountBalance(rows);
-  var opening = 0,
-      closing = 0,
+  var closing = 0,
       otherPurchases = 0,
       myPurchases = 0,
       myPayments = 0,
       receivedPayments = 0,
       previousEntries = 0;
+  // Las columnas de conversión aparecen solo si el detalle visible contiene USD.
+  final showExchange = rows.any((e) {
+    final d = date(e);
+    return e['currency'] == 'USD' &&
+        (from == null || !d.isBefore(from)) &&
+        (to == null || !d.isAfter(to));
+  });
   final detail = <List<Object?>>[];
   for (final e in rows) {
     final d = date(e), effect = personAccountBalance([e]);
     if (from != null && d.isBefore(from)) {
-      opening += effect;
       closing += effect;
       continue;
     }
@@ -103,22 +105,25 @@ ExportReport personAccountReport({
       },
       '${e['description'] ?? ''}',
       '${e['currency']}',
-      MoneyCell(moneyCents(e['amount'])),
-      e['currency'] == 'USD' ? '${e['exchange_rate']}' : '—',
-      MoneyCell(effect),
-      MoneyCell(closing),
-      whoOwes(closing),
+      if (showExchange) ...[
+        e['currency'] == 'USD'
+            ? MoneyCell(
+                moneyCents(e['amount']) * int.parse('${e['direction']}'),
+              )
+            : null,
+        e['currency'] == 'USD' ? '${e['exchange_rate']}' : '—',
+        // Usa el equivalente guardado, con el redondeo original del registro.
+        MoneyCell(effect),
+      ] else
+        MoneyCell(effect),
     ]);
   }
-  final conclusion = closing > 0
-      ? '$owner le debe a $name ${formatMoneyCents(closing, 'NIO')}.'
-      : closing < 0
-      ? '$name le debe a $owner ${formatMoneyCents(-closing, 'NIO')}.'
-      : 'La cuenta está saldada: ninguna de las dos personas debe dinero.';
+
   return PersonAccountExportReport(
     ownerName: owner,
     personName: name,
     closingCents: closing,
+    settlementRate: settlementRate,
     title: 'Cuenta con $name',
     period: from == null
         ? 'Historial completo · saldo de todos los movimientos registrados'
@@ -130,15 +135,15 @@ ExportReport personAccountReport({
         'Movimiento',
         'Descripción',
         'Moneda',
-        'Importe original',
-        'Tasa C\$/US\$',
-        'Variación C\$',
-        'Saldo C\$',
-        'Quién debe después',
+        if (showExchange) ...[
+          'Importe US\$',
+          'Tasa C\$/US\$',
+          'Importe C\$',
+        ] else
+          'Importe C\$',
       ], detail),
     ],
     totals: [
-      ReportTotal('NIO', 'Saldo anterior al período', opening),
       ReportTotal('NIO', 'Compras de $name (+)', otherPurchases),
       ReportTotal('NIO', 'Compras de $owner (−)', -myPurchases),
       ReportTotal('NIO', 'Pagos hechos por $owner (−)', -myPayments),
@@ -152,15 +157,7 @@ ExportReport personAccountReport({
       ReportTotal('NIO', 'Saldo neto al cierre', closing),
     ],
     notes: [
-      conclusion,
-      'Titular del registro: $owner. Cuenta con: $name.',
-      'Saldo positivo: $owner le debe a $name. Saldo negativo: $name le debe a $owner. El importe destacado se presenta sin signo y señala quién paga y quién recibe.',
       'Cada movimiento en USD usa su tasa guardada y se redondea a centavos. No se aplica la tasa actual a movimientos anteriores.',
-      if (from != null)
-        'El saldo anterior incluye todos los movimientos vigentes anteriores al inicio; el saldo final excluye fechas posteriores al cierre.',
-      if (from == null)
-        'El historial completo incluye todas las fechas registradas, incluso fechas futuras si existen.',
-      'Los movimientos anulados se excluyen. Este reporte refleja los datos vigentes al generarlo, incluidas sus correcciones.',
       if (detail.isEmpty)
         'No hay movimientos vigentes para el período seleccionado.',
     ],

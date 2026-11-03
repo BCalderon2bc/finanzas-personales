@@ -38,47 +38,81 @@ Uint8List reportExcel(ExportReport report) {
 
     highlighted('QUIÉN LE DEBE A QUIÉN');
     highlighted(person.direction, fontSize: 18, height: 58);
-    highlighted('Pendiente: ${person.amountLabel}', fontSize: 22, height: 38);
+    highlighted(person.paymentNioLabel, fontSize: 20, height: 38);
+    highlighted(person.paymentUsdLabel, fontSize: 20, height: 38);
+    highlighted(person.paymentRateLabel, height: 30);
+
     highlighted('Titular: ${person.ownerName}', height: 34);
     highlighted('Cuenta con: ${person.personName}', height: 34);
-    if (!person.settled) {
-      highlighted('Debe pagar: ${person.debtor}', height: 34);
-      highlighted('Debe recibir: ${person.creditor}', height: 34);
+
+    summary.appendRow([]);
+  }
+  if (person == null) {
+    summary.appendRow([
+      x.TextCellValue('Moneda'),
+      x.TextCellValue('Concepto'),
+      x.TextCellValue('Monto'),
+    ]);
+    for (final total in report.totals) {
+      summary.appendRow([
+        x.TextCellValue(total.currency),
+        x.TextCellValue(total.label),
+        x.DoubleCellValue(total.cents / 100),
+      ]);
+      if (person != null) {
+        final row = summary.maxRows - 1;
+        summary
+            .cell(x.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row))
+            .cellStyle = x.CellStyle(
+          textWrapping: x.TextWrapping.WrapText,
+        );
+        summary.setRowHeight(row, 34);
+      }
+      summary
+          .cell(
+            x.CellIndex.indexByColumnRow(
+              columnIndex: 2,
+              rowIndex: summary.maxRows - 1,
+            ),
+          )
+          .cellStyle = x.CellStyle(
+        numberFormat: x.NumFormat.custom(formatCode: '#,##0.00'),
+      );
+    }
+    summary.appendRow([]);
+    summary.appendRow([
+      x.TextCellValue('SUMAS POR MONEDA'),
+      x.TextCellValue('Córdobas C\$'),
+      x.TextCellValue('Dólares US\$'),
+    ]);
+    final labels = report.totals.map((t) => t.label).toSet();
+    for (final label in labels) {
+      final nio = report.totals
+          .where((t) => t.label == label && t.currency == 'NIO')
+          .firstOrNull;
+      final usd = report.totals
+          .where((t) => t.label == label && t.currency == 'USD')
+          .firstOrNull;
+      summary.appendRow([
+        x.TextCellValue(label),
+        nio == null ? null : x.DoubleCellValue(nio.cents / 100),
+        usd == null ? null : x.DoubleCellValue(usd.cents / 100),
+      ]);
+      for (var col = 1; col <= 2; col++) {
+        summary
+            .cell(
+              x.CellIndex.indexByColumnRow(
+                columnIndex: col,
+                rowIndex: summary.maxRows - 1,
+              ),
+            )
+            .cellStyle = x.CellStyle(
+          numberFormat: x.NumFormat.custom(formatCode: '#,##0.00'),
+        );
+      }
     }
     summary.appendRow([]);
   }
-  summary.appendRow([
-    x.TextCellValue('Moneda'),
-    x.TextCellValue('Concepto'),
-    x.TextCellValue('Monto'),
-  ]);
-  for (final total in report.totals) {
-    summary.appendRow([
-      x.TextCellValue(total.currency),
-      x.TextCellValue(total.label),
-      x.DoubleCellValue(total.cents / 100),
-    ]);
-    if (person != null) {
-      final row = summary.maxRows - 1;
-      summary
-          .cell(x.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row))
-          .cellStyle = x.CellStyle(
-        textWrapping: x.TextWrapping.WrapText,
-      );
-      summary.setRowHeight(row, 34);
-    }
-    summary
-        .cell(
-          x.CellIndex.indexByColumnRow(
-            columnIndex: 2,
-            rowIndex: summary.maxRows - 1,
-          ),
-        )
-        .cellStyle = x.CellStyle(
-      numberFormat: x.NumFormat.custom(formatCode: '#,##0.00'),
-    );
-  }
-  summary.appendRow([]);
   for (final note in report.notes) {
     summary.appendRow([x.TextCellValue(note)]);
     final row = summary.maxRows - 1;
@@ -127,7 +161,7 @@ Uint8List reportExcel(ExportReport report) {
         backgroundColorHex: x.ExcelColor.fromHexString('#005544'),
       );
     }
-    for (final row in table.rows) {
+    for (final row in _exportTableRows(table, person != null)) {
       sheet.appendRow(
         row
             .map<x.CellValue?>(
@@ -323,44 +357,59 @@ Future<Uint8List> reportPdf(
                 ),
                 pw.SizedBox(height: 5),
                 pw.Text(
-                  person.amountLabel,
+                  person.paymentNioLabel,
                   style: pw.TextStyle(
-                    fontSize: 22,
+                    fontSize: 17,
                     fontWeight: pw.FontWeight.bold,
                     color: PdfColor.fromInt(0xFF17493D),
                   ),
                 ),
+                pw.SizedBox(height: 5),
+                pw.Text(
+                  person.paymentUsdLabel,
+                  style: pw.TextStyle(
+                    fontSize: 17,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColor.fromInt(0xFF17493D),
+                  ),
+                ),
+                pw.SizedBox(height: 5),
+                pw.Text(
+                  person.paymentRateLabel,
+                  style: const pw.TextStyle(fontSize: 9),
+                ),
+
                 pw.SizedBox(height: 5),
                 if (person.settled)
                   pw.Text(
                     'Titular: ${person.ownerName}  |  Cuenta con: ${person.personName}',
                     style: const pw.TextStyle(fontSize: 9),
                   ),
-                if (!person.settled) ...[
-                  pw.SizedBox(height: 5),
-                  pw.Text(
-                    'Debe pagar: ${person.debtor}',
-                    style: const pw.TextStyle(fontSize: 10),
-                  ),
-                  pw.Text(
-                    'Debe recibir: ${person.creditor}',
-                    style: const pw.TextStyle(fontSize: 10),
-                  ),
-                ],
               ],
             ),
           ),
           pw.SizedBox(height: 12),
-          pw.Text(
-            'Resumen del período',
-            style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
-          ),
-          pw.SizedBox(height: 5),
         ],
-        for (final total in report.totals)
-          pw.Text(
-            '${total.currency} · ${total.label}: ${formatMoneyCents(total.cents, total.currency)}',
-            style: pw.TextStyle(fontSize: person == null ? 10 : 9),
+        if (person == null)
+          pw.TableHelper.fromTextArray(
+            headers: ['Concepto', 'Córdobas C\$', 'Dólares US\$'],
+            data: [
+              for (final label in report.totals.map((t) => t.label).toSet())
+                [
+                  label,
+                  for (final c in ['NIO', 'USD']) _totalLabel(report, label, c),
+                ],
+            ],
+            headerStyle: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              fontSize: 8,
+            ),
+            cellStyle: const pw.TextStyle(fontSize: 8),
+            cellAlignments: {
+              1: pw.Alignment.centerRight,
+              2: pw.Alignment.centerRight,
+            },
+            border: pw.TableBorder.all(color: PdfColors.grey300, width: .4),
           ),
         pw.SizedBox(height: 10),
         for (final table in report.tables) ...[
@@ -369,12 +418,12 @@ Future<Uint8List> reportPdf(
             style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
           ),
           pw.SizedBox(height: 6),
-          if (table.rows.isEmpty)
+          if (table.rows.isEmpty && person == null)
             pw.Text('Sin registros.', style: const pw.TextStyle(fontSize: 9))
           else
             pw.TableHelper.fromTextArray(
               headers: table.columns,
-              data: _pdfRows(table.rows),
+              data: _pdfRows(_exportTableRows(table, person != null)),
               columnWidths: {
                 for (var n = 0; n < table.columns.length; n++)
                   n: pw.FlexColumnWidth(
@@ -394,9 +443,9 @@ Future<Uint8List> reportPdf(
                         : table.columns[n] == 'Descripción'
                         ? 3.2
                         : table.columns[n] == 'Moneda'
-                        ? 0.75
+                        ? 1.05
                         : table.columns[n] == 'Fecha'
-                        ? 1.1
+                        ? 1.6
                         : 1.6,
                   ),
               },
@@ -406,14 +455,24 @@ Future<Uint8List> reportPdf(
                     n: pw.Alignment.centerRight,
               },
               headerStyle: pw.TextStyle(
-                fontSize: person == null ? 8 : 7.5,
+                fontSize: table.columns.length >= 11
+                    ? 7
+                    : person == null
+                    ? 8
+                    : 7.5,
                 fontWeight: pw.FontWeight.bold,
                 color: PdfColors.white,
               ),
               headerDecoration: const pw.BoxDecoration(
                 color: PdfColor.fromInt(0xFF005544),
               ),
-              cellStyle: pw.TextStyle(fontSize: person == null ? 8 : 7.5),
+              cellStyle: pw.TextStyle(
+                fontSize: table.columns.length >= 11
+                    ? 7
+                    : person == null
+                    ? 8
+                    : 7.5,
+              ),
               cellPadding: const pw.EdgeInsets.all(5),
               border: pw.TableBorder.all(color: PdfColors.grey300, width: .4),
             ),
@@ -431,4 +490,33 @@ Future<Uint8List> reportPdf(
     ),
   );
   return pdf.save();
+}
+
+String _totalLabel(ExportReport report, String label, String currency) {
+  final total = report.totals
+      .where((t) => t.label == label && t.currency == currency)
+      .firstOrNull;
+  return total == null ? '—' : formatAmountCents(total.cents);
+}
+
+// Total al pie del detalle. Suma únicamente las columnas de importes visibles;
+// la tasa no se suma y el saldo neto conserva su cálculo independiente.
+List<List<Object?>> _exportTableRows(ReportTable table, bool person) {
+  if (!person) return table.rows;
+  final amountColumns = <int>[
+    for (var i = 0; i < table.columns.length; i++)
+      if (['Importe C\$', 'Importe original'].contains(table.columns[i])) i,
+  ];
+  if (amountColumns.isEmpty) return table.rows;
+  final footer = List<Object?>.filled(table.columns.length, null);
+  footer[0] = 'Total';
+  for (final column in amountColumns) {
+    var sum = 0;
+    for (final row in table.rows) {
+      final value = row[column];
+      if (value is MoneyCell) sum += value.cents;
+    }
+    footer[column] = MoneyCell(sum);
+  }
+  return [...table.rows, footer];
 }

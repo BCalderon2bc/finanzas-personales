@@ -1,3 +1,5 @@
+import '../../widgets/adaptive_layout.dart';
+import '../help/app_help.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/supabase_client.dart';
@@ -218,53 +220,67 @@ class _AccountsPageState extends State<AccountsPage> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Text('Mis cuentas'),
-      actions: [
-        IconButton(
-          onPressed: loading || saving ? null : loadAccounts,
-          tooltip: 'Actualizar',
-          icon: const Icon(Icons.refresh),
-        ),
-      ],
-    ),
-    bottomNavigationBar: MediaQuery.sizeOf(context).width >= 650
-        ? null
-        : SafeArea(
-            top: false,
-            minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            child: FilledButton.icon(
-              style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
-              onPressed: saving || loading || error != null
-                  ? null
-                  : () => addAccount(),
-              icon: saving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.add),
-              label: Text(saving ? 'Guardando...' : 'Nueva cuenta'),
+  Widget build(BuildContext context) => GuideScope(
+    topic: 'accounts',
+    ready: !loading && error == null,
+    excludedTargets: {
+      if (accounts.isEmpty) ...['wallet', 'details'],
+    },
+    child: Scaffold(
+      appBar: AppBar(
+        title: GuideAnchor(id: 'title', child: const Text('Mis cuentas')),
+        actions: [
+          const AppHelpButton(topic: 'accounts'),
+          IconButton(
+            onPressed: loading || saving ? null : loadAccounts,
+            tooltip: 'Actualizar',
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
+      ),
+      bottomNavigationBar: !compactLayout(context)
+          ? null
+          : SafeArea(
+              top: false,
+              minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: GuideAnchor(
+                id: 'add',
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+                  onPressed: saving || loading || error != null
+                      ? null
+                      : () => addAccount(),
+                  icon: saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.add),
+                  label: Text(saving ? 'Guardando...' : 'Nueva cuenta'),
+                ),
+              ),
             ),
-          ),
-    floatingActionButton: MediaQuery.sizeOf(context).width < 650
-        ? null
-        : FloatingActionButton.extended(
-            onPressed: saving || loading || error != null
-                ? null
-                : () => addAccount(),
-            icon: saving
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.add),
-            label: Text(saving ? 'Guardando...' : 'Nueva cuenta'),
-          ),
-    body: SafeArea(top: false, child: _buildBody()),
+      floatingActionButton: compactLayout(context)
+          ? null
+          : GuideAnchor(
+              id: 'add',
+              child: FloatingActionButton.extended(
+                onPressed: saving || loading || error != null
+                    ? null
+                    : () => addAccount(),
+                icon: saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.add),
+                label: Text(saving ? 'Guardando...' : 'Nueva cuenta'),
+              ),
+            ),
+      body: SafeArea(top: false, child: _buildBody()),
+    ),
   );
 
   Widget _buildBody() {
@@ -343,27 +359,34 @@ class _AccountsPageState extends State<AccountsPage> {
               parent: AlwaysScrollableScrollPhysics(),
             ),
             padding: EdgeInsets.fromLTRB(
-              12,
+              pageGutter(context),
               16,
-              12,
-              MediaQuery.sizeOf(context).width < 650 ? 24 : 110,
+              pageGutter(context),
+              compactLayout(context) ? 24 : 110,
             ),
             children: [
-              AccountWallet(
-                accounts: accounts,
-                balances: currentBalances,
-                selectedId: selectedAccountId,
-                onSelected: saving
-                    ? null
-                    : (id) => setState(() => selectedAccountId = id),
+              GuideAnchor(
+                id: 'wallet',
+                child: AccountWallet(
+                  accounts: accounts,
+                  balances: currentBalances,
+                  selectedId: selectedAccountId,
+                  onSelected: saving
+                      ? null
+                      : (id) => setState(() => selectedAccountId = id),
+                ),
               ),
               const SizedBox(height: 14),
               if (selected != null)
-                AccountDetails(
-                  account: selected,
-                  balanceCents: currentBalances[selected['id'].toString()] ?? 0,
-                  onEdit: saving ? null : () => addAccount(selected),
-                  onToggle: saving ? null : () => toggleAccount(selected),
+                GuideAnchor(
+                  id: 'details',
+                  child: AccountDetails(
+                    account: selected,
+                    balanceCents:
+                        currentBalances[selected['id'].toString()] ?? 0,
+                    onEdit: saving ? null : () => addAccount(selected),
+                    onToggle: saving ? null : () => toggleAccount(selected),
+                  ),
                 ),
             ],
           ),

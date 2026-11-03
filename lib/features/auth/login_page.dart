@@ -69,9 +69,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void showMessage(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(text)),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
   @override
@@ -91,12 +89,18 @@ class _LoginPageState extends State<LoginPage> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Center(child: ClipRRect(
-                        borderRadius: BorderRadius.circular(18),
-                        child: Image.asset('assets/branding/mi_billete.png',
-                          width: 80, height: 80, fit: BoxFit.contain,
-                          semanticLabel: 'Mi Billete'),
-                      )),
+                      Center(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(18),
+                          child: Image.asset(
+                            'assets/branding/mi_billete.png',
+                            width: 80,
+                            height: 80,
+                            fit: BoxFit.contain,
+                            semanticLabel: 'Mi Billete',
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 16),
                       const Text(
                         'Mi Billete',
@@ -130,8 +134,9 @@ class _LoginPageState extends State<LoginPage> {
                             return 'Escribe tu correo electrónico';
                           }
 
-                          if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
-                              .hasMatch(email)) {
+                          if (!RegExp(
+                            r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+                          ).hasMatch(email)) {
                             return 'Escribe un correo válido';
                           }
 
@@ -196,10 +201,10 @@ class _LoginPageState extends State<LoginPage> {
                         onPressed: loading
                             ? null
                             : () {
-                          setState(() {
-                            isRegister = !isRegister;
-                          });
-                        },
+                                setState(() {
+                                  isRegister = !isRegister;
+                                });
+                              },
                         child: Text(
                           isRegister
                               ? 'Ya tengo una cuenta. Iniciar sesión'

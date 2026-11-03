@@ -28,10 +28,14 @@ class _AppVersionFooterState extends State<AppVersionFooter> {
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children:
-          [
+          children: [
             if (snapshot.connectionState != ConnectionState.done)
-              Center(child: const Text('Consultando versión…', style: TextStyle(fontSize: 12)))
+              Center(
+                child: const Text(
+                  'Consultando versión…',
+                  style: TextStyle(fontSize: 12),
+                ),
+              )
             else if (snapshot.hasError || version.isEmpty)
               Row(
                 children: [

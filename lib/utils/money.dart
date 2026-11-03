@@ -43,7 +43,9 @@ Map<String, int> calculateBalances(
       }
     }
     if (type == 'transfer' && balances.containsKey(destination)) {
-      balances[destination!] = balances[destination]! + amount;
+      balances[destination!] =
+          balances[destination]! +
+          moneyCents(tx['destination_amount'] ?? tx['amount']);
     }
   }
   final currencies = {

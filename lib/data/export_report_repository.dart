@@ -1,4 +1,5 @@
 import '../core/supabase_client.dart';
+import 'card_export_reports.dart';
 import 'transaction_repository.dart';
 import 'card_statement_repository.dart' show statementRows;
 import 'debt_installment_repository.dart';
@@ -6,6 +7,7 @@ import 'export_report_models.dart';
 
 Future<ExportReport> loadExportReport({
   required String kind,
+  String? cardId,
   required String currency,
   required DateTime start,
   required DateTime end,
@@ -16,8 +18,50 @@ Future<ExportReport> loadExportReport({
     throw StateError('Debes iniciar sesión.');
   }
   if (!['all', 'NIO', 'USD'].contains(currency) ||
-      !['movements', 'debts', 'budgets'].contains(kind)) {
+      ![
+        'movements',
+        'debts',
+        'budgets',
+        'credit_cards',
+        'debit_cards',
+      ].contains(kind)) {
     throw ArgumentError('Tipo de reporte o moneda inválidos.');
+  }
+  if (kind == 'credit_cards' || kind == 'debit_cards') {
+    final credit = kind == 'credit_cards';
+    final values = await Future.wait([
+      statementRows(credit ? 'credit_cards' : 'debit_cards', '*', uid),
+      statementRows('accounts', 'id,name,currency,opening_balance', uid),
+      loadUserTransactions(uid),
+      statementRows('credit_card_transactions', '*', uid),
+      statementRows('debt_payments', '*', uid),
+    ]);
+    if (supabase.auth.currentUser?.id != uid)
+      throw StateError('La sesión cambió.');
+    return credit
+        ? creditCardsExport(
+            cards: values[0],
+            movements: values[3],
+            start: start,
+            end: end,
+            generatedAt: DateTime.now(),
+            currency: currency,
+            cardId: cardId,
+          )
+        : debitCardsExport(
+            cards: values[0],
+            accounts: values[1],
+            transactions: values[2],
+            cardPayments: values[3]
+                .where((p) => p['transaction_type'] == 'payment')
+                .toList(),
+            debtPayments: values[4],
+            start: start,
+            end: end,
+            generatedAt: DateTime.now(),
+            currency: currency,
+            cardId: cardId,
+          );
   }
   if (kind == 'debts') {
     final values = await Future.wait<Object>([

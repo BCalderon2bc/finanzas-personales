@@ -102,23 +102,23 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
                 .entries
                 .map(
                   (entry) => Padding(
-                padding: EdgeInsets.only(
-                  right: entry.key == widget.items.length - 1 ? 0 : 14,
-                ),
-                child: SizedBox(
-                  width: itemWidth,
-                  child: _WalletItemExtent(
-                    key: ValueKey('measure-${entry.value['id']}'),
-                    id: '${entry.value['id']}',
-                    measurements: measurements,
-                    child: widget.itemBuilder(
-                      entry.value,
-                      '${entry.value['id']}' == widget.selectedId,
+                    padding: EdgeInsets.only(
+                      right: entry.key == widget.items.length - 1 ? 0 : 14,
+                    ),
+                    child: SizedBox(
+                      width: itemWidth,
+                      child: _WalletItemExtent(
+                        key: ValueKey('measure-${entry.value['id']}'),
+                        id: '${entry.value['id']}',
+                        measurements: measurements,
+                        child: widget.itemBuilder(
+                          entry.value,
+                          '${entry.value['id']}' == widget.selectedId,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-            )
+                )
                 .toList(),
           ),
         );
@@ -189,9 +189,9 @@ class _WalletItemExtent extends SingleChildRenderObjectWidget {
       _RenderWalletItemExtent(id, measurements);
   @override
   void updateRenderObject(
-      BuildContext context,
-      _RenderWalletItemExtent renderObject,
-      ) {
+    BuildContext context,
+    _RenderWalletItemExtent renderObject,
+  ) {
     renderObject.configure(id, measurements);
   }
 }
@@ -232,9 +232,9 @@ class _WalletViewport extends SingleChildRenderObjectWidget {
       _RenderWalletViewport(activeId, measurements, bottomPadding);
   @override
   void updateRenderObject(
-      BuildContext context,
-      _RenderWalletViewport renderObject,
-      ) {
+    BuildContext context,
+    _RenderWalletViewport renderObject,
+  ) {
     renderObject.configure(activeId, measurements, bottomPadding);
   }
 }

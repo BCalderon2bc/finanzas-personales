@@ -2,20 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 String bankKey(String name) {
-  final value = name.toLowerCase()
-      .replaceAll('á', 'a').replaceAll('é', 'e')
-      .replaceAll('í', 'i').replaceAll('ó', 'o').replaceAll('ú', 'u')
+  final value = name
+      .toLowerCase()
+      .replaceAll('á', 'a')
+      .replaceAll('é', 'e')
+      .replaceAll('í', 'i')
+      .replaceAll('ó', 'o')
+      .replaceAll('ú', 'u')
       .replaceAll(RegExp(r'[^a-z0-9]'), '');
   if (value.contains('lafise') || value.contains('bancentro')) return 'lafise';
   if (value.contains('avanz')) return 'avanz';
   if (value.contains('ficohsa')) return 'ficohsa';
   if (value.contains('atlantida')) return 'atlantida';
   if (value.contains('bdf') || value.contains('bancodefinanzas')) return 'bdf';
-  if (value.contains('bfp') || value.contains('produzcamos') ||
+  if (value.contains('bfp') ||
+      value.contains('produzcamos') ||
       value.contains('fomento')) {
     return 'bfp';
   }
-  if (value.contains('banpro') || value.contains('promerica') ||
+  if (value.contains('banpro') ||
+      value.contains('promerica') ||
       value.contains('bancodelaproduccion')) {
     return 'banpro';
   }
@@ -37,7 +43,10 @@ List<Color> bankGradient(String name) => switch (bankKey(name)) {
 
 class BankLogo extends StatelessWidget {
   const BankLogo({
-    super.key, required this.name, this.width = 110, this.height = 32,
+    super.key,
+    required this.name,
+    this.width = 110,
+    this.height = 32,
     this.fallbackIcon = Icons.account_balance_outlined,
   });
   final String name;
@@ -50,12 +59,17 @@ class BankLogo extends StatelessWidget {
     final path = switch (key) {
       'banpro' => 'assets/banks/banpro.webp',
       'atlantida' => 'assets/banks/atlantida.png',
-      'bac' || 'lafise' || 'avanz' || 'bdf' || 'ficohsa' || 'bfp'
-      => 'assets/banks/$key.svg',
+      'bac' ||
+      'lafise' ||
+      'avanz' ||
+      'bdf' ||
+      'ficohsa' ||
+      'bfp' => 'assets/banks/$key.svg',
       _ => null,
     };
     return SizedBox(
-      width: width, height: height,
+      width: width,
+      height: height,
       child: path == null
           ? Icon(fallbackIcon, color: const Color(0xFF2563EB))
           : path.endsWith('.svg')

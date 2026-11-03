@@ -7,21 +7,24 @@ const appMuted = Color(0xFF64748B);
 const appBorder = Color(0xFFE2E8F0);
 
 ThemeData createAppTheme() {
-  final scheme = ColorScheme.fromSeed(
-    seedColor: primaryColor,
-    brightness: Brightness.light,
-  ).copyWith(
-    primary: primaryColor,
-    onPrimary: Colors.white,
-    secondary: const Color(0xFF0F766E),
-    surface: Colors.white,
-    onSurface: appText,
-    onSurfaceVariant: appMuted,
-    outline: appBorder,
-    error: const Color(0xFFB42318),
-  );
+  final scheme =
+      ColorScheme.fromSeed(
+        seedColor: primaryColor,
+        brightness: Brightness.light,
+      ).copyWith(
+        primary: primaryColor,
+        onPrimary: Colors.white,
+        secondary: const Color(0xFF0F766E),
+        surface: Colors.white,
+        onSurface: appText,
+        onSurfaceVariant: appMuted,
+        outline: appBorder,
+        error: const Color(0xFFB42318),
+      );
   final base = ThemeData(useMaterial3: true, colorScheme: scheme);
-  final buttonShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(14));
+  final buttonShape = RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(14),
+  );
   final inputBorder = OutlineInputBorder(
     borderRadius: BorderRadius.circular(14),
     borderSide: const BorderSide(color: appBorder),
@@ -37,27 +40,43 @@ ThemeData createAppTheme() {
       scrolledUnderElevation: 0,
       centerTitle: false,
       titleTextStyle: TextStyle(
-        color: appText, fontSize: 20, fontWeight: FontWeight.w700,
+        color: appText,
+        fontSize: 20,
+        fontWeight: FontWeight.w700,
       ),
     ),
     textTheme: base.textTheme.copyWith(
       headlineMedium: base.textTheme.headlineMedium?.copyWith(
-        color: appText, fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -0.6,
+        color: appText,
+        fontSize: 28,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.6,
       ),
       headlineSmall: base.textTheme.headlineSmall?.copyWith(
-        color: appText, fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -0.4,
+        color: appText,
+        fontSize: 24,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.4,
       ),
       titleLarge: base.textTheme.titleLarge?.copyWith(
-        color: appText, fontSize: 21, fontWeight: FontWeight.w700,
+        color: appText,
+        fontSize: 21,
+        fontWeight: FontWeight.w700,
       ),
       titleMedium: base.textTheme.titleMedium?.copyWith(
-        color: appText, fontSize: 16, fontWeight: FontWeight.w600,
+        color: appText,
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
       ),
       bodyMedium: base.textTheme.bodyMedium?.copyWith(
-        color: appText, fontSize: 14, height: 1.45,
+        color: appText,
+        fontSize: 14,
+        height: 1.45,
       ),
       bodySmall: base.textTheme.bodySmall?.copyWith(
-        color: appMuted, fontSize: 12, height: 1.4,
+        color: appMuted,
+        fontSize: 12,
+        height: 1.4,
       ),
     ),
     cardTheme: CardThemeData(

@@ -156,6 +156,9 @@ List<ExportMovement> normalizeExportMovements({
       type == 'income' ? amount : 0,
       type == 'expense' ? amount : 0,
       unknown: !native.containsKey(type),
+      description: tx['destination_amount'] == null
+          ? null
+          : '${tx['description'] ?? ''} · Recibido: ${formatMoneyCents(moneyCents(tx['destination_amount']), '${tx['destination_currency']}')} · Tasa C\$ ${tx['exchange_rate']} por US\$1',
     );
   }
   const cardTypes = {
@@ -257,6 +260,7 @@ ExportReport movementsReport(
       ReportTotal(c, 'Ingresos menos gastos', income - expense),
     ]);
   }
+  rows.sort((a, b) => a.date.compareTo(b.date));
   return ExportReport(
     title: 'Movimientos',
     period: '${reportDate(start)} al ${reportDate(end)}',

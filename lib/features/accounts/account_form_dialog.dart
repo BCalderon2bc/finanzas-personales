@@ -1,3 +1,5 @@
+import '../../widgets/adaptive_layout.dart';
+import '../help/app_help.dart';
 import '../../data/account_share_logic.dart';
 import 'package:flutter/material.dart';
 import '../../core/supabase_client.dart';
@@ -184,114 +186,62 @@ class _AccountFormDialogState extends State<AccountFormDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text(editing ? 'Editar cuenta' : 'Nueva cuenta'),
-    content: SizedBox(
-      width: 460,
-      child: SingleChildScrollView(
-        child: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              AccountCard(
-                account: preview,
-                balanceCents: previewBalance,
-                balanceLabel: 'Saldo inicial',
-              ),
-              const SizedBox(height: 20),
-              TextFormField(
-                controller: nameController,
-                onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  labelText: 'Nombre de la cuenta *',
+  Widget build(BuildContext context) => GuideScope(
+    topic: 'account_form',
+    ready: true,
+    child: AlertDialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: compactLayout(context) ? 12 : 40,
+        vertical: compactLayout(context) ? 12 : 24,
+      ),
+      contentPadding: EdgeInsets.fromLTRB(
+        compactLayout(context) ? 16 : 24,
+        12,
+        compactLayout(context) ? 16 : 24,
+        16,
+      ),
+      title: Row(
+        children: [
+          Expanded(child: Text(editing ? 'Editar cuenta' : 'Nueva cuenta')),
+          const AppHelpButton(topic: 'accounts'),
+        ],
+      ),
+      content: SizedBox(
+        width: 460,
+        child: SingleChildScrollView(
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AccountCard(
+                  account: preview,
+                  balanceCents: previewBalance,
+                  balanceLabel: 'Saldo inicial',
                 ),
-                validator: (v) => (v ?? '').trim().isEmpty
-                    ? 'Escribe un nombre para la cuenta'
-                    : null,
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: accountType,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Tipo de cuenta'),
-                items: types.entries
-                    .map(
-                      (e) =>
-                          DropdownMenuItem(value: e.key, child: Text(e.value)),
-                    )
-                    .toList(),
-                onChanged: editing
-                    ? null
-                    : (value) {
-                        if (value == null) return;
-                        setState(() {
-                          accountType = value;
-                          if (!supportsDebit) {
-                            institutionId = null;
-                            cardDesign = {...cardDesign, 'enabled': false};
-                          }
-                        });
-                      },
-              ),
-              if (requiresInstitution || institutionId != null) ...[
-                const SizedBox(height: 12),
-                if (loadingInstitutions)
-                  const LinearProgressIndicator()
-                else if (institutionError != null) ...[
-                  const Text('No se pudieron cargar los bancos.'),
-                  TextButton(
-                    onPressed: loadInstitutions,
-                    child: const Text('Reintentar'),
-                  ),
-                ] else
-                  DropdownButtonFormField<String>(
-                    initialValue: institutionId ?? 'none',
-                    isExpanded: true,
+                const SizedBox(height: 20),
+                GuideAnchor(
+                  id: 'name',
+                  child: TextFormField(
+                    controller: nameController,
+                    onChanged: (_) => setState(() {}),
                     decoration: const InputDecoration(
-                      labelText: 'Banco o institución',
+                      labelText: 'Nombre de la cuenta *',
                     ),
-                    items: [
-                      const DropdownMenuItem(
-                        value: 'none',
-                        child: Text('Sin institución'),
-                      ),
-                      ...institutions.map(
-                        (bank) => DropdownMenuItem(
-                          value: bank['id'].toString(),
-                          child: Text(
-                            bank['name'].toString(),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-                    ],
-                    validator: (value) =>
-                        supportsDebit &&
-                            cardDesign['enabled'] == true &&
-                            (value == null || value == 'none')
-                        ? 'Selecciona el banco de la tarjeta de débito'
+                    validator: (v) => (v ?? '').trim().isEmpty
+                        ? 'Escribe un nombre para la cuenta'
                         : null,
-                    onChanged: (value) => setState(() {
-                      institutionId = value == 'none' ? null : value;
-                    }),
                   ),
-              ],
-              const SizedBox(height: 12),
-              if (supportsDebit)
-                AccountDesignFields(
-                  value: cardDesign,
-                  onChanged: (value) => setState(() => cardDesign = value),
-                )
-              else
+                ),
+                const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  initialValue:
-                      debitDesignLabels.containsKey(cardDesign['style'])
-                      ? cardDesign['style'] as String
-                      : 'classic',
-                  decoration: const InputDecoration(labelText: 'Diseño visual'),
-                  items: debitDesignLabels.entries
+                  initialValue: accountType,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Tipo de cuenta',
+                  ),
+                  items: types.entries
                       .map(
                         (e) => DropdownMenuItem(
                           value: e.key,
@@ -299,157 +249,255 @@ class _AccountFormDialogState extends State<AccountFormDialog> {
                         ),
                       )
                       .toList(),
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(
-                        () => cardDesign = {...cardDesign, 'style': value},
-                      );
-                    }
-                  },
+                  onChanged: editing
+                      ? null
+                      : (value) {
+                          if (value == null) return;
+                          setState(() {
+                            accountType = value;
+                            if (!supportsDebit) {
+                              institutionId = null;
+                              cardDesign = {...cardDesign, 'enabled': false};
+                            }
+                          });
+                        },
                 ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: currency,
-                decoration: const InputDecoration(labelText: 'Moneda'),
-                items: const [
-                  DropdownMenuItem(value: 'NIO', child: Text('Córdobas (C\$)')),
-                  DropdownMenuItem(value: 'USD', child: Text('Dólares (US\$)')),
+                if (requiresInstitution || institutionId != null) ...[
+                  const SizedBox(height: 12),
+                  if (loadingInstitutions)
+                    const LinearProgressIndicator()
+                  else if (institutionError != null) ...[
+                    const Text('No se pudieron cargar los bancos.'),
+                    TextButton(
+                      onPressed: loadInstitutions,
+                      child: const Text('Reintentar'),
+                    ),
+                  ] else
+                    DropdownButtonFormField<String>(
+                      initialValue: institutionId ?? 'none',
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Banco o institución',
+                      ),
+                      items: [
+                        const DropdownMenuItem(
+                          value: 'none',
+                          child: Text('Sin institución'),
+                        ),
+                        ...institutions.map(
+                          (bank) => DropdownMenuItem(
+                            value: bank['id'].toString(),
+                            child: Text(
+                              bank['name'].toString(),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ],
+                      validator: (value) =>
+                          supportsDebit &&
+                              cardDesign['enabled'] == true &&
+                              (value == null || value == 'none')
+                          ? 'Selecciona el banco de la tarjeta de débito'
+                          : null,
+                      onChanged: (value) => setState(() {
+                        institutionId = value == 'none' ? null : value;
+                      }),
+                    ),
                 ],
-                onChanged: editing
-                    ? null
-                    : (value) {
-                        if (value != null) setState(() => currency = value);
-                      },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: balanceController,
-                onChanged: (_) => setState(() {}),
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                decoration: const InputDecoration(
-                  labelText: 'Saldo inicial',
-                  helperText:
-                      'Saldo base de la cuenta, antes de los movimientos registrados.',
-                  helperMaxLines: 2,
-                ),
-                validator: (value) {
-                  final text = (value ?? '').trim();
-                  final amount = double.tryParse(text.replaceAll(',', '.'));
-                  if (amount == null || !amount.isFinite || amount < 0) {
-                    return 'Introduce un saldo válido';
-                  }
-                  if (!RegExp(r'^\d+([.,]\d{1,2})?$').hasMatch(text)) {
-                    return 'Usa máximo dos decimales, sin separadores de miles';
-                  }
-                  return null;
-                },
-              ),
-              if (editing)
-                const Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: Text(
-                    'El tipo y la moneda se conservan al editar.',
-                    style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                const SizedBox(height: 12),
+                if (supportsDebit)
+                  AccountDesignFields(
+                    value: cardDesign,
+                    onChanged: (value) => setState(() => cardDesign = value),
+                  )
+                else
+                  DropdownButtonFormField<String>(
+                    initialValue:
+                        debitDesignLabels.containsKey(cardDesign['style'])
+                        ? cardDesign['style'] as String
+                        : 'classic',
+                    decoration: const InputDecoration(
+                      labelText: 'Diseño visual',
+                    ),
+                    items: debitDesignLabels.entries
+                        .map(
+                          (e) => DropdownMenuItem(
+                            value: e.key,
+                            child: Text(e.value),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(
+                          () => cardDesign = {...cardDesign, 'style': value},
+                        );
+                      }
+                    },
+                  ),
+                const SizedBox(height: 12),
+                GuideAnchor(
+                  id: 'currency',
+                  child: DropdownButtonFormField<String>(
+                    initialValue: currency,
+                    decoration: const InputDecoration(labelText: 'Moneda'),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'NIO',
+                        child: Text('Córdobas (C\$)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'USD',
+                        child: Text('Dólares (US\$)'),
+                      ),
+                    ],
+                    onChanged: editing
+                        ? null
+                        : (value) {
+                            if (value != null) setState(() => currency = value);
+                          },
                   ),
                 ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: holderController,
-                maxLength: 200,
-                textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(
-                  labelText: 'Titular de la cuenta (opcional)',
-                  helperText:
-                      'Escribe el nombre del titular tal como aparece en el banco. Se incluirá al copiar los datos.',
-                  helperMaxLines: 3,
+                const SizedBox(height: 12),
+                GuideAnchor(
+                  id: 'opening',
+                  child: TextFormField(
+                    controller: balanceController,
+                    onChanged: (_) => setState(() {}),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Saldo inicial',
+                      helperText:
+                          'Saldo base de la cuenta, antes de los movimientos registrados.',
+                      helperMaxLines: 2,
+                    ),
+                    validator: (value) {
+                      final text = (value ?? '').trim();
+                      final amount = double.tryParse(text.replaceAll(',', '.'));
+                      if (amount == null || !amount.isFinite || amount < 0) {
+                        return 'Introduce un saldo válido';
+                      }
+                      if (!RegExp(r'^\d+([.,]\d{1,2})?$').hasMatch(text)) {
+                        return 'Usa máximo dos decimales, sin separadores de miles';
+                      }
+                      return null;
+                    },
+                  ),
                 ),
-                validator: (v) {
-                  final t = (v ?? '').trim();
-                  return t.length > 200 ||
-                          RegExp(r'[\x00-\x1F\x7F]').hasMatch(t)
-                      ? 'Revisa el nombre del titular.'
-                      : null;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: numberController,
-                maxLength: 100,
-                autocorrect: false,
-                enableSuggestions: false,
-                keyboardType: TextInputType.text,
-                decoration: const InputDecoration(
-                  labelText: 'Número de cuenta bancaria (opcional)',
-                  helperText:
-                      'Cópialo tal como lo muestra tu banco. Conserva ceros iniciales, espacios y guiones. Es distinto al número de la tarjeta.',
-                  helperMaxLines: 4,
+                if (editing)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text(
+                      'El tipo y la moneda se conservan al editar.',
+                      style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: holderController,
+                  maxLength: 200,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(
+                    labelText: 'Titular de la cuenta (opcional)',
+                    helperText:
+                        'Escribe el nombre del titular tal como aparece en el banco. Se incluirá al copiar los datos.',
+                    helperMaxLines: 3,
+                  ),
+                  validator: (v) {
+                    final t = (v ?? '').trim();
+                    return t.length > 200 ||
+                            RegExp(r'[\x00-\x1F\x7F]').hasMatch(t)
+                        ? 'Revisa el nombre del titular.'
+                        : null;
+                  },
                 ),
-                validator: (value) {
-                  final text = (value ?? '').trim();
-                  if (text.isEmpty) return null;
-                  if (text.length > 100 ||
-                      RegExp(r'[\x00-\x1F\x7F]').hasMatch(text))
-                    return 'Revisa el número de cuenta; no debe contener saltos de línea.';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: ibanController,
-                autocorrect: false,
-                enableSuggestions: false,
-                keyboardType: TextInputType.text,
-                textCapitalization: TextCapitalization.characters,
-                decoration: const InputDecoration(
-                  labelText: 'Cuenta IBAN de Nicaragua (opcional)',
-                  helperText:
-                      'Pega el IBAN de tu banco: 28 caracteres. Se guardará en mayúsculas, sin espacios ni guiones.',
-                  helperMaxLines: 3,
+                const SizedBox(height: 12),
+                GuideAnchor(
+                  id: 'number',
+                  child: TextFormField(
+                    controller: numberController,
+                    maxLength: 100,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    keyboardType: TextInputType.text,
+                    decoration: const InputDecoration(
+                      labelText: 'Número de cuenta bancaria (opcional)',
+                      helperText:
+                          'Cópialo tal como lo muestra tu banco. Conserva ceros iniciales, espacios y guiones. Es distinto al número de la tarjeta.',
+                      helperMaxLines: 4,
+                    ),
+                    validator: (value) {
+                      final text = (value ?? '').trim();
+                      if (text.isEmpty) return null;
+                      if (text.length > 100 ||
+                          RegExp(r'[\x00-\x1F\x7F]').hasMatch(text))
+                        return 'Revisa el número de cuenta; no debe contener saltos de línea.';
+                      return null;
+                    },
+                  ),
                 ),
-                validator: (v) {
-                  final selected = institutions
-                      .where((b) => b['id'].toString() == institutionId)
-                      .firstOrNull;
-                  return validateAccountIban(
-                    v,
-                    bankName: '${selected?['name'] ?? ''}',
-                    accountNumber: numberController.text,
-                  );
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: referenceController,
-                decoration: const InputDecoration(
-                  labelText: 'Referencia adicional (opcional)',
-                  helperText: 'No ingreses el PIN ni la contraseña bancaria.',
-                  helperMaxLines: 2,
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: ibanController,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  keyboardType: TextInputType.text,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: const InputDecoration(
+                    labelText: 'Cuenta IBAN de Nicaragua (opcional)',
+                    helperText:
+                        'Pega el IBAN de tu banco: 28 caracteres. Se guardará en mayúsculas, sin espacios ni guiones.',
+                    helperMaxLines: 3,
+                  ),
+                  validator: (v) {
+                    final selected = institutions
+                        .where((b) => b['id'].toString() == institutionId)
+                        .firstOrNull;
+                    return validateAccountIban(
+                      v,
+                      bankName: '${selected?['name'] ?? ''}',
+                      accountNumber: numberController.text,
+                    );
+                  },
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: notesController,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'Notas (opcional)',
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: referenceController,
+                  decoration: const InputDecoration(
+                    labelText: 'Referencia adicional (opcional)',
+                    helperText: 'No ingreses el PIN ni la contraseña bancaria.',
+                    helperMaxLines: 2,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: notesController,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Notas (opcional)',
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        GuideAnchor(
+          id: 'save',
+          child: FilledButton(
+            onPressed: canSave ? save : null,
+            child: const Text('Guardar'),
+          ),
+        ),
+      ],
     ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Cancelar'),
-      ),
-      FilledButton(
-        onPressed: canSave ? save : null,
-        child: const Text('Guardar'),
-      ),
-    ],
   );
 }

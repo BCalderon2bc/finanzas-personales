@@ -1,3 +1,5 @@
+import '../../widgets/adaptive_layout.dart';
+import '../help/app_help.dart';
 import 'package:flutter/material.dart';
 import 'credit_card_face.dart';
 import 'credit_card_products.dart';
@@ -186,195 +188,242 @@ class _CreditCardFormDialogState extends State<CreditCardFormDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text(editing ? 'Editar tarjeta' : 'Nueva tarjeta'),
-    content: SizedBox(
-      width: 460,
-      child: SingleChildScrollView(
-        child: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              CreditCardFace(card: preview),
-              const SizedBox(height: 20),
-              DropdownButtonFormField<String>(
-                initialValue: bankId,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Banco emisor'),
-                items: [
-                  const DropdownMenuItem(
-                    value: '',
-                    child: Text('Sin banco asignado'),
-                  ),
-                  ...widget.institutions.map(
-                    (b) => DropdownMenuItem(
-                      value: b['id'].toString(),
-                      child: Text(
-                        b['name'].toString(),
-                        overflow: TextOverflow.ellipsis,
+  Widget build(BuildContext context) => GuideScope(
+    topic: 'card_form',
+    ready: true,
+    child: AlertDialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: compactLayout(context) ? 12 : 40,
+        vertical: compactLayout(context) ? 12 : 24,
+      ),
+      contentPadding: EdgeInsets.fromLTRB(
+        compactLayout(context) ? 16 : 24,
+        12,
+        compactLayout(context) ? 16 : 24,
+        16,
+      ),
+      title: Row(
+        children: [
+          Expanded(child: Text(editing ? 'Editar tarjeta' : 'Nueva tarjeta')),
+          const AppHelpButton(topic: 'cards'),
+        ],
+      ),
+      content: SizedBox(
+        width: 460,
+        child: SingleChildScrollView(
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                CreditCardFace(card: preview),
+                const SizedBox(height: 20),
+                DropdownButtonFormField<String>(
+                  initialValue: bankId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Banco emisor'),
+                  items: [
+                    const DropdownMenuItem(
+                      value: '',
+                      child: Text('Sin banco asignado'),
+                    ),
+                    ...widget.institutions.map(
+                      (b) => DropdownMenuItem(
+                        value: b['id'].toString(),
+                        child: Text(
+                          b['name'].toString(),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) {
+                      setState(() {
+                        bankId = v;
+                        product = 'standard';
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+                CreditCardProductField(
+                  bank: selectedBank,
+                  value: product,
+                  onChanged: selectProduct,
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  key: ValueKey('network-$network'),
+                  initialValue: network,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Marca'),
+                  items: networks.entries
+                      .map(
+                        (e) => DropdownMenuItem(
+                          value: e.key,
+                          child: Text(e.value),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: product != 'standard'
+                      ? null
+                      : (v) {
+                          if (v != null) {
+                            setState(() => network = v);
+                          }
+                        },
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  key: ValueKey('tier-$tier'),
+                  initialValue: tier,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Categoría de tarjeta',
                   ),
-                ],
-                onChanged: (v) {
-                  if (v != null) {
-                    setState(() {
-                      bankId = v;
-                      product = 'standard';
-                    });
-                  }
-                },
-              ),
-              const SizedBox(height: 12),
-              CreditCardProductField(
-                bank: selectedBank,
-                value: product,
-                onChanged: selectProduct,
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                key: ValueKey('network-$network'),
-                initialValue: network,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Marca'),
-                items: networks.entries
-                    .map(
-                      (e) =>
-                          DropdownMenuItem(value: e.key, child: Text(e.value)),
-                    )
-                    .toList(),
-                onChanged: product != 'standard'
-                    ? null
-                    : (v) {
-                        if (v != null) {
-                          setState(() => network = v);
-                        }
-                      },
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                key: ValueKey('tier-$tier'),
-                initialValue: tier,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Categoría de tarjeta',
+                  items: cardTierLabels.entries
+                      .map(
+                        (e) => DropdownMenuItem(
+                          value: e.key,
+                          child: Text(e.value),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: product != 'standard'
+                      ? null
+                      : (v) {
+                          if (v != null) {
+                            setState(() => tier = v);
+                          }
+                        },
                 ),
-                items: cardTierLabels.entries
-                    .map(
-                      (e) =>
-                          DropdownMenuItem(value: e.key, child: Text(e.value)),
-                    )
-                    .toList(),
-                onChanged: product != 'standard'
-                    ? null
-                    : (v) {
-                        if (v != null) {
-                          setState(() => tier = v);
-                        }
-                      },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: name,
-                onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(labelText: 'Nombre'),
-                validator: (v) =>
-                    (v ?? '').trim().isEmpty ? 'Escribe un nombre' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: reference,
-                maxLength: 4,
-                keyboardType: TextInputType.number,
-                onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  labelText: 'Últimos 4 dígitos (opcional)',
+                const SizedBox(height: 16),
+                GuideAnchor(
+                  id: 'name',
+                  child: TextFormField(
+                    controller: name,
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(labelText: 'Nombre'),
+                    validator: (v) =>
+                        (v ?? '').trim().isEmpty ? 'Escribe un nombre' : null,
+                  ),
                 ),
-                validator: (v) =>
-                    (v ?? '').trim().isEmpty ||
-                        RegExp(r'^\d{4}$').hasMatch(v!.trim())
-                    ? null
-                    : 'Escribe los últimos 4 dígitos',
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Un límite compartido · dos saldos',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Las compras y pagos se registran en su moneda. El límite corresponde a toda la tarjeta.',
-                style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: currency,
-                decoration: const InputDecoration(
-                  labelText: 'Moneda del límite compartido',
-                  helperText:
-                      'Al cambiarla, ingresa el límite que informa el banco en esa moneda. Tus deudas conservan su moneda e importe.',
-                  helperMaxLines: 4,
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: reference,
+                  maxLength: 4,
+                  keyboardType: TextInputType.number,
+                  onChanged: (_) => setState(() {}),
+                  decoration: const InputDecoration(
+                    labelText: 'Últimos 4 dígitos (opcional)',
+                  ),
+                  validator: (v) =>
+                      (v ?? '').trim().isEmpty ||
+                          RegExp(r'^\d{4}$').hasMatch(v!.trim())
+                      ? null
+                      : 'Escribe los últimos 4 dígitos',
                 ),
-                items: const [
-                  DropdownMenuItem(value: 'NIO', child: Text('Córdobas (C\$)')),
-                  DropdownMenuItem(value: 'USD', child: Text('Dólares (US\$)')),
-                ],
-                onChanged: selectCurrency,
-              ),
-              const SizedBox(height: 12),
-              amountField('Límite total ($currency)', limit),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: rate,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
+                const SizedBox(height: 12),
+                const Text(
+                  'Un límite compartido · dos saldos',
+                  style: TextStyle(fontWeight: FontWeight.w700),
                 ),
-                decoration: const InputDecoration(
-                  labelText: 'Córdobas por US\$ 1 (opcional)',
-                  helperText:
-                      'Usa la tasa de tu banco. Solo estima el disponible; no convierte tus deudas.',
-                  helperMaxLines: 3,
+                const SizedBox(height: 8),
+                const Text(
+                  'Las compras y pagos se registran en su moneda. El límite corresponde a toda la tarjeta.',
+                  style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
                 ),
-                validator: (v) {
-                  final text = (v ?? '').trim();
-                  if (text.isEmpty) {
-                    return null;
-                  }
-                  final r = double.tryParse(text.replaceAll(',', '.'));
-                  return r == null ||
-                          !r.isFinite ||
-                          r <= 0 ||
-                          !RegExp(r'^\d+([.,]\d{1,6})?$').hasMatch(text)
-                      ? 'Introduce una tasa positiva con máximo seis decimales'
-                      : null;
-                },
-              ),
-              const SizedBox(height: 20),
-              amountField('Deuda inicial en córdobas (C\$)', nio),
-              const SizedBox(height: 12),
-              amountField('Deuda inicial en dólares (US\$)', usd),
-              const SizedBox(height: 8),
-              const Text(
-                'Ingresa lo que debías antes del historial registrado. Los movimientos existentes se suman a estos importes.',
-                style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
-              ),
-              const SizedBox(height: 16),
-              dayField('Día de corte (opcional)', closing),
-              const SizedBox(height: 12),
-              dayField('Día de pago (opcional)', payment),
-            ],
+                const SizedBox(height: 12),
+                GuideAnchor(
+                  id: 'currency',
+                  child: DropdownButtonFormField<String>(
+                    initialValue: currency,
+                    decoration: const InputDecoration(
+                      labelText: 'Moneda del límite compartido',
+                      helperText:
+                          'Al cambiarla, ingresa el límite que informa el banco en esa moneda. Tus deudas conservan su moneda e importe.',
+                      helperMaxLines: 4,
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'NIO',
+                        child: Text('Córdobas (C\$)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'USD',
+                        child: Text('Dólares (US\$)'),
+                      ),
+                    ],
+                    onChanged: selectCurrency,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                GuideAnchor(
+                  id: 'limit',
+                  child: amountField('Límite total ($currency)', limit),
+                ),
+                const SizedBox(height: 12),
+                GuideAnchor(
+                  id: 'rate',
+                  child: TextFormField(
+                    controller: rate,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Córdobas por US\$ 1 (opcional)',
+                      helperText:
+                          'Usa la tasa de tu banco. Solo estima el disponible; no convierte tus deudas.',
+                      helperMaxLines: 3,
+                    ),
+                    validator: (v) {
+                      final text = (v ?? '').trim();
+                      if (text.isEmpty) {
+                        return null;
+                      }
+                      final r = double.tryParse(text.replaceAll(',', '.'));
+                      return r == null ||
+                              !r.isFinite ||
+                              r <= 0 ||
+                              !RegExp(r'^\d+([.,]\d{1,6})?$').hasMatch(text)
+                          ? 'Introduce una tasa positiva con máximo seis decimales'
+                          : null;
+                    },
+                  ),
+                ),
+                const SizedBox(height: 20),
+                GuideAnchor(
+                  id: 'opening',
+                  child: amountField('Deuda inicial en córdobas (C\$)', nio),
+                ),
+                const SizedBox(height: 12),
+                amountField('Deuda inicial en dólares (US\$)', usd),
+                const SizedBox(height: 8),
+                const Text(
+                  'Ingresa lo que debías antes del historial registrado. Los movimientos existentes se suman a estos importes.',
+                  style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                ),
+                const SizedBox(height: 16),
+                dayField('Día de corte (opcional)', closing),
+                const SizedBox(height: 12),
+                dayField('Día de pago (opcional)', payment),
+              ],
+            ),
           ),
         ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        GuideAnchor(
+          id: 'save',
+          child: FilledButton(onPressed: save, child: const Text('Guardar')),
+        ),
+      ],
     ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Cancelar'),
-      ),
-      FilledButton(onPressed: save, child: const Text('Guardar')),
-    ],
   );
 }

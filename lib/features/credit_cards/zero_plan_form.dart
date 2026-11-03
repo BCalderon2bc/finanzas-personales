@@ -1,3 +1,6 @@
+import '../person_accounts/receipt_draft_field.dart';
+import '../../widgets/adaptive_layout.dart';
+import '../help/app_help.dart';
 import 'package:flutter/material.dart';
 import '../../data/zero_plan_logic.dart';
 
@@ -24,16 +27,19 @@ class ZeroForm extends StatefulWidget {
     required this.fields,
     this.initial = const {},
     this.info,
+    this.attachReceipt = false,
   });
   final String title;
   final List<ZeroField> fields;
   final Map<String, dynamic> initial;
   final String? info;
+  final bool attachReceipt;
   @override
   State<ZeroForm> createState() => _ZeroFormState();
 }
 
 class _ZeroFormState extends State<ZeroForm> {
+  final _receipt = ReceiptDraft();
   final form = GlobalKey<FormState>();
   final controllers = <String, TextEditingController>{};
   final values = <String, dynamic>{};
@@ -55,61 +61,93 @@ class _ZeroFormState extends State<ZeroForm> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text(widget.title),
-    content: SizedBox(
-      width: 460,
-      child: SingleChildScrollView(
-        child: Form(
-          key: form,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (widget.info != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: Text(widget.info!),
+  Widget build(BuildContext context) => GuideScope(
+    topic: 'zero_form',
+    ready: true,
+    excludedTargets: {
+      for (final id in [
+        'mode',
+        'original_amount',
+        'total_installments',
+        'historical_paid',
+      ])
+        if (!widget.fields.any((f) => f.key == id)) id,
+    },
+    child: AlertDialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: compactLayout(context) ? 12 : 40,
+        vertical: compactLayout(context) ? 12 : 24,
+      ),
+      contentPadding: EdgeInsets.fromLTRB(
+        compactLayout(context) ? 16 : 24,
+        12,
+        compactLayout(context) ? 16 : 24,
+        16,
+      ),
+      title: Row(
+        children: [
+          Expanded(child: Text(widget.title)),
+          const AppHelpButton(topic: 'zero'),
+        ],
+      ),
+      content: SizedBox(
+        width: 460,
+        child: SingleChildScrollView(
+          child: Form(
+            key: form,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (widget.info != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: Text(widget.info!),
+                  ),
+                ...widget.fields.map(
+                  (f) => Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: GuideAnchor(id: f.key, child: field(f)),
+                  ),
                 ),
-              ...widget.fields.map(
-                (f) => Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: field(f),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
+      actions: [
+        if (widget.attachReceipt) ReceiptDraftField(draft: _receipt),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        GuideAnchor(
+          id: 'save',
+          child: FilledButton(
+            onPressed: () {
+              if (_receipt.picking || !form.currentState!.validate()) return;
+              final result = <String, dynamic>{..._receipt.fields};
+              for (final f in widget.fields) {
+                if (f.type == 'bool')
+                  result[f.key] = values[f.key] ?? false;
+                else if (f.type == 'choice' || f.type == 'date')
+                  result[f.key] = values[f.key] == '' ? null : values[f.key];
+                else {
+                  final text = controllers[f.key]!.text.trim();
+                  result[f.key] = text.isEmpty
+                      ? null
+                      : f.type == 'money'
+                      ? text.replaceAll(',', '.')
+                      : text;
+                }
+              }
+              Navigator.pop(context, result);
+            },
+            child: const Text('Guardar'),
+          ),
+        ),
+      ],
     ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Cancelar'),
-      ),
-      FilledButton(
-        onPressed: () {
-          if (!form.currentState!.validate()) return;
-          final result = <String, dynamic>{};
-          for (final f in widget.fields) {
-            if (f.type == 'bool')
-              result[f.key] = values[f.key] ?? false;
-            else if (f.type == 'choice' || f.type == 'date')
-              result[f.key] = values[f.key] == '' ? null : values[f.key];
-            else {
-              final text = controllers[f.key]!.text.trim();
-              result[f.key] = text.isEmpty
-                  ? null
-                  : f.type == 'money'
-                  ? text.replaceAll(',', '.')
-                  : text;
-            }
-          }
-          Navigator.pop(context, result);
-        },
-        child: const Text('Guardar'),
-      ),
-    ],
   );
   Widget field(ZeroField f) {
     if (f.type == 'bool')
@@ -229,8 +267,14 @@ Future<Map<String, dynamic>?> zeroForm(
   List<ZeroField> fields, {
   Map<String, dynamic> initial = const {},
   String? info,
+  bool attachReceipt = false,
 }) => showDialog<Map<String, dynamic>>(
   context: context,
-  builder: (_) =>
-      ZeroForm(title: title, fields: fields, initial: initial, info: info),
+  builder: (_) => ZeroForm(
+    title: title,
+    fields: fields,
+    initial: initial,
+    info: info,
+    attachReceipt: attachReceipt,
+  ),
 );

@@ -2,10 +2,12 @@ import '../core/supabase_client.dart';
 import 'person_account_repository.dart';
 import 'person_account_report.dart';
 import 'export_report_models.dart';
+import 'exchange_rate.dart';
 
 Future<ExportReport> loadPersonAccountReport(
   String accountId, {
   String? ownerName,
+  ExchangeRate? settlementRate,
   DateTime? start,
   DateTime? end,
 }) async {
@@ -31,6 +33,7 @@ Future<ExportReport> loadPersonAccountReport(
     account: Map<String, dynamic>.from(values[0] as Map),
     entries: List<Map<String, dynamic>>.from(values[1] as List),
     generatedAt: DateTime.now(),
+    settlementRate: settlementRate,
     ownerName: (ownerName ?? '').trim().isNotEmpty
         ? ownerName
         : (values[2] as Map?)?['full_name']?.toString(),

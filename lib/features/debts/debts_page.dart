@@ -1,3 +1,6 @@
+import '../person_accounts/receipt_draft_field.dart';
+import '../../widgets/adaptive_layout.dart';
+import '../help/app_help.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/supabase_client.dart';
@@ -154,7 +157,8 @@ class _DebtsPageState extends State<DebtsPage> {
       );
       if (data == null || !mounted) return;
       final installmentId = data['installment_id'];
-      await supabase.rpc(
+      final receipt = data.remove(receiptDraftKey) as PendingReceipt?;
+      final saved = await supabase.rpc(
         installmentId == null
             ? 'register_debt_payment'
             : 'register_debt_payment_for_installment',
@@ -169,6 +173,14 @@ class _DebtsPageState extends State<DebtsPage> {
           if (installmentId != null) 'p_installment_id': installmentId,
         },
       );
+      if (mounted)
+        await attachFinancialReceipt(
+          context,
+          receipt,
+          user.id,
+          'debt_payments',
+          saved,
+        );
       if (!mounted) return;
       message('Abono registrado.');
       await loadData();
@@ -325,113 +337,152 @@ class _DebtsPageState extends State<DebtsPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Text('Deudas y préstamos'),
-      actions: [
-        IconButton(
-          tooltip: 'Actualizar',
-          onPressed: loading || saving ? null : loadData,
-          icon: const Icon(Icons.refresh),
+  Widget build(BuildContext context) => GuideScope(
+    topic: 'debts',
+    ready: !loading && error == null,
+    child: Scaffold(
+      appBar: AppBar(
+        title: GuideAnchor(
+          id: 'title',
+          child: const Text('Deudas y préstamos'),
         ),
-      ],
-    ),
-    floatingActionButton: FloatingActionButton.extended(
-      onPressed: loading || saving || error != null ? null : addDebt,
-      icon: const Icon(Icons.add),
-      label: Text(saving ? 'Guardando...' : 'Nueva deuda'),
-    ),
-    body: loading
-        ? const Center(child: CircularProgressIndicator())
-        : error != null
-        ? Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+        actions: [
+          const AppHelpButton(topic: 'debts'),
+          IconButton(
+            tooltip: 'Actualizar',
+            onPressed: loading || saving ? null : loadData,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
+      ),
+      bottomNavigationBar: compactLayout(context)
+          ? GuideAnchor(
+              id: 'add',
+              child: CompactActionBar(
+                label: saving ? 'Guardando...' : 'Nueva deuda',
+                onPressed: loading || saving || error != null ? null : addDebt,
+              ),
+            )
+          : null,
+      floatingActionButton: compactLayout(context)
+          ? null
+          : GuideAnchor(
+              id: 'add',
+              child: FloatingActionButton.extended(
+                onPressed: loading || saving || error != null ? null : addDebt,
+                icon: const Icon(Icons.add),
+                label: Text(saving ? 'Guardando...' : 'Nueva deuda'),
+              ),
+            ),
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : error != null
+          ? Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('No se pudieron cargar las deudas.'),
+                    SelectableText(error!),
+                    TextButton(
+                      onPressed: loadData,
+                      child: const Text('Reintentar'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: loadData,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  16,
+                  16,
+                  compactLayout(context) ? 24 : 100,
+                ),
                 children: [
-                  const Text('No se pudieron cargar las deudas.'),
-                  SelectableText(error!),
-                  TextButton(
-                    onPressed: loadData,
-                    child: const Text('Reintentar'),
+                  GuideAnchor(
+                    id: 'summary',
+                    child: DebtsSummary(
+                      debts: debts,
+                      principalPaid: principalPaid,
+                    ),
                   ),
+                  const SizedBox(height: 12),
+                  GuideAnchor(
+                    id: 'search',
+                    child: TextField(
+                      controller: searchController,
+                      decoration: InputDecoration(
+                        labelText: 'Buscar descripción o acreedor',
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: searchController.text.isEmpty
+                            ? null
+                            : IconButton(
+                                tooltip: 'Limpiar búsqueda',
+                                icon: const Icon(Icons.close),
+                                onPressed: () =>
+                                    setState(() => searchController.clear()),
+                              ),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  DropdownButtonFormField<String>(
+                    initialValue: filter,
+                    decoration: const InputDecoration(
+                      labelText: 'Mostrar deudas',
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'all', child: Text('Todas')),
+                      DropdownMenuItem(value: 'active', child: Text('Activas')),
+                      DropdownMenuItem(
+                        value: 'overdue',
+                        child: Text('Con capital vencido'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'today',
+                        child: Text('Con vencimiento hoy'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'paused',
+                        child: Text('Pausadas'),
+                      ),
+                      DropdownMenuItem(value: 'paid', child: Text('Pagadas')),
+                      DropdownMenuItem(
+                        value: 'cancelled',
+                        child: Text('Canceladas'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) setState(() => filter = value);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      'El capital pendiente no incluye intereses ni comisiones. Registrar una deuda no modifica tus cuentas.',
+                    ),
+                  ),
+                  Text('${visibleDebts.length} de ${debts.length} deudas'),
+                  if (visibleDebts.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text(
+                        'No hay deudas para este filtro.',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ...visibleDebts.map(debtCard),
                 ],
               ),
             ),
-          )
-        : RefreshIndicator(
-            onRefresh: loadData,
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-              children: [
-                DebtsSummary(debts: debts, principalPaid: principalPaid),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: searchController,
-                  decoration: InputDecoration(
-                    labelText: 'Buscar descripción o acreedor',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: searchController.text.isEmpty
-                        ? null
-                        : IconButton(
-                            tooltip: 'Limpiar búsqueda',
-                            icon: const Icon(Icons.close),
-                            onPressed: () =>
-                                setState(() => searchController.clear()),
-                          ),
-                  ),
-                  onChanged: (_) => setState(() {}),
-                ),
-                const SizedBox(height: 12),
-
-                DropdownButtonFormField<String>(
-                  initialValue: filter,
-                  decoration: const InputDecoration(
-                    labelText: 'Mostrar deudas',
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'all', child: Text('Todas')),
-                    DropdownMenuItem(value: 'active', child: Text('Activas')),
-                    DropdownMenuItem(
-                      value: 'overdue',
-                      child: Text('Con capital vencido'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'today',
-                      child: Text('Con vencimiento hoy'),
-                    ),
-                    DropdownMenuItem(value: 'paused', child: Text('Pausadas')),
-                    DropdownMenuItem(value: 'paid', child: Text('Pagadas')),
-                    DropdownMenuItem(
-                      value: 'cancelled',
-                      child: Text('Canceladas'),
-                    ),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) setState(() => filter = value);
-                  },
-                ),
-                const SizedBox(height: 12),
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    'El capital pendiente no incluye intereses ni comisiones. Registrar una deuda no modifica tus cuentas.',
-                  ),
-                ),
-                Text('${visibleDebts.length} de ${debts.length} deudas'),
-                if (visibleDebts.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Text(
-                      'No hay deudas para este filtro.',
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ...visibleDebts.map(debtCard),
-              ],
-            ),
-          ),
+    ),
   );
 }

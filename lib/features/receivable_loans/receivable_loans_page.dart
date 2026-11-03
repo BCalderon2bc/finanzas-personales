@@ -1,4 +1,9 @@
+import '../person_accounts/receipt_history.dart';
+import '../person_accounts/receipt_draft_field.dart';
+import '../../widgets/adaptive_layout.dart';
+import '../help/app_help.dart';
 import 'package:flutter/material.dart';
+import '../person_accounts/person_receipts_dialog.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/supabase_client.dart';
 import '../../utils/money.dart';
@@ -137,7 +142,31 @@ class _ReceivableLoansPageState extends State<ReceivableLoansPage> {
         return;
       }
       checkSession(user.id);
-      await supabase.rpc('register_receivable_loan_v2', params: data);
+      final receipt = data.remove(receiptDraftKey) as PendingReceipt?;
+      final saved = await supabase.rpc(
+        'register_receivable_loan_v2',
+        params: data,
+      );
+      if (receipt != null && mounted) {
+        String table = 'receivable_loans';
+        Object? id = saved;
+        try {
+          final row = await supabase
+              .from('receivable_loans')
+              .select('card_transaction_id')
+              .eq('id', saved)
+              .eq('user_id', user.id)
+              .single();
+          if (row['card_transaction_id'] != null) {
+            table = 'credit_card_transactions';
+            id = row['card_transaction_id'];
+          }
+        } catch (_) {
+          id = null;
+        }
+        if (mounted)
+          await attachFinancialReceipt(context, receipt, user.id, table, id);
+      }
       if (!mounted) {
         return;
       }
@@ -188,7 +217,19 @@ class _ReceivableLoansPageState extends State<ReceivableLoansPage> {
         return;
       }
       checkSession(user.id);
-      await supabase.rpc('register_receivable_loan_payment', params: data);
+      final receipt = data.remove(receiptDraftKey) as PendingReceipt?;
+      final saved = await supabase.rpc(
+        'register_receivable_loan_payment',
+        params: data,
+      );
+      if (mounted)
+        await attachFinancialReceipt(
+          context,
+          receipt,
+          user.id,
+          'receivable_loan_payments',
+          saved,
+        );
       if (!mounted) {
         return;
       }
@@ -345,62 +386,115 @@ class _ReceivableLoansPageState extends State<ReceivableLoansPage> {
             ).compareTo(DateTime.parse(a['payment_date'].toString())),
           );
     final currency = loan['currency'].toString();
+    final uid = supabase.auth.currentUser?.id;
+    Map<String, int>? counts;
+    var filter = ReceiptFilter.all;
+    int countFor(Map<String, dynamic> row) =>
+        counts?['receivable_loan_payments/${row['id']}'] ?? 0;
+    Future<void> refreshCounts() async {
+      if (uid == null) return;
+      try {
+        counts = await loadReceiptCounts(
+          uid,
+          'movement-receipts',
+          rows.map((row) => 'receivable_loan_payments/${row['id']}'),
+        );
+      } catch (_) {
+        counts = null;
+      }
+    }
+
+    await refreshCounts();
+    if (!mounted || supabase.auth.currentUser?.id != uid) return;
     final selected = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Cobros · ${loan['borrower_name']}'),
-        content: SizedBox(
-          width: 550,
-          height: MediaQuery.sizeOf(ctx).height * 0.55,
-          child: rows.isEmpty
-              ? const Center(child: Text('Todavía no registras cobros.'))
-              : ListView(
-                  children: rows.map((p) {
-                    final voided = p['is_voided'] == true;
-                    return Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(
-                              '${receivableDate(DateTime.parse(p['payment_date'].toString()).toLocal())}${voided ? ' · Anulado' : ''}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            Text(
-                              'Capital: ${receivableMoney(moneyCents(p['principal_amount']), currency)}',
-                            ),
-                            Text(
-                              'Intereses: ${receivableMoney(moneyCents(p['interest_amount']), currency)}',
-                            ),
-                            Text('Cuenta: ${accountName(p['account_id'])}'),
-                            if ((p['reference']?.toString() ?? '').isNotEmpty)
-                              SelectableText('Referencia: ${p['reference']}'),
-                            if (voided) Text('Motivo: ${p['void_reason']}'),
-                            if (!voided)
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: TextButton.icon(
-                                  onPressed: () => Navigator.pop(ctx, p),
-                                  icon: const Icon(Icons.cancel_outlined),
-                                  label: const Text('Anular cobro'),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, update) => AlertDialog(
+          title: Text('Cobros · ${loan['borrower_name']}'),
+          content: SizedBox(
+            width: 550,
+            height: MediaQuery.sizeOf(ctx).height * 0.55,
+            child: rows.isEmpty
+                ? const Center(child: Text('Todavía no registras cobros.'))
+                : ListView(
+                    children: [
+                      if (counts != null)
+                        ReceiptFilterField(
+                          value: filter,
+                          onChanged: (value) => update(() => filter = value),
+                        ),
+                      ...rows
+                          .where(
+                            (p) =>
+                                counts == null || filter.matches(countFor(p)),
+                          )
+                          .map((p) {
+                            final voided = p['is_voided'] == true;
+                            return Card(
+                              child: Padding(
+                                padding: const EdgeInsets.all(14),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    Text(
+                                      '${receivableDate(DateTime.parse(p['payment_date'].toString()).toLocal())}${voided ? ' · Anulado' : ''}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Capital: ${receivableMoney(moneyCents(p['principal_amount']), currency)}',
+                                    ),
+                                    Text(
+                                      'Intereses: ${receivableMoney(moneyCents(p['interest_amount']), currency)}',
+                                    ),
+                                    Text(
+                                      'Cuenta: ${accountName(p['account_id'])}',
+                                    ),
+                                    if ((p['reference']?.toString() ?? '')
+                                        .isNotEmpty)
+                                      SelectableText(
+                                        'Referencia: ${p['reference']}',
+                                      ),
+                                    MovementReceiptsButton(
+                                      table: 'receivable_loan_payments',
+                                      record: p,
+                                      count: countFor(p),
+                                      onClosed: () async {
+                                        await refreshCounts();
+                                        if (ctx.mounted) update(() {});
+                                      },
+                                    ),
+                                    if (voided)
+                                      Text('Motivo: ${p['void_reason']}'),
+                                    if (!voided)
+                                      Align(
+                                        alignment: Alignment.centerRight,
+                                        child: TextButton.icon(
+                                          onPressed: () =>
+                                              Navigator.pop(ctx, p),
+                                          icon: const Icon(
+                                            Icons.cancel_outlined,
+                                          ),
+                                          label: const Text('Anular cobro'),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cerrar'),
+                            );
+                          }),
+                    ],
+                  ),
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cerrar'),
+            ),
+          ],
+        ),
       ),
     );
     if (selected != null && mounted) {
@@ -468,6 +562,15 @@ class _ReceivableLoansPageState extends State<ReceivableLoansPage> {
                   ),
                 ),
               ],
+            ),
+            MovementReceiptsButton(
+              table: loan['card_transaction_id'] == null
+                  ? 'receivable_loans'
+                  : 'credit_card_transactions',
+              record: {
+                ...loan,
+                'id': loan['card_transaction_id'] ?? loan['id'],
+              },
             ),
             if ((loan['description']?.toString() ?? '').isNotEmpty)
               Padding(
@@ -592,109 +695,151 @@ class _ReceivableLoansPageState extends State<ReceivableLoansPage> {
             b['borrower_name'].toString().toLowerCase(),
           ),
         );
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Préstamos por cobrar'),
-        actions: [
-          IconButton(
-            tooltip: 'Actualizar',
-            onPressed: loading || saving ? null : loadData,
-            icon: const Icon(Icons.refresh),
+    return GuideScope(
+      topic: 'receivables',
+      ready: !loading && error == null,
+      child: Scaffold(
+        appBar: AppBar(
+          title: GuideAnchor(
+            id: 'title',
+            child: const Text('Préstamos por cobrar'),
           ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: loading || saving || error != null ? null : createLoan,
-        icon: const Icon(Icons.add),
-        label: Text(saving ? 'Guardando...' : 'Dinero que presté'),
-      ),
-      body: loading
-          ? const Center(child: CircularProgressIndicator())
-          : error != null
-          ? Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text('No se pudieron cargar los préstamos.'),
-                    SelectableText(error!),
-                    TextButton(
-                      onPressed: loadData,
-                      child: const Text('Reintentar'),
-                    ),
-                  ],
+          actions: [
+            const AppHelpButton(topic: 'receivables'),
+            IconButton(
+              tooltip: 'Actualizar',
+              onPressed: loading || saving ? null : loadData,
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
+        ),
+        bottomNavigationBar: compactLayout(context)
+            ? GuideAnchor(
+                id: 'add',
+                child: CompactActionBar(
+                  label: saving ? 'Guardando...' : 'Dinero que presté',
+                  onPressed: loading || saving || error != null
+                      ? null
+                      : createLoan,
+                ),
+              )
+            : null,
+        floatingActionButton: compactLayout(context)
+            ? null
+            : GuideAnchor(
+                id: 'add',
+                child: FloatingActionButton.extended(
+                  onPressed: loading || saving || error != null
+                      ? null
+                      : createLoan,
+                  icon: const Icon(Icons.add),
+                  label: Text(saving ? 'Guardando...' : 'Dinero que presté'),
                 ),
               ),
-            )
-          : Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1050),
-                child: RefreshIndicator(
-                  onRefresh: loadData,
-                  child: ListView(
-                    physics: const ClampingScrollPhysics(
-                      parent: AlwaysScrollableScrollPhysics(),
-                    ),
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
+        body: loading
+            ? const Center(child: CircularProgressIndicator())
+            : error != null
+            ? Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      ReceivableLoansSummary(loans: loans, payments: payments),
-                      const SizedBox(height: 20),
-                      TextField(
-                        controller: search,
-                        onChanged: (_) => setState(() {}),
-                        decoration: const InputDecoration(
-                          labelText: 'Buscar persona o descripción',
-                          prefixIcon: Icon(Icons.search),
-                        ),
+                      const Text('No se pudieron cargar los préstamos.'),
+                      SelectableText(error!),
+                      TextButton(
+                        onPressed: loadData,
+                        child: const Text('Reintentar'),
                       ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        initialValue: filter,
-                        decoration: const InputDecoration(labelText: 'Mostrar'),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'pending',
-                            child: Text('Pendientes'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'overdue',
-                            child: Text('Vencidos'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'paid',
-                            child: Text('Capital recuperado'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'all',
-                            child: Text('Todos los vigentes'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'voided',
-                            child: Text('Anulados'),
-                          ),
-                        ],
-                        onChanged: (v) {
-                          if (v != null) {
-                            setState(() => filter = v);
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      if (visible.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.all(30),
-                          child: Text(
-                            'No hay préstamos para este filtro.',
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ...visible.map(loanCard),
                     ],
                   ),
                 ),
+              )
+            : Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1050),
+                  child: RefreshIndicator(
+                    onRefresh: loadData,
+                    child: ListView(
+                      physics: const ClampingScrollPhysics(
+                        parent: AlwaysScrollableScrollPhysics(),
+                      ),
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        16,
+                        16,
+                        compactLayout(context) ? 24 : 110,
+                      ),
+                      children: [
+                        GuideAnchor(
+                          id: 'summary',
+                          child: ReceivableLoansSummary(
+                            loans: loans,
+                            payments: payments,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        GuideAnchor(
+                          id: 'search',
+                          child: TextField(
+                            controller: search,
+                            onChanged: (_) => setState(() {}),
+                            decoration: const InputDecoration(
+                              labelText: 'Buscar persona o descripción',
+                              prefixIcon: Icon(Icons.search),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          initialValue: filter,
+                          decoration: const InputDecoration(
+                            labelText: 'Mostrar',
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'pending',
+                              child: Text('Pendientes'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'overdue',
+                              child: Text('Vencidos'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'paid',
+                              child: Text('Capital recuperado'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'all',
+                              child: Text('Todos los vigentes'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'voided',
+                              child: Text('Anulados'),
+                            ),
+                          ],
+                          onChanged: (v) {
+                            if (v != null) {
+                              setState(() => filter = v);
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        if (visible.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.all(30),
+                            child: Text(
+                              'No hay préstamos para este filtro.',
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ...visible.map(loanCard),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-            ),
+      ),
     );
   }
 }

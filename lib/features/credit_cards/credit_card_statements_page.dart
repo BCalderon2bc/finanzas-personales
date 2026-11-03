@@ -1,7 +1,10 @@
+import '../person_accounts/receipt_draft_field.dart';
+import '../help/app_help.dart';
 import 'dart:convert';
 import 'dart:math';
 import 'statement_credit_dialog.dart';
 import 'package:flutter/material.dart';
+import '../person_accounts/person_receipts_dialog.dart';
 import '../../core/supabase_client.dart';
 import '../../utils/money.dart';
 import '../../data/card_statement_repository.dart';
@@ -195,7 +198,8 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
     }
     sameOwner(userId);
     final linked = result['statement_id'];
-    await supabase.rpc(
+    final receipt = result.remove(receiptDraftKey) as PendingReceipt?;
+    final saved = await supabase.rpc(
       linked == null
           ? 'register_credit_card_payment'
           : 'register_credit_card_payment_for_statement',
@@ -207,6 +211,14 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
         if (linked != null) 'p_statement_id': linked,
       },
     );
+    if (mounted)
+      await attachFinancialReceipt(
+        context,
+        receipt,
+        userId,
+        'credit_card_transactions',
+        saved,
+      );
     message('Pago registrado.');
   });
   Future<void> assign(Map<String, dynamic> s) => perform((userId) async {
@@ -462,6 +474,13 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
                         subtitle: Text(
                           'Saldo: ${cardMoney(moneyCents(c['balance_credit']), currency)} · Mínimo: ${cardMoney(moneyCents(c['minimum_credit']), currency)}',
                         ),
+                        leading: t == null
+                            ? null
+                            : MovementReceiptsButton(
+                                table: 'credit_card_transactions',
+                                record: t,
+                                iconOnly: true,
+                              ),
                         trailing: c['is_removed'] == true
                             ? null
                             : IconButton(
@@ -496,6 +515,13 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
                           ? 'Revisa este vínculo'
                           : '${shortStatementDate(tx['transaction_date'])}${tx['is_voided'] == true ? ' · Anulado' : ''}',
                     ),
+                    leading: tx == null
+                        ? null
+                        : MovementReceiptsButton(
+                            table: 'credit_card_transactions',
+                            record: tx,
+                            iconOnly: true,
+                          ),
                     trailing: IconButton(
                       tooltip: 'Quitar vínculo',
                       onPressed: saving
@@ -527,91 +553,107 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
     rows.sort(
       (a, b) => '${b['closing_date']}'.compareTo('${a['closing_date']}'),
     );
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Cortes y pagos'),
-        actions: [
-          IconButton(
-            tooltip: 'Actualizar',
-            onPressed: loading || saving ? null : load,
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        top: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 800),
-            child: loading
-                ? const Center(child: CircularProgressIndicator())
-                : error != null
-                ? ListView(
-                    padding: const EdgeInsets.all(20),
-                    children: [
-                      Text(error!),
-                      TextButton(
-                        onPressed: load,
-                        child: const Text('Reintentar'),
-                      ),
-                    ],
-                  )
-                : RefreshIndicator(
-                    onRefresh: load,
-                    child: ListView(
-                      padding: const EdgeInsets.all(12),
-                      physics: const AlwaysScrollableScrollPhysics(),
+    return GuideScope(
+      topic: 'statements',
+      ready: !loading && error == null,
+      child: Scaffold(
+        appBar: AppBar(
+          title: GuideAnchor(id: 'title', child: const Text('Cortes y pagos')),
+          actions: [
+            const AppHelpButton(topic: 'statements'),
+            IconButton(
+              tooltip: 'Actualizar',
+              onPressed: loading || saving ? null : load,
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
+        ),
+        body: SafeArea(
+          top: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 800),
+              child: loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : error != null
+                  ? ListView(
+                      padding: const EdgeInsets.all(20),
                       children: [
-                        Text(
-                          '${widget.card['name']}',
-                          style: const TextStyle(
-                            fontSize: 21,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        const Text(
-                          'La deuda total cambia con los movimientos. El saldo al corte y el mínimo se copian del banco. '
-                          'Registrar un corte no vuelve a cargar ese saldo a la tarjeta.',
-                        ),
-                        const SizedBox(height: 12),
-                        FilledButton.icon(
-                          onPressed: saving ? null : () => edit(),
-                          icon: const Icon(Icons.add),
-                          label: Text(
-                            saving ? 'Guardando...' : 'Registrar nuevo corte',
-                          ),
-                        ),
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Mostrar historial'),
-                          value: showHistory,
-                          onChanged: (v) => setState(() => showHistory = v),
-                        ),
-                        if (rows.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.all(20),
-                            child: Text(
-                              'Aún no hay estados de cuenta registrados.',
-                            ),
-                          ),
-                        ...rows.map(statementCard),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                          child: Text(
-                            'Las compras nuevas y las devoluciones actualizan la deuda total. Los pagos y las reversiones aplicadas reducen el pendiente de este corte. '
-                            'Usa Aplicar reversión con las reducciones confirmadas por el banco. El saldo y mínimo informados conservan sus importes originales; no descuentes de nuevo esas reducciones al editar el corte. '
-                            'Cubrir el mínimo no significa liquidar la deuda ni garantiza evitar intereses.',
-                            style: TextStyle(
-                              color: Color(0xFF64748B),
-                              fontSize: 12,
-                              height: 1.5,
-                            ),
-                          ),
+                        Text(error!),
+                        TextButton(
+                          onPressed: load,
+                          child: const Text('Reintentar'),
                         ),
                       ],
+                    )
+                  : RefreshIndicator(
+                      onRefresh: load,
+                      child: ListView(
+                        padding: const EdgeInsets.all(12),
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          Text(
+                            '${widget.card['name']}',
+                            style: const TextStyle(
+                              fontSize: 21,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          GuideAnchor(
+                            id: 'explanation',
+                            child: const Text(
+                              'La deuda total cambia con los movimientos. El saldo al corte y el mínimo se copian del banco. '
+                              'Registrar un corte no vuelve a cargar ese saldo a la tarjeta.',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          GuideAnchor(
+                            id: 'add',
+                            child: FilledButton.icon(
+                              onPressed: saving ? null : () => edit(),
+                              icon: const Icon(Icons.add),
+                              label: Text(
+                                saving
+                                    ? 'Guardando...'
+                                    : 'Registrar nuevo corte',
+                              ),
+                            ),
+                          ),
+                          GuideAnchor(
+                            id: 'history',
+                            child: SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Mostrar historial'),
+                              value: showHistory,
+                              onChanged: (v) => setState(() => showHistory = v),
+                            ),
+                          ),
+                          if (rows.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.all(20),
+                              child: Text(
+                                'Aún no hay estados de cuenta registrados.',
+                              ),
+                            ),
+                          ...rows.map(statementCard),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                            child: Text(
+                              'Las compras nuevas y las devoluciones actualizan la deuda total. Los pagos y las reversiones aplicadas reducen el pendiente de este corte. '
+                              'Usa Aplicar reversión con las reducciones confirmadas por el banco. El saldo y mínimo informados conservan sus importes originales; no descuentes de nuevo esas reducciones al editar el corte. '
+                              'Cubrir el mínimo no significa liquidar la deuda ni garantiza evitar intereses.',
+                              style: TextStyle(
+                                color: Color(0xFF64748B),
+                                fontSize: 12,
+                                height: 1.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+            ),
           ),
         ),
       ),

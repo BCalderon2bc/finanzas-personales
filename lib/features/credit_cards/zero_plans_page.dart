@@ -1,4 +1,7 @@
+import '../person_accounts/receipt_draft_field.dart';
+import '../help/app_help.dart';
 import 'package:flutter/material.dart';
+import '../person_accounts/person_receipts_dialog.dart';
 import '../../core/supabase_client.dart';
 import '../../data/card_statement_repository.dart' show statementRows;
 import '../../data/zero_plan_repository.dart';
@@ -463,6 +466,7 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
     Map<String, dynamic> i, {
     bool existing = false,
   }) => run(() async {
+    final receiptUser = zeroUser();
     final curr = '${p['currency']}', pending = data!.remaining(i);
     final availablePayments = data!.transactions
         .where(
@@ -520,6 +524,7 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
         'amount': (pending / 100).toStringAsFixed(2),
         'date': zeroDate(DateTime.now()),
       },
+      attachReceipt: !existing,
       info: existing
           ? 'Solo clasifica parte de un pago existente: NO vuelve a descontar tu cuenta ni la tarjeta.'
           : 'Registra el pago una sola vez: descuenta esta cuenta y reduce la deuda de tarjeta y el pendiente de esta cuota. Si ya anotaste el pago, cancela y usa Vincular pago registrado.',
@@ -529,7 +534,8 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
     if (amount > pending)
       throw StateError('El monto supera lo pendiente de la cuota.');
     final date = existing ? null : DateTime.parse('${v['date']}');
-    await commands.run('zero_plan_allocate', {
+    final receipt = v.remove(receiptDraftKey) as PendingReceipt?;
+    final saved = await commands.run('zero_plan_allocate', {
       'p_installment_id': i['id'],
       'p_amount': v['amount'],
       'p_payment_id': existing ? v['payment_id'] : null,
@@ -543,6 +549,14 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
               12,
             ).toUtc().toIso8601String(),
     }, operation: true);
+    if (mounted)
+      await attachFinancialReceipt(
+        context,
+        receipt,
+        receiptUser,
+        'credit_card_transactions',
+        saved,
+      );
     message(
       existing ? 'Pago vinculado sin otro descuento.' : 'Pago registrado.',
     );
@@ -675,6 +689,13 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
                 subtitle: Text(
                   'Pago: ${zeroDateLabel(data!.payment(a['payment_id'])?['transaction_date'])}',
                 ),
+                leading: data!.payment(a['payment_id']) == null
+                    ? null
+                    : MovementReceiptsButton(
+                        table: 'credit_card_transactions',
+                        record: data!.payment(a['payment_id'])!,
+                        iconOnly: true,
+                      ),
                 trailing: IconButton(
                   tooltip: 'Quitar vínculo; conserva el pago bancario',
                   onPressed: busy || p['is_voided'] == true
@@ -744,6 +765,9 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
     final list = data!.forPlan('${p['id']}'),
         pending = data!.pending('${p['id']}'),
         curr = '${p['currency']}';
+    final source = data!.transactions
+        .where((t) => t['id'] == p['source_transaction_id'])
+        .firstOrNull;
     final inCuts = list
         .where(
           (i) =>
@@ -791,6 +815,11 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
                   : 'Origen: pendiente ya incluido en tu tarjeta',
               style: const TextStyle(fontSize: 12),
             ),
+            if (source != null)
+              MovementReceiptsButton(
+                table: 'credit_card_transactions',
+                record: source,
+              ),
             if (p['is_voided'] == true) Text('Motivo: ${p['void_reason']}'),
             ExpansionTile(
               title: const Text('Ver cuotas, pagos y cortes'),
@@ -850,99 +879,119 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
             )
             .toList() ??
         [];
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Planes tasa cero'),
-        actions: [
-          IconButton(
-            onPressed: loading || busy ? null : load,
-            tooltip: 'Actualizar',
-            icon: const Icon(Icons.refresh),
+    return GuideScope(
+      topic: 'zero',
+      ready: !loading && error == null,
+      child: Scaffold(
+        appBar: AppBar(
+          title: GuideAnchor(
+            id: 'title',
+            child: const Text('Planes tasa cero'),
           ),
-        ],
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: FilledButton.icon(
-            onPressed: loading || busy || error != null ? null : add,
-            icon: const Icon(Icons.add),
-            label: Text(busy ? 'Procesando…' : 'Agregar plan tasa cero'),
+          actions: [
+            const AppHelpButton(topic: 'zero'),
+            IconButton(
+              onPressed: loading || busy ? null : load,
+              tooltip: 'Actualizar',
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
+        ),
+        bottomNavigationBar: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: GuideAnchor(
+              id: 'add',
+              child: FilledButton.icon(
+                onPressed: loading || busy || error != null ? null : add,
+                icon: const Icon(Icons.add),
+                label: Text(busy ? 'Procesando…' : 'Agregar plan tasa cero'),
+              ),
+            ),
           ),
         ),
-      ),
-      body: SafeArea(
-        top: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 850),
-            child: loading
-                ? const Center(child: CircularProgressIndicator())
-                : ListView(
-                    physics: const ClampingScrollPhysics(
-                      parent: AlwaysScrollableScrollPhysics(),
-                    ),
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      Text(
-                        '${card?['name'] ?? widget.card['name']}',
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                        ),
+        body: SafeArea(
+          top: false,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 850),
+              child: loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView(
+                      physics: const ClampingScrollPhysics(
+                        parent: AlwaysScrollableScrollPhysics(),
                       ),
-                      const Text(
-                        'La deuda total y el uso del límite incluyen el capital pendiente de los planes. Las cuotas distribuyen ese capital: no vuelven a sumarlo. El disponible es una estimación; usa la tasa del banco en la tarjeta.',
-                      ),
-                      if (error != null) ...[
-                        SelectableText(error!),
-                        TextButton(
-                          onPressed: load,
-                          child: const Text('Reintentar'),
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        Text(
+                          '${card?['name'] ?? widget.card['name']}',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ] else ...[
-                        for (final curr in cardCurrencies)
-                          Card(
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Text(
-                                    'Deuda TOTAL ${curr == 'NIO' ? 'en córdobas' : 'en dólares'}: ${cardMoney(cardBalance(card!, data!.transactions, curr), curr)}',
-                                  ),
-                                  Text(
-                                    'De esa deuda, pendiente controlado en tasa cero: ${cardMoney(data!.plans.where((p) => p['credit_card_id'] == card!['id'] && p['currency'] == curr && p['is_voided'] != true).fold<int>(0, (s, p) => s + data!.pending('${p['id']}')), curr)}',
-                                  ),
-                                ],
+                        GuideAnchor(
+                          id: 'explanation',
+                          child: const Text(
+                            'La deuda total y el uso del límite incluyen el capital pendiente de los planes. Las cuotas distribuyen ese capital: no vuelven a sumarlo. El disponible es una estimación; usa la tasa del banco en la tarjeta.',
+                          ),
+                        ),
+                        if (error != null) ...[
+                          SelectableText(error!),
+                          TextButton(
+                            onPressed: load,
+                            child: const Text('Reintentar'),
+                          ),
+                        ] else ...[
+                          for (final curr in cardCurrencies)
+                            Card(
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    Text(
+                                      'Deuda TOTAL ${curr == 'NIO' ? 'en córdobas' : 'en dólares'}: ${cardMoney(cardBalance(card!, data!.transactions, curr), curr)}',
+                                    ),
+                                    Text(
+                                      'De esa deuda, pendiente controlado en tasa cero: ${cardMoney(data!.plans.where((p) => p['credit_card_id'] == card!['id'] && p['currency'] == curr && p['is_voided'] != true).fold<int>(0, (s, p) => s + data!.pending('${p['id']}')), curr)}',
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
+                          Text(
+                            'Disponible estimado: ${cardMoney(cardAvailable(card!, cardBalance(card!, data!.transactions, 'NIO'), cardBalance(card!, data!.transactions, 'USD')), '${card!['currency']}')}',
                           ),
-                        Text(
-                          'Disponible estimado: ${cardMoney(cardAvailable(card!, cardBalance(card!, data!.transactions, 'NIO'), cardBalance(card!, data!.transactions, 'USD')), '${card!['currency']}')}',
-                        ),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 10),
-                          child: Text(
-                            'Si una cuota está incluida en el corte del banco, registra ese corte con su monto real y vincula la cuota. Este módulo no calcula ni modifica automáticamente tu saldo al corte ni el pago mínimo.',
-                          ),
-                        ),
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Mostrar planes anulados'),
-                          value: showVoided,
-                          onChanged: (v) => setState(() => showVoided = v),
-                        ),
-                        if (plans.isEmpty)
                           const Padding(
-                            padding: EdgeInsets.all(24),
-                            child: Text('Todavía no hay planes para mostrar.'),
+                            padding: EdgeInsets.symmetric(vertical: 10),
+                            child: Text(
+                              'Si una cuota está incluida en el corte del banco, registra ese corte con su monto real y vincula la cuota. Este módulo no calcula ni modifica automáticamente tu saldo al corte ni el pago mínimo.',
+                            ),
                           ),
-                        discrepancyNotice(),
-                        ...plans.map(planCard),
+                          GuideAnchor(
+                            id: 'voided',
+                            child: SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('Mostrar planes anulados'),
+                              value: showVoided,
+                              onChanged: (v) => setState(() => showVoided = v),
+                            ),
+                          ),
+                          if (plans.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.all(24),
+                              child: Text(
+                                'Todavía no hay planes para mostrar.',
+                              ),
+                            ),
+                          discrepancyNotice(),
+                          ...plans.map(planCard),
+                        ],
                       ],
-                    ],
-                  ),
+                    ),
+            ),
           ),
         ),
       ),

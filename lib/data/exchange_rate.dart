@@ -11,7 +11,9 @@ class ExchangeRate {
     }
     final parts = normalized.split('.');
     final whole = int.parse(parts.first);
-    final fraction = parts.length == 1 ? 0 : int.parse(parts[1].padRight(6, '0'));
+    final fraction = parts.length == 1
+        ? 0
+        : int.parse(parts[1].padRight(6, '0'));
     final value = whole * 1000000 + fraction;
     if (value <= 0 || value > 1000000 * 1000000) {
       return null;
@@ -21,7 +23,9 @@ class ExchangeRate {
 
   String get decimal {
     final whole = micros ~/ 1000000;
-    final fraction = (micros % 1000000).toString().padLeft(6, '0')
+    final fraction = (micros % 1000000)
+        .toString()
+        .padLeft(6, '0')
         .replaceFirst(RegExp(r'0+$'), '');
     return fraction.isEmpty ? '$whole' : '$whole.$fraction';
   }

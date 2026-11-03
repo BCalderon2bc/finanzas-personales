@@ -22,9 +22,16 @@ const categoryIconOptions = {
 };
 
 const categoryColorOptions = [
-  '#2563EB', '#7C3AED', '#DB2777', '#DC2626',
-  '#C2410C', '#A16207', '#047857', '#0F766E',
-  '#0369A1', '#475569',
+  '#2563EB',
+  '#7C3AED',
+  '#DB2777',
+  '#DC2626',
+  '#C2410C',
+  '#A16207',
+  '#047857',
+  '#0F766E',
+  '#0369A1',
+  '#475569',
 ];
 
 IconData categoryIcon(dynamic key) {

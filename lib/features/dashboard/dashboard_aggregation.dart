@@ -133,7 +133,9 @@ DashboardOverview buildDashboardOverview(
     final destination = accountMap[tx['destination_account_id']?.toString()];
 
     if (type == 'transfer' &&
-        (destination == null || destination['currency'] != currency)) {
+        (destination == null ||
+            destination['currency'] !=
+                (tx['destination_currency'] ?? currency))) {
       throw StateError(
         'Una transferencia tiene cuentas de monedas diferentes.',
       );

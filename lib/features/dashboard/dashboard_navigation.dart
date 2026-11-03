@@ -1,3 +1,4 @@
+import '../help/app_help.dart';
 import '../../widgets/app_version_footer.dart';
 import 'package:flutter/material.dart';
 import 'dashboard_overview.dart';
@@ -182,6 +183,19 @@ class DashboardNavigation extends StatelessWidget {
                             Navigator.pop(context);
                             onSettings?.call();
                           },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.menu_book_outlined),
+                    title: const Text('Manual y ayuda'),
+                    onTap: () {
+                      final nav = Navigator.of(context);
+                      nav.pop();
+                      nav.push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const AppManualPage(),
+                        ),
+                      );
+                    },
                   ),
                   const Divider(height: 24),
                   const Padding(

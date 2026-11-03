@@ -1,3 +1,4 @@
+import '../person_accounts/receipt_draft_field.dart';
 import 'package:flutter/material.dart';
 import '../../utils/money.dart';
 import '../../data/card_statement_logic.dart';
@@ -24,6 +25,7 @@ class DebtPaymentDialog extends StatefulWidget {
 }
 
 class _DebtPaymentDialogState extends State<DebtPaymentDialog> {
+  final _receipt = ReceiptDraft();
   final formKey = GlobalKey<FormState>();
   final principal = TextEditingController(text: '0.00');
   final interest = TextEditingController(text: '0.00');
@@ -79,6 +81,7 @@ class _DebtPaymentDialogState extends State<DebtPaymentDialog> {
   );
 
   void save() {
+    if (_receipt.picking) return;
     if (!formKey.currentState!.validate()) return;
     final capital = cents(principal),
         interests = cents(interest),
@@ -88,6 +91,7 @@ class _DebtPaymentDialogState extends State<DebtPaymentDialog> {
       return;
     }
     Navigator.pop(context, <String, dynamic>{
+      ..._receipt.fields,
       'principal_amount': capital / 100,
       'interest_amount': interests / 100,
       'fee_amount': fees / 100,
@@ -225,6 +229,7 @@ class _DebtPaymentDialogState extends State<DebtPaymentDialog> {
         ),
       ),
       actions: [
+        ReceiptDraftField(draft: _receipt),
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancelar'),
