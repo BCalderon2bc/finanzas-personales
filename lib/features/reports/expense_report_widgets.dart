@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../utils/money.dart';
+import '../../data/expense_report_categories.dart';
 
 String expenseMoney(int cents, String currency) =>
     formatMoneyCents(cents, currency);
@@ -51,8 +52,8 @@ class ExpenseReportSummary extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: total < 0
-              ? const [Color(0xFF064E3B), Color(0xFF0D8262)]
-              : const [Color(0xFF172554), Color(0xFF2563EB)],
+              ? const [Color(0xFF064E3B), Color(0xFF166B56)]
+              : const [Color(0xFF1C4140), Color(0xFF17604E)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -141,7 +142,7 @@ class ExpenseCategoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final refund = amountCents < 0;
-    final accent = refund ? const Color(0xFF087F5B) : color;
+    final accent = refund ? const Color(0xFF14684D) : color;
     final ratio = amountCents > 0 && positiveTotalCents > 0
         ? amountCents / positiveTotalCents
         : 0.0;
@@ -151,7 +152,7 @@ class ExpenseCategoryCard extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: const BorderSide(color: Color(0xFFE2E8F0)),
+        side: const BorderSide(color: Color(0xFFD9E3DA)),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -180,7 +181,7 @@ class ExpenseCategoryCard extends StatelessWidget {
                         Text(
                           name,
                           style: const TextStyle(
-                            color: Color(0xFF172033),
+                            color: Color(0xFF182B24),
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
                           ),
@@ -189,7 +190,7 @@ class ExpenseCategoryCard extends StatelessWidget {
                         Text(
                           '$count movimientos',
                           style: const TextStyle(
-                            color: Color(0xFF64748B),
+                            color: Color(0xFF50665B),
                             fontSize: 12,
                           ),
                         ),
@@ -198,7 +199,7 @@ class ExpenseCategoryCard extends StatelessWidget {
                   ),
                   const Icon(
                     Icons.chevron_right_rounded,
-                    color: Color(0xFF64748B),
+                    color: Color(0xFF50665B),
                     size: 20,
                   ),
                 ],
@@ -247,7 +248,7 @@ class ExpenseCategoryCard extends StatelessWidget {
                   value: ratio.clamp(0.0, 1.0).toDouble(),
                   minHeight: 7,
                   color: accent,
-                  backgroundColor: const Color(0xFFF1F5F9),
+                  backgroundColor: const Color(0xFFF0F4EF),
                 ),
               ),
             ],
@@ -274,7 +275,7 @@ class ExpenseDetailTile extends StatelessWidget {
     final debt = tx['source'] == 'debt_payment';
     final amount = moneyCents(tx['amount']);
     final refund = amount < 0;
-    final color = refund ? const Color(0xFF087F5B) : const Color(0xFF2563EB);
+    final color = refund ? const Color(0xFF14684D) : const Color(0xFF17604E);
     final description = tx['description']?.toString().trim() ?? '';
     final reference = tx['reference']?.toString().trim() ?? '';
     final cardName = tx['card_name']?.toString().trim() ?? '';
@@ -289,8 +290,12 @@ class ExpenseDetailTile extends StatelessWidget {
       'fee': 'Comisión',
       'refund': 'Devolución',
     };
+    final insurance = debt ? moneyCents(tx['insurance_amount'] ?? 0) : 0;
+    final otherFees = debt ? moneyCents(tx['fee_amount']) - insurance : 0;
     final label = debt
-        ? 'Intereses y comisiones de deuda'
+        ? 'Abono de deuda'
+        : isCardInsuranceExpense(tx)
+        ? 'Seguro de tarjeta'
         : card
         ? cardTypes[tx['card_transaction_type']] ?? 'Tarjeta'
         : 'Gasto de cuenta';
@@ -299,7 +304,7 @@ class ExpenseDetailTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: const Color(0xFFF8FAF7),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -329,7 +334,7 @@ class ExpenseDetailTile extends StatelessWidget {
                 Text(
                   '$dateText · $label',
                   style: const TextStyle(
-                    color: Color(0xFF64748B),
+                    color: Color(0xFF50665B),
                     fontSize: 12,
                   ),
                 ),
@@ -337,7 +342,7 @@ class ExpenseDetailTile extends StatelessWidget {
                   Text(
                     cardName,
                     style: const TextStyle(
-                      color: Color(0xFF64748B),
+                      color: Color(0xFF50665B),
                       fontSize: 12,
                     ),
                   ),
@@ -356,17 +361,23 @@ class ExpenseDetailTile extends StatelessWidget {
                     'Intereses: ${expenseMoney(moneyCents(tx['interest_amount']), currency)}',
                     style: const TextStyle(fontSize: 12),
                   ),
-                  Text(
-                    'Comisiones: ${expenseMoney(moneyCents(tx['fee_amount']), currency)}',
-                    style: const TextStyle(fontSize: 12),
-                  ),
+                  if (insurance != 0)
+                    Text(
+                      'Seguro: ${expenseMoney(insurance, currency)}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  if (otherFees != 0)
+                    Text(
+                      'Comisiones y otros cargos: ${expenseMoney(otherFees, currency)}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
                 ],
                 if (reference.isNotEmpty) ...[
                   const SizedBox(height: 7),
                   SelectableText(
                     'Referencia: $reference',
                     style: const TextStyle(
-                      color: Color(0xFF64748B),
+                      color: Color(0xFF50665B),
                       fontSize: 12,
                     ),
                   ),

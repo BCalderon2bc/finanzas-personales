@@ -8,6 +8,7 @@ import 'export_report_models.dart';
 Future<ExportReport> loadExportReport({
   required String kind,
   String? cardId,
+  String? accountId,
   required String currency,
   required DateTime start,
   required DateTime end,
@@ -23,12 +24,19 @@ Future<ExportReport> loadExportReport({
         'debts',
         'budgets',
         'credit_cards',
+        'credit_card_expenses',
+        'accounts',
         'debit_cards',
       ].contains(kind)) {
     throw ArgumentError('Tipo de reporte o moneda inválidos.');
   }
-  if (kind == 'credit_cards' || kind == 'debit_cards') {
-    final credit = kind == 'credit_cards';
+  if ([
+    'credit_cards',
+    'credit_card_expenses',
+    'debit_cards',
+    'accounts',
+  ].contains(kind)) {
+    final credit = kind == 'credit_cards' || kind == 'credit_card_expenses';
     final values = await Future.wait([
       statementRows(credit ? 'credit_cards' : 'debit_cards', '*', uid),
       statementRows('accounts', 'id,name,currency,opening_balance', uid),
@@ -38,6 +46,16 @@ Future<ExportReport> loadExportReport({
     ]);
     if (supabase.auth.currentUser?.id != uid)
       throw StateError('La sesión cambió.');
+    if (kind == 'credit_card_expenses')
+      return creditCardExpensesExport(
+        cards: values[0],
+        movements: values[3],
+        start: start,
+        end: end,
+        generatedAt: DateTime.now(),
+        currency: currency,
+        cardId: cardId,
+      );
     return credit
         ? creditCardsExport(
             cards: values[0],
@@ -61,6 +79,8 @@ Future<ExportReport> loadExportReport({
             generatedAt: DateTime.now(),
             currency: currency,
             cardId: cardId,
+            accountId: accountId,
+            allAccounts: kind == 'accounts',
           );
   }
   if (kind == 'debts') {
@@ -91,19 +111,19 @@ Future<ExportReport> loadExportReport({
     statementRows('credit_cards', 'id,name,currency', uid),
     statementRows(
       'credit_card_transactions',
-      'id,credit_card_id,account_id,category_id,transaction_type,amount,currency,transaction_date,description,reference,is_voided,is_receivable_funding,account_debit_amount,account_debit_currency,payment_exchange_rate',
+      'id,credit_card_id,account_id,category_id,transaction_type,charge_kind,amount,currency,transaction_date,description,reference,is_voided,is_receivable_funding,account_debit_amount,account_debit_currency,payment_exchange_rate',
       uid,
     ),
     statementRows('debts', 'id,description,currency', uid),
     statementRows(
       'debt_payments',
-      'id,debt_id,account_id,principal_amount,interest_amount,fee_amount,currency,payment_date,reference,is_voided',
+      'id,debt_id,account_id,principal_amount,interest_amount,fee_amount,insurance_amount,currency,payment_date,reference,is_voided',
       uid,
     ),
     if (kind == 'budgets')
       statementRows(
         'budgets',
-        'id,category_id,currency,budget_amount,month',
+        'id,category_id,currency,budget_amount,month,start_date,end_date',
         uid,
       ),
   ]);

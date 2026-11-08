@@ -1,3 +1,4 @@
+import 'period_logic.dart';
 import '../utils/money.dart';
 import 'card_statement_logic.dart';
 import 'debt_installment_logic.dart';
@@ -8,10 +9,15 @@ class MoneyCell {
 }
 
 class ReportTable {
-  const ReportTable(this.name, this.columns, this.rows);
+  const ReportTable(
+    this.name,
+    this.columns,
+    this.rows, {
+    this.footerRows = const [],
+  });
   final String name;
   final List<String> columns;
-  final List<List<Object?>> rows;
+  final List<List<Object?>> rows, footerRows;
 }
 
 class ReportTotal {
@@ -28,12 +34,14 @@ class ExportReport {
     required this.tables,
     required this.totals,
     required this.notes,
+    this.showTotalsSummary = true,
   });
   final String title, period;
   final DateTime generatedAt;
   final List<ReportTable> tables;
   final List<ReportTotal> totals;
   final List<String> notes;
+  final bool showTotalsSummary;
   int get rowCount => tables.fold(0, (n, t) => n + t.rows.length);
 }
 
@@ -150,7 +158,9 @@ List<ExportMovement> normalizeExportMovements({
     }
     add(
       tx,
-      native[type] ?? 'Movimiento por revisar',
+      tx['expense_kind'] == 'card_insurance'
+          ? 'Seguro de tarjeta'
+          : native[type] ?? 'Movimiento por revisar',
       account,
       amount,
       type == 'income' ? amount : 0,
@@ -185,6 +195,8 @@ List<ExportMovement> normalizeExportMovements({
       tx,
       funding
           ? 'Préstamo desde tarjeta'
+          : tx['charge_kind'] == 'insurance'
+          ? 'Seguro de tarjeta'
           : cardTypes[type] ?? 'Ajuste de tarjeta por revisar',
       _lookup(cards, tx['credit_card_id'], 'name', 'Tarjeta no disponible'),
       type == 'refund' ? -amount : amount,
@@ -222,7 +234,7 @@ List<ExportMovement> normalizeExportMovements({
       interest + fee,
       description:
           '$debt · Capital: ${formatMoneyCents(capital, currency)}; '
-          'intereses: ${formatMoneyCents(interest, currency)}; comisiones: ${formatMoneyCents(fee, currency)}',
+          'intereses: ${formatMoneyCents(interest, currency)}; seguro: ${formatMoneyCents(moneyCents(p['insurance_amount'] ?? 0), currency)}; otros cargos: ${formatMoneyCents(fee - moneyCents(p['insurance_amount'] ?? 0), currency)}',
     );
   }
   result.sort((a, b) => b.date.compareTo(a.date));
@@ -384,11 +396,47 @@ ExportReport debtsReport({
         'Pendiente',
         'Estado',
       ], quotas),
+      ReportTable(
+        'Desglose de abonos',
+        const [
+          'Fecha',
+          'Préstamo',
+          'Moneda',
+          'Capital',
+          'Intereses',
+          'Seguro',
+          'Otros cargos',
+          'Total',
+        ],
+        [
+          for (final p in payments)
+            if (p['is_voided'] != true &&
+                (currency == 'all' || p['currency'] == currency))
+              [
+                shortStatementDate(p['payment_date']),
+                _lookup(
+                  debts,
+                  p['debt_id'],
+                  'description',
+                  'Préstamo no disponible',
+                ),
+                '${p['currency']}',
+                MoneyCell(moneyCents(p['principal_amount'])),
+                MoneyCell(moneyCents(p['interest_amount'])),
+                MoneyCell(moneyCents(p['insurance_amount'] ?? 0)),
+                MoneyCell(
+                  moneyCents(p['fee_amount']) -
+                      moneyCents(p['insurance_amount'] ?? 0),
+                ),
+                MoneyCell(debtPaymentTotalCents(p)),
+              ],
+        ],
+      ),
     ],
     totals: totals,
     notes: const [
       'Los saldos son actuales, no una reconstrucción histórica. Las deudas canceladas se muestran pero no integran el total pendiente.',
-      'Las cuotas son pagos programados y pueden incluir intereses/comisiones; no se suman de nuevo al capital pendiente. Si un préstamo figura pagado con capital restante, revisa su historial.',
+      'Las cuotas son pagos programados y pueden incluir intereses, seguro y otros cargos; no se suman de nuevo al capital pendiente. Si un préstamo figura pagado con capital restante, revisa su historial.',
     ],
   );
 }
@@ -401,36 +449,33 @@ ExportReport budgetsReport({
   required String currency,
   required DateTime generatedAt,
 }) {
-  final used = <String, int>{};
-  for (final m in movements) {
-    if (m.date.year == month.year &&
-        m.date.month == month.month &&
-        m.categoryId != null) {
-      final key = '${m.categoryId}|${m.currency}';
-      used[key] = (used[key] ?? 0) + m.expense;
-    }
-  }
   final rows = <List<Object?>>[], totals = <ReportTotal>[];
   final limits = <String, int>{}, expenses = <String, int>{};
   final counted = <String>{};
   for (final b in budgets) {
-    final date = statementDate(b['month']);
-    if (date == null ||
-        date.year != month.year ||
-        date.month != month.month ||
+    final from = budgetStart(b), until = budgetEnd(b);
+    if (until.isBefore(DateTime(month.year, month.month)) ||
+        from.isAfter(DateTime(month.year, month.month + 1, 0)) ||
         (currency != 'all' && b['currency'] != currency)) {
       continue;
     }
     final c = '${b['currency']}',
         limit = moneyCents(b['budget_amount']),
-        spent = used['${b['category_id']}|$c'] ?? 0;
+        spent = movements
+            .where(
+              (m) =>
+                  m.categoryId == b['category_id'] &&
+                  m.currency == c &&
+                  includesDay(m.date, from, until),
+            )
+            .fold<int>(0, (total, m) => total + m.expense);
     limits[c] = (limits[c] ?? 0) + limit;
-    if (counted.add('${b['category_id']}|$c')) {
+    if (counted.add('${b['id']}')) {
       expenses[c] = (expenses[c] ?? 0) + spent;
     }
     rows.add([
       _lookup(categories, b['category_id'], 'name', 'Categoría no disponible'),
-      '${month.year}-${month.month.toString().padLeft(2, '0')}',
+      '${reportDate(from)} al ${reportDate(until)}',
       c,
       MoneyCell(limit),
       MoneyCell(spent),
@@ -458,7 +503,7 @@ ExportReport budgetsReport({
     tables: [
       ReportTable('Presupuestos', const [
         'Categoría',
-        'Mes',
+        'Período',
         'Moneda',
         'Límite',
         'Gasto neto',
@@ -468,7 +513,7 @@ ExportReport budgetsReport({
     ],
     totals: totals,
     notes: const [
-      'Solo incluye categorías presupuestadas del mes. Descuenta devoluciones. Importes originales, sin conversión de monedas.',
+      'Incluye presupuestos que coinciden con el mes seleccionado. El gasto de cada presupuesto corresponde a todas sus fechas. Descuenta devoluciones. Importes originales, sin conversión de monedas.',
     ],
   );
 }

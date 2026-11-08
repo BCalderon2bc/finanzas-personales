@@ -193,7 +193,9 @@ class CreditCardFace extends StatelessWidget {
           ),
         SizedBox(height: compact ? 6 : 12),
         AspectRatio(
-          aspectRatio: visual?.aspectRatio ?? 1.586,
+          // A common viewport keeps portrait and landscape designs aligned.
+          // BoxFit.contain preserves the complete original card image.
+          aspectRatio: compact ? 1.586 : visual?.aspectRatio ?? 1.586,
           child: visual == null
               ? customFace()
               : visual.asset.toLowerCase().endsWith('.svg')

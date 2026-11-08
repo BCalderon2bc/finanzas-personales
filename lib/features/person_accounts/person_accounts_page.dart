@@ -1,3 +1,4 @@
+import '../../widgets/page_intro.dart';
 import '../../widgets/adaptive_layout.dart';
 import '../help/app_help.dart';
 import 'package:flutter/material.dart';
@@ -214,7 +215,7 @@ class _PersonAccountsPageState extends State<PersonAccountsPage> {
           top: false,
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 900),
+              constraints: const BoxConstraints(maxWidth: 1160),
               child: loading
                   ? const Center(child: CircularProgressIndicator())
                   : error != null || invalid != null
@@ -240,16 +241,11 @@ class _PersonAccountsPageState extends State<PersonAccountsPage> {
                           compact ? 24 : 110,
                         ),
                         children: [
-                          const Text(
-                            'Lleva la cuenta con cada persona',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Sus compras suman (+), las tuyas restan (−). Todas las cuentas se expresan en córdobas.',
+                          const PageIntro(
+                            icon: Icons.people_alt_outlined,
+                            title: 'Saldos entre personas',
+                            description:
+                                'Consulta cuánto debes y cuánto te deben. Los saldos se muestran en córdobas.',
                           ),
                           for (final invite in shares.where(
                             (s) =>
@@ -298,15 +294,20 @@ class _PersonAccountsPageState extends State<PersonAccountsPage> {
                                 setState(() => sharedOnly = value),
                           ),
                           const SizedBox(height: 16),
-                          Wrap(
-                            spacing: 12,
-                            runSpacing: 12,
+                          AdaptiveColumns(
+                            minColumnWidth: 135,
                             children: [
-                              _summary('Tú debes', payable, Icons.north_east),
+                              _summary(
+                                'Tú debes',
+                                payable,
+                                Icons.north_east,
+                                Theme.of(context).colorScheme.error,
+                              ),
                               _summary(
                                 'Te deben',
                                 receivable,
                                 Icons.south_west,
+                                const Color(0xFF14684D),
                               ),
                             ],
                           ),
@@ -316,6 +317,11 @@ class _PersonAccountsPageState extends State<PersonAccountsPage> {
                             style: TextStyle(fontSize: 12),
                           ),
                           const SizedBox(height: 18),
+                          Text(
+                            'Personas',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: 10),
                           GuideAnchor(
                             id: 'filter',
                             child: TextField(
@@ -337,79 +343,89 @@ class _PersonAccountsPageState extends State<PersonAccountsPage> {
                             Padding(
                               padding: const EdgeInsets.all(24),
                               child: Text(
-                                sharedOnly
+                                search.text.trim().isNotEmpty
+                                    ? 'No encontramos personas con ese nombre.'
+                                    : sharedOnly
                                     ? 'No hay cuentas compartidas para mostrar.'
                                     : 'Agrega una persona para empezar a registrar sus compras y las tuyas.',
                                 textAlign: TextAlign.center,
                               ),
                             ),
-                          ...visible.map((a) {
-                            final b = balance(a);
-                            final color = b > 0
-                                ? Theme.of(context).colorScheme.error
-                                : b < 0
-                                ? const Color(0xFF087F5B)
-                                : Theme.of(context).colorScheme.primary;
-                            return Card(
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(12),
-                                onTap: saving
-                                    ? null
-                                    : () async {
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute<void>(
-                                            builder: (_) =>
-                                                PersonAccountDetailPage(
-                                                  account: a,
-                                                ),
+                          if (visible.isNotEmpty)
+                            AdaptiveColumns(
+                              minColumnWidth: 320,
+                              children: visible.map((a) {
+                                final b = balance(a);
+                                final color = b > 0
+                                    ? Theme.of(context).colorScheme.error
+                                    : b < 0
+                                    ? const Color(0xFF14684D)
+                                    : Theme.of(context).colorScheme.primary;
+                                final name = accountName(a);
+                                return Card(
+                                  margin: EdgeInsets.zero,
+                                  clipBehavior: Clip.antiAlias,
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(12),
+                                    onTap: saving
+                                        ? null
+                                        : () async {
+                                            await Navigator.push(
+                                              context,
+                                              MaterialPageRoute<void>(
+                                                builder: (_) =>
+                                                    PersonAccountDetailPage(
+                                                      account: a,
+                                                    ),
+                                              ),
+                                            );
+                                            if (mounted) await load();
+                                          },
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(16),
+                                      child: Row(
+                                        children: [
+                                          CircleAvatar(
+                                            child: Text(
+                                              name.isEmpty
+                                                  ? '?'
+                                                  : name.characters.first
+                                                        .toUpperCase(),
+                                            ),
                                           ),
-                                        );
-                                        if (mounted) await load();
-                                      },
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Row(
-                                    children: [
-                                      CircleAvatar(
-                                        child: Text(
-                                          accountName(
-                                            a,
-                                          ).characters.first.toUpperCase(),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              accountName(a),
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.w700,
-                                                fontSize: 17,
-                                              ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  accountName(a),
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: 17,
+                                                  ),
+                                                ),
+                                                if (a['is_active'] != true)
+                                                  const Text('Archivada'),
+                                                Text(
+                                                  '${personBalanceLabel(b)} · ${formatMoneyCents(b.abs(), 'NIO')}',
+                                                  style: TextStyle(
+                                                    color: color,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
-                                            if (a['is_active'] != true)
-                                              const Text('Archivada'),
-                                            Text(
-                                              '${personBalanceLabel(b)} · ${formatMoneyCents(b.abs(), 'NIO')}',
-                                              style: TextStyle(
-                                                color: color,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
+                                          ),
+                                          const Icon(Icons.chevron_right),
+                                        ],
                                       ),
-                                      const Icon(Icons.chevron_right),
-                                    ],
+                                    ),
                                   ),
-                                ),
-                              ),
-                            );
-                          }),
+                                );
+                              }).toList(),
+                            ),
                         ],
                       ),
                     ),
@@ -420,24 +436,28 @@ class _PersonAccountsPageState extends State<PersonAccountsPage> {
     );
   }
 
-  Widget _summary(String title, int cents, IconData icon) => Container(
-    constraints: const BoxConstraints(minWidth: 200),
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(16),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon),
-        const SizedBox(height: 8),
-        Text(title),
-        Text(
-          formatMoneyCents(cents, 'NIO'),
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 21),
+  Widget _summary(String title, int cents, IconData icon, Color color) =>
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withAlpha(20),
+          borderRadius: BorderRadius.circular(16),
         ),
-      ],
-    ),
-  );
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: color),
+            const SizedBox(height: 8),
+            Text(title),
+            Text(
+              formatMoneyCents(cents, 'NIO'),
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w700,
+                fontSize: 21,
+              ),
+            ),
+          ],
+        ),
+      );
 }

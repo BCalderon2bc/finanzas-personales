@@ -2,12 +2,12 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'dashboard_overview.dart';
 
-const _blue = Color(0xFF2563EB);
-const _green = Color(0xFF087F5B);
-const _red = Color(0xFFB42318);
+const _blue = Color(0xFF17604E);
+const _green = Color(0xFF14684D);
+const _red = Color(0xFFA2322C);
 const _amber = Color(0xFFB45309);
-const _muted = Color(0xFF64748B);
-const _border = Color(0xFFE2E8F0);
+const _muted = Color(0xFF50665B);
+const _border = Color(0xFFD9E3DA);
 
 class DashboardFinancialHealth extends StatelessWidget {
   const DashboardFinancialHealth({
@@ -751,7 +751,7 @@ class _DonutPainter extends CustomPainter {
       ..strokeWidth = stroke
       ..strokeCap = StrokeCap.butt;
 
-    paint.color = const Color(0xFFF1F5F9);
+    paint.color = const Color(0xFFF0F4EF);
     canvas.drawCircle(center, radius, paint);
 
     final positive = slices.where((slice) => slice.value > 0).toList();

@@ -8,7 +8,7 @@ Future<List<Map<String, dynamic>>> loadUserDebtPayments(String userId) async {
         .from('debt_payments')
         .select(
           'id, debt_id, account_id, principal_amount, interest_amount, '
-          'fee_amount, currency, payment_date, created_at, reference, debts(description)',
+          'fee_amount, insurance_amount, currency, payment_date, created_at, reference, debts(description)',
         )
         .eq('user_id', userId)
         .eq('is_voided', false)
@@ -40,12 +40,13 @@ List<Map<String, dynamic>> debtPaymentExpenses(
       'created_at': payment['created_at'],
       'category_id': null,
       'description': name.isEmpty
-          ? 'Intereses y comisiones de deuda'
-          : 'Intereses y comisiones: $name',
+          ? 'Costos de deuda'
+          : 'Costos de deuda: $name',
       'reference': payment['reference'],
       'source': 'debt_payment',
       'interest_amount': payment['interest_amount'],
       'fee_amount': payment['fee_amount'],
+      'insurance_amount': payment['insurance_amount'] ?? 0,
     });
   }
   return expenses;

@@ -159,7 +159,7 @@ class _CategoryFormDialogState extends State<CategoryFormDialog> {
                     padding: EdgeInsets.only(top: 8),
                     child: Text(
                       'El tipo se conserva para mantener la clasificación del historial.',
-                      style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                      style: TextStyle(color: Color(0xFF50665B), fontSize: 12),
                     ),
                   ),
                 const SizedBox(height: 22),
@@ -182,10 +182,10 @@ class _CategoryFormDialogState extends State<CategoryFormDialog> {
                           style: IconButton.styleFrom(
                             backgroundColor: selected
                                 ? color
-                                : const Color(0xFFF1F5F9),
+                                : const Color(0xFFF0F4EF),
                             foregroundColor: selected
                                 ? Colors.white
-                                : const Color(0xFF64748B),
+                                : const Color(0xFF50665B),
                             minimumSize: const Size(48, 48),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),

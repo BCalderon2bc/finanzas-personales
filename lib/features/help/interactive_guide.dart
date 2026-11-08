@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../core/supabase_client.dart';
 import 'guide_catalog.dart';
 import 'guide_progress.dart';
+import 'movement_practice_page.dart';
 export 'guide_catalog.dart';
 export 'guide_progress.dart';
 
@@ -45,6 +46,8 @@ class GuideScope extends StatefulWidget {
   @override
   State<GuideScope> createState() => GuideScopeState();
 }
+
+enum _GuideResult { completed, practice }
 
 class GuideScopeState extends State<GuideScope> {
   final _ownScroll = ScrollController();
@@ -153,7 +156,7 @@ class GuideScopeState extends State<GuideScope> {
           catalog.isEmpty)
         return;
       FocusManager.instance.primaryFocus?.unfocus();
-      final finished = await showGeneralDialog<bool>(
+      final result = await showGeneralDialog<_GuideResult>(
         context: context,
         barrierDismissible: false,
         barrierLabel: 'Guía interactiva',
@@ -167,7 +170,16 @@ class GuideScopeState extends State<GuideScope> {
           userId: uid,
         ),
       );
-      if (finished == true) await progress.complete(topic);
+      if (result != null) await progress.complete(topic);
+      if (result == _GuideResult.practice &&
+          mounted &&
+          uid == userId &&
+          route?.isCurrent == true) {
+        await Navigator.push<void>(
+          context,
+          MaterialPageRoute<void>(builder: (_) => const MovementPracticePage()),
+        );
+      }
     } finally {
       _running = false;
       _dismiss = null;
@@ -279,7 +291,7 @@ class _GuideOverlayState extends State<_GuideOverlay>
 
   void _close() {
     if (mounted && ModalRoute.of(context)?.isCurrent == true)
-      Navigator.pop(context, false);
+      Navigator.pop(context);
   }
 
   @override
@@ -352,7 +364,7 @@ class _GuideOverlayState extends State<_GuideOverlay>
     if (_moving || !_valid) return;
     final next = _index + delta;
     if (next >= widget.steps.length) {
-      Navigator.pop(context, true);
+      Navigator.pop(context, _GuideResult.completed);
       return;
     }
     if (next < 0) return;
@@ -488,12 +500,25 @@ class _GuideOverlayState extends State<_GuideOverlay>
                                         'Este control aparece cuando hay datos o al elegir esa opción. Puedes continuar.',
                                         style: TextStyle(
                                           fontSize: 12,
-                                          color: Color(0xFF64748B),
+                                          color: Color(0xFF50665B),
                                         ),
                                       ),
                                     ),
                                 ],
                               ),
+                              if (!_moving &&
+                                  widget.owner.topic == 'movements' &&
+                                  _index == widget.steps.length - 1)
+                                OutlinedButton.icon(
+                                  onPressed: () => Navigator.pop(
+                                    context,
+                                    _GuideResult.practice,
+                                  ),
+                                  icon: const Icon(Icons.science_outlined),
+                                  label: const Text(
+                                    'Practicar con un movimiento',
+                                  ),
+                                ),
                               const SizedBox(height: 12),
                               Wrap(
                                 alignment: WrapAlignment.spaceBetween,

@@ -208,7 +208,7 @@ class _ReceivableLoanFormDialogState extends State<ReceivableLoanFormDialog> {
                       child: Text(
                         'No registres otra compra manual por este mismo préstamo. El cargo se crea al guardar.',
                         style: TextStyle(
-                          color: Color(0xFF64748B),
+                          color: Color(0xFF50665B),
                           fontSize: 12,
                         ),
                       ),

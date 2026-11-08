@@ -1,3 +1,4 @@
+import '../../widgets/adaptive_layout.dart';
 import '../person_accounts/receipt_history.dart';
 import '../help/app_help.dart';
 import 'dart:convert';
@@ -129,6 +130,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
     'payment': 'Pago',
     'interest': 'Intereses',
     'fee': 'Comisión',
+    'insurance': 'Seguro de tarjeta',
     'refund': 'Devolución',
     'adjustment': 'Ajuste',
   };
@@ -272,6 +274,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
       final changes = <String, dynamic>{
         for (final key in [
           'transaction_type',
+          'charge_kind',
           'currency',
           'amount',
           'category_id',
@@ -374,7 +377,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
         final result = await supabase
             .from('credit_card_transactions')
             .select(
-              'id, transaction_type, amount, currency, transaction_date, created_at, '
+              'id, transaction_type, charge_kind, amount, currency, transaction_date, created_at, '
               'description, reference, account_id, account_debit_amount, account_debit_currency, payment_exchange_rate, category_id, is_voided, is_receivable_funding, void_reason, voided_at, accounts(name), categories(name)',
             )
             .eq('credit_card_id', widget.cardId)
@@ -479,7 +482,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
               children: [
                 Expanded(
                   child: Text(
-                    '${types[type] ?? type}${voided ? ' · Anulado' : ''}',
+                    '${tx['charge_kind'] == 'insurance' ? 'Seguro de tarjeta' : types[type] ?? type}${voided ? ' · Anulado' : ''}',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
@@ -602,7 +605,10 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
       if (currencyFilter != 'all' && tx['currency'] != currencyFilter) {
         return false;
       }
-      if (filter != 'all' && tx['transaction_type'] != filter) return false;
+      if (filter == 'insurance'
+          ? tx['charge_kind'] != 'insurance'
+          : filter != 'all' && tx['transaction_type'] != filter)
+        return false;
       final voided = tx['is_voided'] == true;
       if (statusFilter == 'valid' && voided) return false;
       if (statusFilter == 'voided' && !voided) return false;
@@ -627,179 +633,190 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
             ),
           ],
         ),
-        body: loading
-            ? const Center(child: CircularProgressIndicator())
-            : error != null
-            ? Center(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
+        body: PageFrame(
+          maxWidth: 1000,
+          child: loading
+              ? const Center(child: CircularProgressIndicator())
+              : error != null
+              ? Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('No se pudo cargar el historial.'),
+                        SelectableText(error!),
+                        TextButton(
+                          onPressed: loadData,
+                          child: const Text('Reintentar'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: loadData,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
                     children: [
-                      const Text('No se pudo cargar el historial.'),
-                      SelectableText(error!),
-                      TextButton(
-                        onPressed: loadData,
-                        child: const Text('Reintentar'),
+                      const Text(
+                        'Últimos ingresados primero',
+                        style: TextStyle(
+                          color: Color(0xFF50665B),
+                          fontSize: 12,
+                        ),
                       ),
+                      const SizedBox(height: 12),
+                      Text(
+                        name,
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                      for (final c in cardCurrencies)
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text(
+                                  c == 'USD' ? 'Dólares' : 'Córdobas',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                Text(
+                                  'Inicial: ${cardMoney(cardOpening(cardData, c), c)}',
+                                ),
+                                Builder(
+                                  builder: (context) {
+                                    final balance = cardBalance(
+                                      cardData,
+                                      movements.map(
+                                        (tx) => {
+                                          ...tx,
+                                          'credit_card_id': widget.cardId,
+                                        },
+                                      ),
+                                      c,
+                                    );
+                                    return Text(
+                                      '${balance != null && balance < 0 ? 'A favor' : 'Deuda'}: ${cardMoney(balance?.abs(), c)}',
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 12),
+                      GuideAnchor(
+                        id: 'currency',
+                        child: DropdownButtonFormField<String>(
+                          initialValue: currencyFilter,
+                          decoration: const InputDecoration(
+                            labelText: 'Moneda',
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'all',
+                              child: Text('Ambas monedas'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'NIO',
+                              child: Text('Córdobas'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'USD',
+                              child: Text('Dólares'),
+                            ),
+                          ],
+                          onChanged: (v) {
+                            if (v != null) {
+                              setState(() => currencyFilter = v);
+                            }
+                          },
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Text('+ aumenta la deuda · − reduce la deuda'),
+                      ),
+                      GuideAnchor(
+                        id: 'state',
+                        child: DropdownButtonFormField<String>(
+                          initialValue: statusFilter,
+                          decoration: const InputDecoration(
+                            labelText: 'Estado del registro',
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'valid',
+                              child: Text('Vigentes'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'voided',
+                              child: Text('Anulados'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'all',
+                              child: Text('Todos'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null)
+                              setState(() => statusFilter = value);
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      GuideAnchor(
+                        id: 'type',
+                        child: DropdownButtonFormField<String>(
+                          initialValue: filter,
+                          decoration: const InputDecoration(
+                            labelText: 'Tipo de movimiento',
+                          ),
+                          items: [
+                            const DropdownMenuItem(
+                              value: 'all',
+                              child: Text('Todos'),
+                            ),
+                            ...types.entries.map(
+                              (e) => DropdownMenuItem(
+                                value: e.key,
+                                child: Text(e.value),
+                              ),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) setState(() => filter = value);
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (receiptCounts != null)
+                        ReceiptFilterField(
+                          value: receiptFilter,
+                          onChanged: (value) =>
+                              setState(() => receiptFilter = value),
+                        ),
+                      Text(
+                        '${visible.length} de ${movements.length} movimientos',
+                      ),
+                      if (visible.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Text(
+                            'No hay movimientos para este filtro.',
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ...visible.map(movementCard),
                     ],
                   ),
                 ),
-              )
-            : RefreshIndicator(
-                onRefresh: loadData,
-                child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    const Text(
-                      'Últimos ingresados primero',
-                      style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      name,
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    for (final c in cardCurrencies)
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Text(
-                                c == 'USD' ? 'Dólares' : 'Córdobas',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              Text(
-                                'Inicial: ${cardMoney(cardOpening(cardData, c), c)}',
-                              ),
-                              Builder(
-                                builder: (context) {
-                                  final balance = cardBalance(
-                                    cardData,
-                                    movements.map(
-                                      (tx) => {
-                                        ...tx,
-                                        'credit_card_id': widget.cardId,
-                                      },
-                                    ),
-                                    c,
-                                  );
-                                  return Text(
-                                    '${balance != null && balance < 0 ? 'A favor' : 'Deuda'}: ${cardMoney(balance?.abs(), c)}',
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 12),
-                    GuideAnchor(
-                      id: 'currency',
-                      child: DropdownButtonFormField<String>(
-                        initialValue: currencyFilter,
-                        decoration: const InputDecoration(labelText: 'Moneda'),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'all',
-                            child: Text('Ambas monedas'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'NIO',
-                            child: Text('Córdobas'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'USD',
-                            child: Text('Dólares'),
-                          ),
-                        ],
-                        onChanged: (v) {
-                          if (v != null) {
-                            setState(() => currencyFilter = v);
-                          }
-                        },
-                      ),
-                    ),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                      child: Text('+ aumenta la deuda · − reduce la deuda'),
-                    ),
-                    GuideAnchor(
-                      id: 'state',
-                      child: DropdownButtonFormField<String>(
-                        initialValue: statusFilter,
-                        decoration: const InputDecoration(
-                          labelText: 'Estado del registro',
-                        ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'valid',
-                            child: Text('Vigentes'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'voided',
-                            child: Text('Anulados'),
-                          ),
-                          DropdownMenuItem(value: 'all', child: Text('Todos')),
-                        ],
-                        onChanged: (value) {
-                          if (value != null)
-                            setState(() => statusFilter = value);
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    GuideAnchor(
-                      id: 'type',
-                      child: DropdownButtonFormField<String>(
-                        initialValue: filter,
-                        decoration: const InputDecoration(
-                          labelText: 'Tipo de movimiento',
-                        ),
-                        items: [
-                          const DropdownMenuItem(
-                            value: 'all',
-                            child: Text('Todos'),
-                          ),
-                          ...types.entries.map(
-                            (e) => DropdownMenuItem(
-                              value: e.key,
-                              child: Text(e.value),
-                            ),
-                          ),
-                        ],
-                        onChanged: (value) {
-                          if (value != null) setState(() => filter = value);
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    if (receiptCounts != null)
-                      ReceiptFilterField(
-                        value: receiptFilter,
-                        onChanged: (value) =>
-                            setState(() => receiptFilter = value),
-                      ),
-                    Text(
-                      '${visible.length} de ${movements.length} movimientos',
-                    ),
-                    if (visible.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Text(
-                          'No hay movimientos para este filtro.',
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ...visible.map(movementCard),
-                  ],
-                ),
-              ),
+        ),
       ),
     );
   }

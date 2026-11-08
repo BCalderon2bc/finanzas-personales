@@ -1,11 +1,70 @@
 import 'package:flutter/material.dart';
+
 import '../../utils/money.dart';
 import '../../widgets/category_style.dart';
+
+class TransactionHistoryHeader extends StatelessWidget {
+  const TransactionHistoryHeader({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+      ),
+      child: DefaultTextStyle.merge(
+        style: TextStyle(
+          color: theme.colorScheme.onSurface,
+          fontWeight: FontWeight.w700,
+        ),
+        child: const _HistoryColumns(
+          date: Text('Fecha'),
+          description: Text('Descripción'),
+          account: Text('Cuenta'),
+          amount: Text('Monto', textAlign: TextAlign.end),
+        ),
+      ),
+    );
+  }
+}
+
+class _HistoryColumns extends StatelessWidget {
+  const _HistoryColumns({
+    required this.date,
+    required this.description,
+    required this.account,
+    required this.amount,
+    this.action = const SizedBox.shrink(),
+  });
+
+  final Widget date, description, account, amount, action;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    child: Row(
+      children: [
+        Expanded(flex: 2, child: date),
+        const SizedBox(width: 12),
+        Expanded(flex: 5, child: description),
+        const SizedBox(width: 12),
+        Expanded(flex: 3, child: account),
+        const SizedBox(width: 12),
+        Expanded(flex: 3, child: amount),
+        const SizedBox(width: 8),
+        SizedBox(width: 20, child: action),
+      ],
+    ),
+  );
+}
 
 class TransactionTile extends StatelessWidget {
   const TransactionTile({
     super.key,
     this.receiptCount = 0,
+    this.table = false,
     required this.transaction,
     required this.label,
     required this.account,
@@ -14,47 +73,20 @@ class TransactionTile extends StatelessWidget {
     this.categoryStyle,
     this.onTap,
   });
+
   final Map<String, dynamic> transaction;
   final int receiptCount;
+  final bool table;
   final Map<String, dynamic>? categoryStyle;
   final String label, account, destination, category;
   final VoidCallback? onTap;
 
-  Widget badge(String text, Color color, {IconData? icon}) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-    decoration: BoxDecoration(
-      color: color.withAlpha(14),
-      borderRadius: BorderRadius.circular(8),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (icon != null) ...[
-          Icon(icon, color: color, size: 13),
-          const SizedBox(width: 4),
-        ],
-        Flexible(
-          child: Text(
-            text,
-            style: TextStyle(
-              color: color,
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-
   @override
   Widget build(BuildContext context) {
-    const green = Color(0xFF087F5B);
-    const red = Color(0xFFB42318);
-    const blue = Color(0xFF2563EB);
-    const muted = Color(0xFF64748B);
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final type = transaction['transaction_type'];
-    final income = ['income', 'deposit'].contains(type);
+    final income = type == 'income' || type == 'deposit';
     final expense = [
       'expense',
       'withdrawal',
@@ -66,18 +98,11 @@ class TransactionTile extends StatelessWidget {
       'debt_payment',
       'receivable_loan',
     ].contains(transaction['source']);
-    final reconciled = transaction['is_reconciled'] == true;
-    final description = transaction['description']?.toString().trim() ?? '';
-    final currency = transaction['currency']?.toString() ?? 'NIO';
-    final cents = moneyCents(transaction['amount']);
-    final date = DateTime.tryParse(
-      '${transaction['transaction_date']}',
-    )?.toLocal();
     final color = income
-        ? green
+        ? const Color(0xFF14684D)
         : expense
-        ? red
-        : blue;
+        ? colors.error
+        : colors.primary;
     final icon = switch (type) {
       'card_payment' => Icons.credit_card_outlined,
       'debt_payment' => Icons.payments_outlined,
@@ -87,139 +112,158 @@ class TransactionTile extends StatelessWidget {
       _ => Icons.receipt_long_outlined,
     };
     final styledCategory = categoryStyle;
-    final hasCategoryStyle =
-        styledCategory != null && ['income', 'expense'].contains(type);
-    final visualColor = hasCategoryStyle
-        ? categoryColor(styledCategory?['color'], income: income)
+    final useCategory =
+        styledCategory != null && (type == 'income' || type == 'expense');
+    final visualColor = useCategory
+        ? categoryColor(styledCategory['color'], income: income)
         : color;
-    final visualIcon = hasCategoryStyle
-        ? categoryIcon(styledCategory?['icon'])
+    final visualIcon = useCategory
+        ? categoryIcon(styledCategory['icon'])
         : icon;
-
-    Widget amount() => Text(
-      '${income
-          ? '+'
-          : expense
-          ? '−'
-          : ''}${formatMoneyCents(cents, currency)}',
-      style: TextStyle(color: color, fontSize: 17, fontWeight: FontWeight.w800),
+    final description = transaction['description']?.toString().trim() ?? '';
+    final accountLabel = type == 'transfer'
+        ? '$account → $destination'
+        : account;
+    final currency = transaction['currency']?.toString() ?? 'NIO';
+    final cents = moneyCents(transaction['amount']);
+    final date = DateTime.tryParse(
+      '${transaction['transaction_date']}',
+    )?.toLocal();
+    final dateLabel = date == null
+        ? 'Sin fecha'
+        : '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+    final sign = income
+        ? '+'
+        : expense
+        ? '−'
+        : '';
+    final status = external
+        ? 'Pago vinculado'
+        : transaction['is_reconciled'] == true
+        ? 'Conciliado'
+        : 'Por conciliar';
+    final title = description.isEmpty ? label : description;
+    final subtitle = [
+      if (description.isNotEmpty) label,
+      if (category.isNotEmpty) category,
+      status,
+    ].join(' · ');
+    final chevron = Icon(
+      Icons.chevron_right_rounded,
+      color: colors.onSurfaceVariant,
+      size: 20,
     );
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: const BorderSide(color: Color(0xFFE2E8F0)),
+    Widget amount({TextAlign? align}) => Text(
+      '$sign${formatMoneyCents(cents, currency)}',
+      textAlign: align,
+      style: theme.textTheme.titleMedium?.copyWith(
+        color: color,
+        fontWeight: FontWeight.w800,
       ),
-      clipBehavior: Clip.antiAlias,
+    );
+
+    Widget receipt() => Tooltip(
+      message: '$receiptCount comprobantes',
+      child: Icon(Icons.attach_file, size: 16, color: colors.onSurfaceVariant),
+    );
+
+    if (table) {
+      return Material(
+        color: colors.surface,
+        child: InkWell(
+          onTap: onTap,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: colors.outlineVariant)),
+            ),
+            child: _HistoryColumns(
+              date: Text(dateLabel, style: theme.textTheme.bodySmall),
+              description: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall,
+                  ),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
+              ),
+              account: Text(
+                accountLabel,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              amount: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (receiptCount > 0) receipt(),
+                  Flexible(child: amount(align: TextAlign.end)),
+                ],
+              ),
+              action: chevron,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: LayoutBuilder(
-            builder: (context, box) {
-              final compact = box.maxWidth < 560;
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: visualColor.withAlpha(15),
-                      borderRadius: BorderRadius.circular(14),
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: visualColor.withAlpha(18),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(visualIcon, color: visualColor, size: 19),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall,
                     ),
-                    child: Icon(visualIcon, color: visualColor, size: 22),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          description.isEmpty ? label : description,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFF172033),
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          type == 'transfer'
-                              ? '$account → $destination'
-                              : account,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: muted, fontSize: 12),
-                        ),
-                        if (compact) ...[const SizedBox(height: 9), amount()],
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: [
-                            badge(label, color),
-                            if (receiptCount > 0)
-                              badge(
-                                '$receiptCount',
-                                blue,
-                                icon: Icons.attach_file,
-                              ),
-                            if (category.isNotEmpty)
-                              badge(category, visualColor),
-                            if (external)
-                              badge(
-                                'Pago vinculado',
-                                blue,
-                                icon: Icons.link_rounded,
-                              )
-                            else if (reconciled)
-                              badge(
-                                'Conciliado',
-                                green,
-                                icon: Icons.verified_outlined,
-                              )
-                            else
-                              badge('Por conciliar', muted),
-                          ],
-                        ),
-                      ],
+                    const SizedBox(height: 3),
+                    amount(),
+                    const SizedBox(height: 3),
+                    Text(
+                      '$dateLabel · $accountLabel',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall,
                     ),
-                  ),
-                  if (!compact) ...[
-                    const SizedBox(width: 16),
-                    Flexible(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          amount(),
-                          if (date != null) ...[
-                            const SizedBox(height: 6),
-                            Text(
-                              '${date.hour.toString().padLeft(2, '0')}:'
-                              '${date.minute.toString().padLeft(2, '0')}',
-                              style: const TextStyle(
-                                color: muted,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall,
                     ),
                   ],
-                  const SizedBox(width: 6),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: muted,
-                    size: 18,
-                  ),
-                ],
-              );
-            },
+                ),
+              ),
+              if (receiptCount > 0) receipt(),
+              chevron,
+            ],
           ),
         ),
       ),

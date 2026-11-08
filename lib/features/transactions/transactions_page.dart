@@ -1,3 +1,4 @@
+import 'movement_totals_panel.dart';
 import '../person_accounts/receipt_history.dart';
 import '../person_accounts/receipt_draft_field.dart';
 import '../../widgets/adaptive_layout.dart';
@@ -241,6 +242,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
             'amount',
             if (!fx) 'category_id',
             'description',
+            if (!fx) 'expense_kind',
             'reference',
             if (fx) ...['exchange_rate', 'destination_amount'],
           ])
@@ -492,7 +494,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
     return TransactionBalances(nioCents: nioCents, usdCents: usdCents);
   }
 
-  Widget _transactionCard(Map<String, dynamic> tx) {
+  Widget _transactionCard(Map<String, dynamic> tx, {required bool table}) {
     final external = [
       'credit_card_payment',
       'debt_payment',
@@ -500,9 +502,12 @@ class _TransactionsPageState extends State<TransactionsPage> {
     ].contains(tx['source']);
     final reconciled = tx['is_reconciled'] == true;
     return TransactionTile(
+      table: table,
       transaction: tx,
       receiptCount: receiptCounts?[financialReceiptFolder(tx)] ?? 0,
-      label: typeLabel(tx['transaction_type']?.toString()),
+      label: tx['expense_kind'] == 'card_insurance'
+          ? 'Seguro de tarjeta'
+          : typeLabel(tx['transaction_type']?.toString()),
       account: accountName(tx['account_id']?.toString()),
       destination: accountName(tx['destination_account_id']?.toString()),
       category: categoryName(tx['category_id']?.toString()),
@@ -546,16 +551,21 @@ class _TransactionsPageState extends State<TransactionsPage> {
 
   // Sin agrupar por fecha efectiva: un registro retroactivo recién ingresado
   // debe conservarse antes de los registros anteriores.
-  List<Widget> _historyRows(List<Map<String, dynamic>> rows) => [
-    const Padding(
-      padding: EdgeInsets.only(bottom: 12),
-      child: Text(
-        'Últimos ingresados primero',
-        style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
+  List<Widget> _historyRows(List<Map<String, dynamic>> rows) {
+    final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+    final table = MediaQuery.sizeOf(context).width >= 880 * scale.clamp(1, 1.8);
+    return [
+      const Padding(
+        padding: EdgeInsets.only(bottom: 8),
+        child: Text(
+          'Últimos ingresados primero',
+          style: TextStyle(fontSize: 12),
+        ),
       ),
-    ),
-    ...rows.map(_transactionCard),
-  ];
+      if (table) const TransactionHistoryHeader(),
+      for (final row in rows) _transactionCard(row, table: table),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -655,7 +665,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
               )
             : Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1160),
+                  constraints: const BoxConstraints(maxWidth: widePageMaxWidth),
                   child: RefreshIndicator(
                     onRefresh: loadData,
                     child: ListView(
@@ -677,27 +687,28 @@ class _TransactionsPageState extends State<TransactionsPage> {
                           child: TransactionFiltersBar(
                             accounts: accounts,
                             value: filter,
+                            receiptFilter: receiptCounts == null
+                                ? null
+                                : receiptFilter,
+                            onReceiptChanged: (value) =>
+                                setState(() => receiptFilter = value),
                             onChanged: (value) =>
                                 setState(() => filter = value),
                           ),
                         ),
-                        if (receiptCounts != null) ...[
-                          const SizedBox(height: 12),
-                          ReceiptFilterField(
-                            value: receiptFilter,
-                            onChanged: (value) =>
-                                setState(() => receiptFilter = value),
-                          ),
-                        ],
                         Padding(
                           padding: const EdgeInsets.only(top: 14),
                           child: Text(
                             '${visibleTransactions.length} de ${movements.length} movimientos',
                             style: const TextStyle(
-                              color: Color(0xFF64748B),
+                              color: Color(0xFF50665B),
                               fontSize: 12,
                             ),
                           ),
+                        ),
+                        MovementTotalsPanel(
+                          rows: visibleTransactions,
+                          selectedType: filter.type,
                         ),
                         const SizedBox(height: 12),
                         if (visibleTransactions.isEmpty)

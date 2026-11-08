@@ -108,13 +108,13 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
     final coveredMinimum =
         item.kind == AgendaKind.cardPayment && item.minimumRemaining == 0;
     final color = isCut
-        ? const Color(0xFF2563EB)
+        ? const Color(0xFF17604E)
         : days < 0 &&
               (loan || (!coveredMinimum && item.minimumRemaining != null))
-        ? const Color(0xFFB42318)
+        ? const Color(0xFFA2322C)
         : days <= 0
         ? const Color(0xFFB45309)
-        : const Color(0xFF2563EB);
+        : const Color(0xFF17604E);
     final when = days < 0
         ? 'Fecha pasada · hace ${-days} días'
         : days == 0
@@ -183,20 +183,23 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
                         ),
                       ],
                       const SizedBox(height: 4),
-                      Text(
-                        '$label${item.currency == null ? '' : ' · ${item.currency}'} · ${shortStatementDate(item.date.toIso8601String())}',
-                        style: const TextStyle(
-                          color: Color(0xFF64748B),
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        when,
-                        style: TextStyle(
-                          color: color,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          Text(
+                            '$label${item.currency == null ? '' : ' · ${item.currency}'}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          Text(
+                            '${isCut ? 'Corte' : 'Fecha límite'} · ${shortStatementDate(item.date.toIso8601String())} · $when',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: color,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ],
                       ),
                       if (item.amount != null) ...[
                         const SizedBox(height: 6),
@@ -205,9 +208,9 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
                               ? 'Cuota pendiente'
                               : loan
                               ? 'Capital pendiente'
-                              : 'Pendiente del período'}: '
+                              : 'Saldo pendiente del corte'} · '
                           '${formatMoneyCents(item.amount!, item.currency!)}',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
+                          style: Theme.of(context).textTheme.titleSmall,
                         ),
                         if (item.kind == AgendaKind.cardPayment)
                           Text(
@@ -215,7 +218,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
                                 ? 'Mínimo: sin registrar'
                                 : item.minimumRemaining == 0
                                 ? 'Mínimo cubierto'
-                                : 'Mínimo pendiente: ${formatMoneyCents(item.minimumRemaining!, item.currency!)}',
+                                : 'Mínimo pendiente · ${formatMoneyCents(item.minimumRemaining!, item.currency!)}',
                           ),
                       ] else if (!isCut)
                         Text(
@@ -227,10 +230,13 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
                   ),
                 ),
                 const SizedBox(width: 4),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  size: 20,
-                  color: Color(0xFF64748B),
+                const Tooltip(
+                  message: 'Ver detalle',
+                  child: Icon(
+                    Icons.chevron_right_rounded,
+                    size: 20,
+                    color: Color(0xFF50665B),
+                  ),
                 ),
               ],
             ),
@@ -252,7 +258,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
             children: [
               const Icon(
                 Icons.event_available_outlined,
-                color: Color(0xFF2563EB),
+                color: Color(0xFF17604E),
               ),
               const SizedBox(width: 9),
               const Expanded(
@@ -270,7 +276,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
           ),
           const Text(
             'Fechas pasadas, hoy y próximos 7 días. Importes en la moneda del pago.',
-            style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
+            style: TextStyle(color: Color(0xFF50665B), fontSize: 12),
           ),
           if (loading)
             const Padding(
@@ -318,7 +324,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
                   'el capital pendiente si no hay cuotas configuradas. Con un calendario vigente, muestra sus cuotas pendientes, sin sumarlas otra vez al capital. Los pagos cubiertos no aparecen como pendientes. '
                   'La agenda se calcula al actualizar el inicio y es independiente del mes del reporte.',
                   style: TextStyle(
-                    color: Color(0xFF64748B),
+                    color: Color(0xFF50665B),
                     fontSize: 12,
                     height: 1.5,
                   ),

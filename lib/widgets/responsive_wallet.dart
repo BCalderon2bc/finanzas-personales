@@ -81,53 +81,64 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
     return LayoutBuilder(
       builder: (context, box) {
         final mobile = box.maxWidth < 650;
+        // Fit complete cards across the available desktop width.
+        final desktopColumns =
+            ((box.maxWidth + 14) / (widget.desktopItemWidth + 14))
+                .round()
+                .clamp(2, 5)
+                .toInt();
+        final desktopWidth =
+            (box.maxWidth - 14 * (desktopColumns - 1)) / desktopColumns;
         final itemWidth = mobile && widget.items.length > 1
             ? (box.maxWidth * 0.87).clamp(0.0, 360.0).toDouble()
             : mobile
             ? box.maxWidth
-            : widget.desktopItemWidth;
+            : desktopWidth;
         itemExtent = itemWidth + 14;
         final index = visibleIndex.clamp(0, widget.items.length - 1).toInt();
         final activeId = '${widget.items[index]['id']}';
+        final cards = Row(
+          crossAxisAlignment: mobile
+              ? CrossAxisAlignment.start
+              : CrossAxisAlignment.stretch,
+          children: widget.items
+              .asMap()
+              .entries
+              .map(
+                (entry) => Padding(
+                  padding: EdgeInsets.only(
+                    right: entry.key == widget.items.length - 1 ? 0 : 14,
+                  ),
+                  child: SizedBox(
+                    width: itemWidth,
+                    child: _WalletItemExtent(
+                      key: ValueKey('measure-${entry.value['id']}'),
+                      id: '${entry.value['id']}',
+                      measurements: measurements,
+                      child: widget.itemBuilder(
+                        entry.value,
+                        '${entry.value['id']}' == widget.selectedId,
+                      ),
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+        );
         final strip = SingleChildScrollView(
           controller: controller,
           primary: false,
           physics: const ClampingScrollPhysics(),
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.only(bottom: 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: widget.items
-                .asMap()
-                .entries
-                .map(
-                  (entry) => Padding(
-                    padding: EdgeInsets.only(
-                      right: entry.key == widget.items.length - 1 ? 0 : 14,
-                    ),
-                    child: SizedBox(
-                      width: itemWidth,
-                      child: _WalletItemExtent(
-                        key: ValueKey('measure-${entry.value['id']}'),
-                        id: '${entry.value['id']}',
-                        measurements: measurements,
-                        child: widget.itemBuilder(
-                          entry.value,
-                          '${entry.value['id']}' == widget.selectedId,
-                        ),
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
+          child: mobile ? cards : IntrinsicHeight(child: cards),
         );
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
-                Icon(widget.icon, color: const Color(0xFF2563EB), size: 23),
+                Icon(widget.icon, color: const Color(0xFF17604E), size: 23),
                 const SizedBox(width: 9),
                 Expanded(
                   child: Text(
@@ -138,7 +149,7 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
                     ),
                   ),
                 ),
-                if (widget.items.length > 1) ...[
+                if (widget.items.length > (mobile ? 1 : desktopColumns)) ...[
                   IconButton(
                     tooltip: 'Anteriores',
                     onPressed: () => move(-1, itemWidth),
@@ -153,9 +164,11 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
               ],
             ),
             const SizedBox(height: 6),
-            const Text(
-              'Desliza para ver más. Toca una tarjeta para ver sus detalles.',
-              style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+            Text(
+              mobile
+                  ? 'Desliza para ver más. Toca una tarjeta para ver sus detalles.'
+                  : 'Selecciona una tarjeta para ver sus detalles.',
+              style: const TextStyle(color: Color(0xFF50665B), fontSize: 13),
             ),
             const SizedBox(height: 14),
             ClipRect(

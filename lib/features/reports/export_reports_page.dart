@@ -1,5 +1,5 @@
+import '../../widgets/page_intro.dart';
 import '../../widgets/adaptive_layout.dart';
-import 'dart:typed_data';
 import '../../data/exchange_rate.dart';
 import '../../data/financial_settings_repository.dart';
 import 'package:flutter/foundation.dart';
@@ -8,8 +8,11 @@ import 'package:flutter/services.dart';
 import 'package:file_saver/file_saver.dart';
 import '../../services/report_share.dart';
 import '../help/app_help.dart';
+import '../person_accounts/person_receipts_dialog.dart' show showFilePreview;
 import '../../data/export_report_models.dart';
 import '../../data/export_report_repository.dart';
+import '../../data/card_statement_repository.dart' show statementRows;
+import '../../data/payment_agenda_labels.dart' show agendaCardLabel;
 import '../../data/export_report_writer.dart';
 import '../../core/supabase_client.dart';
 import '../../utils/money.dart';
@@ -27,8 +30,10 @@ class ExportReportsPage extends StatefulWidget {
 class _ExportReportsPageState extends State<ExportReportsPage> {
   String kind = 'movements', currency = 'all';
   bool busy = false, loadingPeople = true, allHistory = true;
-  String? personId, peopleError, cardId;
-  List<Map<String, dynamic>> creditCards = [], debitCards = [];
+  String? personId, peopleError, cardId, accountId;
+  List<Map<String, dynamic>> creditCards = [],
+      debitCards = [],
+      bankAccounts = [];
   final reportOwner = TextEditingController();
   final settlementRate = TextEditingController();
 
@@ -48,6 +53,30 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
     loadPeople();
   }
 
+  String accountBankLabel(Map account) {
+    final institution = account['financial_institutions'];
+    final bank = institution is Map
+        ? institution['name']?.toString().trim() ?? ''
+        : '';
+    if (bank.isNotEmpty) return bank;
+    return account['account_type'] == 'cash' ? 'Efectivo' : 'Banco sin asignar';
+  }
+
+  String debitCardLabel(Map<String, dynamic> card) {
+    final account = card['accounts'];
+    final name = account is Map ? account['name'] : null;
+    final network = card['network']?.toString().trim() ?? '';
+    return agendaCardLabel({
+      'financial_institutions': {
+        'name': account is Map
+            ? accountBankLabel(account)
+            : 'Banco sin asignar',
+      },
+      'name': "${name ?? 'Cuenta'} · ${network.isEmpty ? 'Débito' : network}",
+      'card_reference': card['card_reference'],
+    });
+  }
+
   Future<void> loadPeople() async {
     setState(() {
       loadingPeople = true;
@@ -56,14 +85,21 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
     try {
       final uid = personUserId();
       final rows = await personRows('person_accounts', uid);
+      final accountRows = await statementRows(
+        'accounts',
+        'id,name,currency,account_type,financial_institutions(name)',
+        uid,
+      );
       final cardRows = await supabase
           .from('credit_cards')
-          .select('id,name')
+          .select('id,name,card_reference,financial_institutions(name)')
           .eq('user_id', uid)
           .order('name');
       final debitRows = await supabase
           .from('debit_cards')
-          .select('id,account_id,network,accounts(name)')
+          .select(
+            'id,network,card_reference,accounts(name,account_type,financial_institutions(name))',
+          )
           .eq('user_id', uid)
           .order('id');
       String? profileName;
@@ -97,6 +133,7 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
         if (settlementRate.text.trim().isEmpty && suggestedPaymentRate != null)
           settlementRate.text = suggestedPaymentRate;
         people = rows;
+        bankAccounts = accountRows;
         creditCards = List<Map<String, dynamic>>.from(cardRows);
         debitCards = List<Map<String, dynamic>>.from(debitRows);
         loadingPeople = false;
@@ -169,6 +206,7 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
           : await loadExportReport(
               kind: kind,
               cardId: cardId,
+              accountId: accountId,
               currency: currency,
               start: start,
               end: end,
@@ -178,10 +216,12 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
       Uint8List? pdfData;
       String? note;
       try {
-        final fonts = await Future.wait([
-          rootBundle.load('assets/fonts/DejaVuSans.ttf'),
-          rootBundle.load('assets/fonts/DejaVuSans-Bold.ttf'),
-        ]);
+        final regularFont = await rootBundle.load(
+          'assets/fonts/DejaVuSans.ttf',
+        );
+        final boldFont = await rootBundle.load(
+          'assets/fonts/DejaVuSans-Bold.ttf',
+        );
         Uint8List? logo;
         try {
           logo = (await rootBundle.load(
@@ -192,8 +232,8 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
         }
         pdfData = await reportPdf(
           result,
-          regularFont: fonts[0],
-          boldFont: fonts[1],
+          regularFont: regularFont,
+          boldFont: boldFont,
           logo: logo,
         );
       } catch (e) {
@@ -235,6 +275,25 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
         ? '_${selectedName.replaceAll(RegExp(r'[^a-zA-Z0-9_-]+'), '_')}'
         : '';
     return 'MiBillete_${kind}${suffix}_${date.year}${date.month.toString().padLeft(2, '0')}${date.day.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> preview(bool asPdf) async {
+    final bytes = asPdf ? pdf : excel;
+    if (bytes == null || busy || report == null) return;
+    if (supabase.auth.currentUser?.id != preparedUser) {
+      setState(clear);
+      message('La sesión cambió. Prepara el reporte nuevamente.');
+      return;
+    }
+    final extension = asPdf ? 'pdf' : 'xlsx';
+    final filename = '${exportName()}.$extension';
+    await showFilePreview(
+      context,
+      label: filename,
+      sourceName: filename,
+      load: () async => bytes,
+      expanded: true,
+    );
   }
 
   Future<void> save(bool asPdf) async {
@@ -361,6 +420,11 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
               spacing: 10,
               runSpacing: 10,
               children: [
+                OutlinedButton.icon(
+                  onPressed: busy || !available ? null : () => preview(asPdf),
+                  icon: const Icon(Icons.visibility_outlined),
+                  label: const Text('Vista previa'),
+                ),
                 FilledButton.icon(
                   onPressed: busy || !available ? null : () => save(asPdf),
                   icon: const Icon(Icons.download_outlined),
@@ -411,15 +475,12 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
             child: ListView(
               padding: EdgeInsets.all(pageGutter(context)),
               children: [
-                const Text(
-                  'Mi Billete',
-                  style: TextStyle(fontSize: 23, fontWeight: FontWeight.w700),
+                const PageIntro(
+                  icon: Icons.file_download_outlined,
+                  title: 'Prepara tu reporte',
+                  description:
+                      'Elige los datos que quieres descargar o compartir en PDF o Excel. Los importes conservan su moneda original.',
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Prepara el reporte y luego elige Descargar o Compartir en PDF o Excel. Los importes conservan su moneda original.',
-                ),
-                const SizedBox(height: 20),
                 GuideAnchor(
                   id: 'kind',
                   child: DropdownButtonFormField<String>(
@@ -439,8 +500,19 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                         ),
                       ),
                       DropdownMenuItem(
+                        value: 'accounts',
+                        child: Text('Cuentas y efectivo'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'credit_card_expenses',
+                        child: Text('Gastos de tarjetas de crédito'),
+                      ),
+                      DropdownMenuItem(
                         value: 'credit_cards',
-                        child: Text('Tarjetas de crédito'),
+                        child: Text(
+                          'Tarjetas de crédito · movimientos y totales',
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                       DropdownMenuItem(
                         value: 'debit_cards',
@@ -465,6 +537,7 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                               setState(() {
                                 kind = v;
                                 cardId = null;
+                                accountId = null;
                                 if (v == 'movements') {
                                   final today = DateUtils.dateOnly(
                                     DateTime.now(),
@@ -514,7 +587,9 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                     ),
                   ),
                 const SizedBox(height: 14),
-                if (kind == 'credit_cards' || kind == 'debit_cards') ...[
+                if (kind == 'credit_cards' ||
+                    kind == 'credit_card_expenses' ||
+                    kind == 'debit_cards') ...[
                   DropdownButtonFormField<String>(
                     key: ValueKey('report-card-$kind-$cardId'),
                     initialValue: cardId ?? '',
@@ -522,17 +597,22 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                     decoration: const InputDecoration(labelText: 'Tarjeta'),
                     items: [
                       const DropdownMenuItem(value: '', child: Text('Todas')),
-                      ...(kind == 'credit_cards' ? creditCards : debitCards).map(
-                        (card) => DropdownMenuItem(
-                          value: '${card['id']}',
-                          child: Text(
-                            kind == 'credit_cards'
-                                ? '${card['name']}'
-                                : '${card['accounts'] is Map ? card['accounts']['name'] : 'Cuenta'} · ${card['network'] ?? 'Débito'}',
-                            overflow: TextOverflow.ellipsis,
+                      ...((kind == 'credit_cards' ||
+                                  kind == 'credit_card_expenses')
+                              ? creditCards
+                              : debitCards)
+                          .map(
+                            (card) => DropdownMenuItem(
+                              value: '${card['id']}',
+                              child: Text(
+                                (kind == 'credit_cards' ||
+                                        kind == 'credit_card_expenses')
+                                    ? agendaCardLabel(card)
+                                    : debitCardLabel(card),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
                     ],
                     onChanged: busy
                         ? null
@@ -546,6 +626,36 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                     const Text(
                       'Se muestran todos los movimientos de la cuenta vinculada; una cuenta con varias tarjetas se suma una sola vez.',
                     ),
+                ],
+                if (kind == 'accounts') ...[
+                  DropdownButtonFormField<String>(
+                    key: ValueKey('report-account-$accountId'),
+                    initialValue: accountId ?? '',
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Cuenta'),
+                    items: [
+                      const DropdownMenuItem(
+                        value: '',
+                        child: Text('Todas las cuentas'),
+                      ),
+                      ...bankAccounts.map(
+                        (a) => DropdownMenuItem(
+                          value: '${a['id']}',
+                          child: Text(
+                            '${accountBankLabel(a)} · ${a['name']} · ${a['currency']}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ],
+                    onChanged: busy
+                        ? null
+                        : (value) => setState(() {
+                            accountId = value == '' ? null : value;
+                            clear();
+                          }),
+                  ),
+                  const SizedBox(height: 12),
                 ],
                 if (kind == 'person') ...[
                   GuideAnchor(
@@ -638,6 +748,8 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                 ],
                 if (kind == 'movements' ||
                     kind == 'credit_cards' ||
+                    kind == 'credit_card_expenses' ||
+                    kind == 'accounts' ||
                     kind == 'debit_cards' ||
                     kind == 'person' && !allHistory)
                   OutlinedButton.icon(
@@ -812,7 +924,7 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                     padding: EdgeInsets.only(top: 10),
                     child: Text(
                       'En la web, el navegador gestiona la descarga. Compartir muestra los destinos disponibles en tu dispositivo.',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                      style: TextStyle(fontSize: 12, color: Color(0xFF50665B)),
                     ),
                   ),
                   if (pdfNotice != null)
@@ -828,7 +940,7 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                         n,
                         style: const TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF64748B),
+                          color: Color(0xFF50665B),
                         ),
                       ),
                     ),

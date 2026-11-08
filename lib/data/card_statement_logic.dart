@@ -28,6 +28,61 @@ DateTime nextCalendarDay(int day, DateTime today) {
       : inMonth(today.year, today.month + 1);
 }
 
+bool isCurrentStatement(Map<String, dynamic> row) =>
+    row['is_archived'] != true && row['is_voided'] != true;
+
+/// Pairs separately saved currencies when they describe the same cut.
+/// Each row keeps its own ID for payments, edits and existing documents.
+List<List<Map<String, dynamic>>> groupCardStatements(
+  Iterable<Map<String, dynamic>> rows,
+) {
+  final documents = <(Object?, Object?), List<Map<String, dynamic>>>{};
+  for (final row in rows) {
+    final key = (row['credit_card_id'], row['statement_group_id'] ?? row['id']);
+    documents.putIfAbsent(key, () => []).add(row);
+  }
+
+  final result = <List<Map<String, dynamic>>>[];
+  final byDates =
+      <(Object?, Object?, Object?, Object?), List<Map<String, dynamic>>>{};
+  for (final group in documents.values) {
+    final row = group.first;
+    if (group.length != 1 ||
+        row['is_voided'] == true ||
+        (row['currency'] != 'NIO' && row['currency'] != 'USD')) {
+      result.add(group);
+      continue;
+    }
+    final dates = (
+      row['credit_card_id'],
+      row['closing_date'],
+      row['due_date'],
+      row['bonus_payment_date'],
+    );
+    byDates.putIfAbsent(dates, () => []).add(row);
+  }
+  for (final candidates in byDates.values) {
+    if (candidates.length == 2 &&
+        candidates.first['currency'] != candidates.last['currency']) {
+      result.add(candidates);
+    } else {
+      result.addAll(candidates.map((row) => [row]));
+    }
+  }
+  for (final group in result) {
+    group.sort((a, b) => '${a['currency']}'.compareTo('${b['currency']}'));
+  }
+  result.sort((a, b) {
+    final byDate = '${b.first['closing_date']}'.compareTo(
+      '${a.first['closing_date']}',
+    );
+    return byDate == 0
+        ? '${a.first['id']}'.compareTo('${b.first['id']}')
+        : byDate;
+  });
+  return result;
+}
+
 class StatementProgress {
   const StatementProgress({
     required this.statement,

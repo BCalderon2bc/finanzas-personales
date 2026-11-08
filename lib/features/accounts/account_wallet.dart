@@ -34,9 +34,21 @@ class AccountWallet extends StatelessWidget {
           child: InkWell(
             borderRadius: BorderRadius.circular(24),
             onTap: onSelected == null ? null : () => onSelected!(id),
-            child: AccountCard(
-              account: {...account, 'notes': null, 'account_reference': null},
-              balanceCents: balances[id] ?? 0,
+            child: DecoratedBox(
+              position: DecorationPosition.foreground,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                border: selected
+                    ? Border.all(color: Colors.white, width: 3)
+                    : null,
+              ),
+              child: AccountCard(
+                account: {...account, 'notes': null, 'account_reference': null},
+                balanceCents: balances[id] ?? 0,
+                balanceLabel: selected
+                    ? 'Seleccionada · Saldo registrado'
+                    : 'Saldo registrado',
+              ),
             ),
           ),
         ),

@@ -1,3 +1,4 @@
+import 'zero_plans_page.dart';
 import '../person_accounts/receipt_draft_field.dart';
 import '../help/app_help.dart';
 import 'dart:convert';
@@ -7,8 +8,11 @@ import 'package:flutter/material.dart';
 import '../person_accounts/person_receipts_dialog.dart';
 import '../../core/supabase_client.dart';
 import '../../utils/money.dart';
+import '../../widgets/adaptive_layout.dart';
 import '../../data/card_statement_repository.dart';
+import '../../data/card_statement_pdf.dart';
 import 'credit_card_statement_form.dart';
+import 'credit_card_face.dart';
 import 'credit_card_payment_dialog.dart';
 import 'credit_card_balances.dart';
 
@@ -37,6 +41,7 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
   String? error;
   int requestId = 0;
   String get cardId => '${widget.card['id']}';
+  String get bank => cardBankKey(cardBankName(widget.card));
   @override
   void initState() {
     super.initState();
@@ -110,31 +115,76 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
     }
   }
 
+  String documentId(Map<String, dynamic> statement) =>
+      '${statement['statement_group_id'] ?? statement['id']}';
+
   Future<void> edit([Map<String, dynamic>? statement]) =>
       perform((userId) async {
+        final editable = statement == null
+            ? <Map<String, dynamic>>[]
+            : [
+                statement,
+                for (final row in data!.statements)
+                  if (row['id'] != statement['id'] &&
+                      row['credit_card_id'] == statement['credit_card_id'] &&
+                      documentId(row) == documentId(statement) &&
+                      row['is_archived'] != true &&
+                      row['is_voided'] != true)
+                    row,
+              ];
         final result = await showDialog<Map<String, dynamic>>(
           context: context,
-          builder: (_) => CreditCardStatementForm(statement: statement),
+          builder: (_) => CreditCardStatementForm(
+            statements: editable,
+            bank: bank,
+            cardReference: widget.card['card_reference']?.toString(),
+          ),
         );
-        if (result == null || !mounted) {
-          return;
-        }
+        if (result == null || !mounted) return;
         sameOwner(userId);
-        await supabase.rpc(
-          'save_credit_card_statement',
+        final folderId = await supabase.rpc(
+          'save_credit_card_statement_with_overdue',
           params: {
             'p_card_id': cardId,
-            'p_currency': result['currency'],
             'p_closing_date': result['closing_date'],
+            'p_bonus_payment_date': result['bonus_payment_date'],
             'p_due_date': result['due_date'],
-            'p_balance': result['balance'],
-            'p_minimum': result['minimum'],
             'p_notes': result['notes'],
-            'p_statement_id': statement?['id'],
+            'p_rows': result['rows'],
+            'p_edit_id': statement?['id'],
           },
+        );
+        if (!mounted) return;
+        sameOwner(userId);
+        await attachFinancialReceipt(
+          context,
+          result[receiptDraftKey] as PendingReceipt?,
+          userId,
+          'credit_card_statements',
+          folderId,
         );
         message('Estado de cuenta guardado.');
       });
+
+  Future<void> openStatementFiles(List<Map<String, dynamic>> group) {
+    final documents = <String, bool>{};
+    for (final row in group) {
+      final id = documentId(row);
+      documents[id] = documents[id] == true || row['is_voided'] != true;
+    }
+    final target =
+        group.where(isCurrentStatement).firstOrNull ??
+        group.where((row) => row['is_voided'] != true).firstOrNull ??
+        group.first;
+    return showDialog<void>(
+      context: context,
+      builder: (_) => PersonReceiptsDialog.statement(
+        entryId: documentId(target),
+        statementDocuments: documents,
+      ),
+    );
+  }
+
   Future<void> credit(Map<String, dynamic> s) => perform((userId) async {
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -334,8 +384,8 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
       false;
   Future<void> voidStatement(Map<String, dynamic> s) => perform((userId) async {
     final yes = await confirm(
-      'Anular estado de cuenta',
-      'Se conserva el registro en el historial. No se anulan pagos ni cambia la deuda real de la tarjeta.',
+      'Anular corte en ${currencyName(s)}',
+      'Esta moneda pasará al historial. Los pagos registrados siguen aplicados a la deuda de la tarjeta.',
     );
     if (!yes || !mounted) {
       return;
@@ -346,9 +396,115 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
       params: {'p_statement_id': s['id']},
     );
   });
-  Widget statementCard(Map<String, dynamic> s) {
+  String currencyName(Map<String, dynamic> row) => switch (row['currency']) {
+    'NIO' => 'córdobas',
+    'USD' => 'dólares',
+    final value => '$value',
+  };
+
+  Widget dates(Map<String, dynamic> row) => Wrap(
+    spacing: 20,
+    runSpacing: 4,
+    children: [
+      Text('Corte · ${shortStatementDate(row['closing_date'])}'),
+      Text('Fecha máxima de pago · ${shortStatementDate(row['due_date'])}'),
+      if (row['bonus_payment_date'] != null)
+        Text(
+          'Para bonificar · ${shortStatementDate(row['bonus_payment_date'])}',
+        ),
+    ],
+  );
+
+  Widget statementCard(
+    List<Map<String, dynamic>> group,
+    List<Map<String, dynamic>> visible,
+  ) {
+    final first = visible.first;
+    final current = visible.where(isCurrentStatement).toList();
+    final sharedDates = visible.every(
+      (row) =>
+          row['closing_date'] == first['closing_date'] &&
+          row['due_date'] == first['due_date'] &&
+          row['bonus_payment_date'] == first['bonus_payment_date'],
+    );
+    final sharedNotes = visible.every((row) => row['notes'] == first['notes']);
+    final sharedEdit =
+        current.isNotEmpty &&
+        current.every((row) => documentId(row) == documentId(current.first));
+    final note = first['notes']?.toString().trim() ?? '';
+    return Card(
+      key: ValueKey(documentId(group.first)),
+      margin: const EdgeInsets.only(bottom: 14),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Estado de cuenta',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            if (sharedDates) ...[const SizedBox(height: 6), dates(first)],
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: saving ? null : () => openStatementFiles(group),
+                  icon: const Icon(Icons.attach_file),
+                  label: const Text('Documento del banco'),
+                ),
+                if (sharedEdit)
+                  TextButton.icon(
+                    onPressed: saving ? null : () => edit(current.first),
+                    icon: const Icon(Icons.edit_outlined),
+                    label: Text(
+                      group.length == current.length
+                          ? 'Editar corte'
+                          : 'Editar ${currencyName(current.first)}',
+                    ),
+                  ),
+              ],
+            ),
+            if (sharedNotes && note.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text('Notas · $note'),
+              ),
+            const SizedBox(height: 14),
+            AdaptiveColumns(
+              minColumnWidth: 330,
+              children: [
+                for (final row in visible)
+                  currencyPanel(
+                    row,
+                    showDates: !sharedDates,
+                    showNotes: !sharedNotes,
+                    editSeparately: !sharedEdit,
+                    showPlanLink: row == first,
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget currencyPanel(
+    Map<String, dynamic> s, {
+    required bool showDates,
+    required bool showNotes,
+    required bool editSeparately,
+    required bool showPlanLink,
+  }) {
     final p = data!.progress(s), currency = '${s['currency']}';
-    final current = s['is_voided'] != true && s['is_archived'] != true;
+    final balanceCaption = switch (bank) {
+      'avanz' => 'Pago de contado informado',
+      'bac' || 'ficohsa' || 'lafise' => 'Importe registrado del corte',
+      _ => 'Saldo al corte',
+    };
+    final current = isCurrentStatement(s);
     final status = s['is_voided'] == true
         ? 'Anulado'
         : s['is_archived'] == true
@@ -359,56 +515,94 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
     final links = data!.links.where(
       (l) => '${l['statement_id']}' == '${s['id']}',
     );
-    return Card(
+    final theme = Theme.of(context);
+    final name = currencyName(s);
+    return DecoratedBox(
+      key: ValueKey(s['id']),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              '$currency · $status',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${name[0].toUpperCase()}${name.substring(1)} · $currency',
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      Text(status, style: theme.textTheme.bodySmall),
+                    ],
+                  ),
+                ),
+                if (current)
+                  PopupMenuButton<VoidCallback>(
+                    tooltip: 'Más acciones en $name',
+                    enabled: !saving,
+                    onSelected: (action) => action(),
+                    itemBuilder: (_) => [
+                      PopupMenuItem<VoidCallback>(
+                        value: () => assign(s),
+                        child: const Text('Vincular pago existente'),
+                      ),
+                      PopupMenuItem<VoidCallback>(
+                        value: () => credit(s),
+                        child: const Text('Aplicar reversión'),
+                      ),
+                      if (editSeparately)
+                        PopupMenuItem<VoidCallback>(
+                          value: () => edit(s),
+                          child: const Text('Editar esta moneda'),
+                        ),
+                      PopupMenuItem<VoidCallback>(
+                        value: () => voidStatement(s),
+                        child: const Text('Anular esta moneda'),
+                      ),
+                    ],
+                  ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text('Corte: ${shortStatementDate(s['closing_date'])}'),
-            Text('Vence: ${shortStatementDate(s['due_date'])}'),
-            const Divider(height: 24),
-            Text('Saldo al corte: ${cardMoney(p.balance, currency)}'),
+            const SizedBox(height: 12),
+            Text('Mínimo pendiente', style: theme.textTheme.bodyMedium),
             Text(
-              'Mínimo informado: ${s['minimum_due'] == null ? 'Sin registrar' : cardMoney(moneyCents(s['minimum_due']), currency)}',
-            ),
-            Text('Pagos vinculados: ${cardMoney(p.paid, currency)}'),
-            if (p.balanceCredit > 0)
-              Text(
-                'Reversiones aplicadas al saldo: ${cardMoney(p.balanceCredit, currency)}',
+              s['minimum_due'] == null
+                  ? 'Sin registrar'
+                  : cardMoney(p.minimumRemaining, currency),
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w700,
               ),
-            if (p.minimumCredit > 0)
-              Text(
-                'Reversiones aplicadas al mínimo: ${cardMoney(p.minimumCredit, currency)}',
-              ),
-            const SizedBox(height: 8),
-            Text(
-              'Pendiente del período: ${cardMoney(p.remaining, currency)}',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
             ),
+            if (showDates) ...[const SizedBox(height: 8), dates(s)],
+            const SizedBox(height: 8),
+            Text('$balanceCaption · ${cardMoney(p.balance, currency)}'),
             Text(
-              'Mínimo pendiente: ${s['minimum_due'] == null ? 'Sin registrar' : cardMoney(p.minimumRemaining, currency)}',
+              'Saldo pendiente · ${cardMoney(p.remaining, currency)}',
+              style: theme.textTheme.bodySmall,
             ),
             if (!p.known)
-              const Text(
-                'Hay un vínculo que requiere revisión. No se presenta como pagado.',
-                style: TextStyle(color: Color(0xFFB42318)),
+              Text(
+                'Revisa los pagos o reversiones vinculados a esta moneda.',
+                style: TextStyle(color: theme.colorScheme.error),
               ),
             if (p.excessLinked > 0)
               Text(
-                'Pagos vinculados por encima del saldo al corte: ${cardMoney(p.excessLinked, currency)}.',
+                'Pagos por encima del saldo del corte · ${cardMoney(p.excessLinked, currency)}',
               ),
-            if ((s['notes']?.toString() ?? '').isNotEmpty)
+            if (showNotes && (s['notes']?.toString().trim() ?? '').isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: Text('${s['notes']}'),
+                child: Text('Notas · ${s['notes']}'),
               ),
-            if (current) ...[
+            if (current &&
+                ((p.minimumRemaining ?? 0) > 0 || (p.remaining ?? 0) > 0)) ...[
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
@@ -424,28 +618,52 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
                   if (p.remaining != null && p.remaining! > 0)
                     FilledButton(
                       onPressed: saving ? null : () => pay(s, p.remaining!),
-                      child: const Text('Pagar saldo al corte'),
+                      child: const Text('Pagar pendiente'),
                     ),
-                  TextButton(
-                    onPressed: saving ? null : () => assign(s),
-                    child: const Text('Vincular pago existente'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: saving ? null : () => credit(s),
-                    icon: const Icon(Icons.undo),
-                    label: const Text('Aplicar reversión'),
-                  ),
-                  TextButton(
-                    onPressed: saving ? null : () => edit(s),
-                    child: const Text('Editar corte'),
-                  ),
-                  TextButton(
-                    onPressed: saving ? null : () => voidStatement(s),
-                    child: const Text('Anular corte'),
-                  ),
                 ],
               ),
             ],
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              childrenPadding: const EdgeInsets.only(bottom: 8),
+              expandedCrossAxisAlignment: CrossAxisAlignment.start,
+              title: const Text('Desglose del corte'),
+              children: [
+                Text(
+                  'Mínimo informado · ${s['minimum_due'] == null ? 'Sin registrar' : cardMoney(moneyCents(s['minimum_due']), currency)}',
+                ),
+                if (statementShowsOverdue(bank) && s['overdue_due'] != null)
+                  Text(
+                    'Pago atrasado informado · ${cardMoney(moneyCents(s['overdue_due']), currency)}',
+                  ),
+                Text('Pagos vinculados · ${cardMoney(p.paid, currency)}'),
+                if (p.balanceCredit > 0)
+                  Text(
+                    'Reversiones al saldo · ${cardMoney(p.balanceCredit, currency)}',
+                  ),
+                if (p.minimumCredit > 0)
+                  Text(
+                    'Reversiones al mínimo · ${cardMoney(p.minimumCredit, currency)}',
+                  ),
+                if (showPlanLink)
+                  TextButton.icon(
+                    onPressed: saving
+                        ? null
+                        : () async {
+                            await Navigator.push<void>(
+                              context,
+                              MaterialPageRoute<void>(
+                                builder: (_) =>
+                                    ZeroPlansPage(card: widget.card),
+                              ),
+                            );
+                            if (mounted) await load();
+                          },
+                    icon: const Icon(Icons.calendar_month_outlined),
+                    label: const Text('Ver cuotas y planes tasa cero'),
+                  ),
+              ],
+            ),
             if (data!.credits.any(
               (c) => '${c['statement_id']}' == '${s['id']}',
             ))
@@ -540,19 +758,20 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final rows =
-        data?.statements
-            .where(
-              (s) =>
-                  '${s['credit_card_id']}' == cardId &&
-                  (showHistory ||
-                      (s['is_voided'] != true && s['is_archived'] != true)),
-            )
-            .toList() ??
-        <Map<String, dynamic>>[];
-    rows.sort(
-      (a, b) => '${b['closing_date']}'.compareTo('${a['closing_date']}'),
+    final groups = groupCardStatements(
+      (data?.statements ?? const <Map<String, dynamic>>[]).where(
+        (row) => '${row['credit_card_id']}' == cardId,
+      ),
     );
+    final visibleGroups = [
+      for (final group in groups)
+        (
+          group: group,
+          visible: showHistory
+              ? group
+              : group.where(isCurrentStatement).toList(),
+        ),
+    ].where((entry) => entry.visible.isNotEmpty);
     return GuideScope(
       topic: 'statements',
       ready: !loading && error == null,
@@ -572,7 +791,7 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
           top: false,
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 800),
+              constraints: const BoxConstraints(maxWidth: 920),
               child: loading
                   ? const Center(child: CircularProgressIndicator())
                   : error != null
@@ -603,8 +822,8 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
                           GuideAnchor(
                             id: 'explanation',
                             child: const Text(
-                              'La deuda total cambia con los movimientos. El saldo al corte y el mínimo se copian del banco. '
-                              'Registrar un corte no vuelve a cargar ese saldo a la tarjeta.',
+                              'Cada corte reúne el documento del banco y sus montos en córdobas y dólares. '
+                              'Debajo verás cuánto queda por pagar en cada moneda.',
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -629,14 +848,17 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
                               onChanged: (v) => setState(() => showHistory = v),
                             ),
                           ),
-                          if (rows.isEmpty)
-                            const Padding(
-                              padding: EdgeInsets.all(20),
+                          if (visibleGroups.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.all(20),
                               child: Text(
-                                'Aún no hay estados de cuenta registrados.',
+                                groups.isEmpty
+                                    ? 'Aún no hay estados de cuenta registrados.'
+                                    : 'No hay cortes vigentes. Activa el historial para ver los anteriores.',
                               ),
                             ),
-                          ...rows.map(statementCard),
+                          for (final (:group, :visible) in visibleGroups)
+                            statementCard(group, visible),
                           const Padding(
                             padding: EdgeInsets.symmetric(vertical: 16),
                             child: Text(
@@ -644,7 +866,7 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
                               'Usa Aplicar reversión con las reducciones confirmadas por el banco. El saldo y mínimo informados conservan sus importes originales; no descuentes de nuevo esas reducciones al editar el corte. '
                               'Cubrir el mínimo no significa liquidar la deuda ni garantiza evitar intereses.',
                               style: TextStyle(
-                                color: Color(0xFF64748B),
+                                color: Color(0xFF50665B),
                                 fontSize: 12,
                                 height: 1.5,
                               ),

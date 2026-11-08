@@ -26,9 +26,9 @@ class CreditCardDetails extends StatelessWidget {
       onPlans;
   @override
   Widget build(BuildContext context) {
-    const blue = Color(0xFF2563EB),
-        green = Color(0xFF087F5B),
-        muted = Color(0xFF64748B);
+    const blue = Color(0xFF17604E),
+        green = Color(0xFF14684D),
+        muted = Color(0xFF50665B);
     final active = card['is_active'] == true;
     final base = card['currency'].toString();
     final limit = moneyCents(card['credit_limit']);
@@ -191,7 +191,7 @@ class CreditCardDetails extends StatelessWidget {
                       : 0,
                   color: color,
                   minHeight: 9,
-                  backgroundColor: const Color(0xFFE2E8F0),
+                  backgroundColor: const Color(0xFFD9E3DA),
                 ),
               ),
               const SizedBox(height: 8),

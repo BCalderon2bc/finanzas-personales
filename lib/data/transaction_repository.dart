@@ -10,7 +10,7 @@ Future<List<Map<String, dynamic>>> loadUserTransactions(String userId) async {
         .from('transactions')
         .select(
           'id, account_id, destination_account_id, category_id, transaction_type, amount, '
-          'currency, transaction_date, description, reference, is_reconciled, created_at',
+          'currency, expense_kind, transaction_date, description, reference, is_reconciled, created_at',
         )
         .eq('user_id', userId)
         .order('created_at', ascending: false)

@@ -1,6 +1,7 @@
 import '../../widgets/adaptive_layout.dart';
 import 'package:flutter/material.dart';
 import 'transaction_filter.dart';
+import '../person_accounts/receipt_history.dart';
 
 class TransactionFiltersBar extends StatefulWidget {
   const TransactionFiltersBar({
@@ -8,10 +9,14 @@ class TransactionFiltersBar extends StatefulWidget {
     required this.accounts,
     required this.value,
     required this.onChanged,
+    this.receiptFilter,
+    this.onReceiptChanged,
   });
   final List<Map<String, dynamic>> accounts;
   final TransactionFilter value;
   final ValueChanged<TransactionFilter> onChanged;
+  final ReceiptFilter? receiptFilter;
+  final ValueChanged<ReceiptFilter>? onReceiptChanged;
   @override
   State<TransactionFiltersBar> createState() => _TransactionFiltersBarState();
 }
@@ -100,6 +105,25 @@ class _TransactionFiltersBarState extends State<TransactionFiltersBar> {
     return 'Todas las fechas';
   }
 
+  static const typeLabels = {
+    'all': 'Todos',
+    'income': 'Ingresos',
+    'expense': 'Gastos',
+    'insurance': 'Seguro de tarjeta',
+    'transfer': 'Transferencias',
+    'deposit': 'Depósitos',
+    'withdrawal': 'Retiros',
+    'card_payment': 'Pagos de tarjeta',
+    'debt_payment': 'Abonos de deudas',
+    'adjustment': 'Ajustes',
+  };
+
+  Widget removable(String label, VoidCallback clear) => InputChip(
+    label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+    deleteButtonTooltipMessage: 'Quitar filtro: $label',
+    onDeleted: clear,
+  );
+
   @override
   Widget build(BuildContext context) {
     final accountId = filter.accountId;
@@ -111,6 +135,44 @@ class _TransactionFiltersBarState extends State<TransactionFiltersBar> {
         : filter.reconciled == true
         ? 'reconciled'
         : 'pending';
+
+    final receipt = widget.receiptFilter;
+    final activeReceipt = receipt != null && receipt != ReceiptFilter.all;
+    final accountName = widget.accounts
+        .where((a) => '${a['id']}' == accountId)
+        .firstOrNull?['name'];
+    final chips = [
+      if (filter.query.trim().isNotEmpty)
+        removable(
+          'Búsqueda: ${filter.query.trim()}',
+          () => widget.onChanged(filter.copyWith(query: '')),
+        ),
+      if (filter.type != 'all')
+        removable(
+          typeLabels[filter.type] ?? filter.type,
+          () => widget.onChanged(filter.copyWith(type: 'all')),
+        ),
+      if (accountId != null)
+        removable(
+          '${accountName ?? 'Cuenta no disponible'}',
+          () => widget.onChanged(filter.copyWith(clearAccount: true)),
+        ),
+      if (filter.start != null || filter.end != null)
+        removable(
+          dateLabel,
+          () => widget.onChanged(filter.copyWith(clearDates: true)),
+        ),
+      if (filter.reconciled != null)
+        removable(
+          filter.reconciled == true ? 'Conciliados' : 'Por conciliar',
+          () => widget.onChanged(filter.copyWith(clearReconciled: true)),
+        ),
+      if (activeReceipt)
+        removable(
+          receipt.label,
+          () => widget.onReceiptChanged?.call(ReceiptFilter.all),
+        ),
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -143,25 +205,9 @@ class _TransactionFiltersBarState extends State<TransactionFiltersBar> {
               decoration: const InputDecoration(
                 labelText: 'Tipo de movimiento',
               ),
-              items: const [
-                DropdownMenuItem(value: 'all', child: Text('Todos')),
-                DropdownMenuItem(value: 'income', child: Text('Ingresos')),
-                DropdownMenuItem(value: 'expense', child: Text('Gastos')),
-                DropdownMenuItem(
-                  value: 'transfer',
-                  child: Text('Transferencias'),
-                ),
-                DropdownMenuItem(value: 'deposit', child: Text('Depósitos')),
-                DropdownMenuItem(value: 'withdrawal', child: Text('Retiros')),
-                DropdownMenuItem(
-                  value: 'card_payment',
-                  child: Text('Pagos de tarjeta'),
-                ),
-                DropdownMenuItem(
-                  value: 'debt_payment',
-                  child: Text('Abonos de deudas'),
-                ),
-                DropdownMenuItem(value: 'adjustment', child: Text('Ajustes')),
+              items: [
+                for (final type in typeLabels.entries)
+                  DropdownMenuItem(value: type.key, child: Text(type.value)),
               ],
               onChanged: (value) {
                 if (value != null) {
@@ -241,31 +287,41 @@ class _TransactionFiltersBarState extends State<TransactionFiltersBar> {
           ],
         ),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 6,
-          crossAxisAlignment: WrapCrossAlignment.center,
+        AdaptiveColumns(
+          minColumnWidth: 235,
           children: [
             OutlinedButton.icon(
               onPressed: chooseDates,
               icon: const Icon(Icons.date_range),
               label: Text(dateLabel),
             ),
-            if (filter.start != null || filter.end != null)
-              IconButton(
-                tooltip: 'Quitar fechas',
-                icon: const Icon(Icons.close_rounded),
-                onPressed: () =>
-                    widget.onChanged(filter.copyWith(clearDates: true)),
-              ),
-            if (filter.isActive)
-              TextButton.icon(
-                onPressed: () => widget.onChanged(const TransactionFilter()),
-                icon: const Icon(Icons.filter_alt_off_outlined, size: 18),
-                label: const Text('Limpiar filtros'),
+            if (receipt != null && widget.onReceiptChanged != null)
+              ReceiptFilterField(
+                key: ValueKey(receipt),
+                value: receipt,
+                onChanged: widget.onReceiptChanged!,
               ),
           ],
         ),
+        if (chips.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              ...chips,
+              TextButton(
+                onPressed: () {
+                  widget.onChanged(const TransactionFilter());
+                  if (activeReceipt)
+                    widget.onReceiptChanged?.call(ReceiptFilter.all);
+                },
+                child: const Text('Limpiar filtros'),
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }

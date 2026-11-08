@@ -1,6 +1,8 @@
+import '../../widgets/page_intro.dart';
 import 'package:flutter/material.dart';
 import 'interactive_guide.dart';
 import 'guide_destinations.dart';
+import 'movement_practice_page.dart';
 export 'interactive_guide.dart';
 
 const appHelp = <String, (String, String)>{
@@ -40,13 +42,17 @@ const appHelp = <String, (String, String)>{
     'Cuentas con personas',
     'Registra compras, pagos y saldos anteriores entre tú y otra persona.\n\nSaldo positivo: tú le debes a esa persona. Saldo negativo: esa persona te debe a ti. El reporte utiliza ambos nombres para indicar quién paga y quién recibe.\n\nLos movimientos en dólares conservan su tasa registrada; el saldo neto del módulo se expresa en córdobas. Un cierre conserva una revisión del historial; los movimientos incluidos quedan protegidos. Las correcciones posteriores se registran después del cierre.',
   ),
+  'recurring': (
+    'Gastos fijos y suscripciones',
+    'Los gastos fijos tienen un monto previsto y una casilla de pagado para cada mes. Los gastos variables, como gasolina, muestran el acumulado que escribas manualmente. Usa Actualizar acumulado y escribe el total que llevas gastado. Cada mes guarda su importe.\n\nPara tus registros contables, ingresa los gastos y comprobantes en Movimientos.',
+  ),
   'budgets': (
     'Presupuestos y categorías',
-    'Un presupuesto limita gastos de una categoría durante un mes y en una moneda. Las categorías ayudan a ordenar ingresos y gastos.\n\nCompara gasto neto con límite. Las devoluciones reducen el gasto correspondiente. Los dólares y córdobas se comparan por separado. Crear un presupuesto no mueve dinero de tus cuentas.',
+    'Un presupuesto limita gastos de una categoría entre una fecha inicial y una fecha final, en su moneda. Las categorías ayudan a ordenar ingresos y gastos.\n\nCompara gasto neto con límite. Las devoluciones reducen el gasto correspondiente. Los dólares y córdobas se comparan por separado. Crear un presupuesto no mueve dinero de tus cuentas.',
   ),
   'reports': (
     'Reportes, descargar y compartir',
-    'Elige tipo, moneda y fechas; luego pulsa Preparar reportes. Después puedes Descargar o Compartir el PDF y el Excel.\n\nCrédito: muestra deuda por tarjeta, con compras, pagos y reembolsos. Débito: muestra los movimientos de la cuenta vinculada; no identifica qué tarjeta física se usó. Si varias tarjetas apuntan a la misma cuenta, el total se cuenta una sola vez.\n\nLos reportes conservan la moneda original. En cuentas con personas, los importes tienen signo y Total suma/resta en córdobas. El recuadro indica alternativas de pago en córdobas o dólares usando la tasa que elijas. En tarjetas, Saldo incluye apertura y movimientos anteriores al período.\n\nPara compartir en iPhone, abre la web en Safari mediante HTTPS y pulsa Compartir después de preparar el archivo. Si el navegador no admite compartir archivos, descárgalo y compártelo desde Archivos. Cancelar la hoja de compartir no envía nada.',
+    'Elige tipo, moneda y fechas; luego pulsa Preparar reportes. Después puedes Descargar o Compartir el PDF y el Excel.\n\nGastos de tarjetas: muestra compras, intereses, seguros y otros cargos, menos reembolsos; permite elegir todas o una tarjeta. Crédito: muestra deuda por tarjeta, con compras, pagos y reembolsos. Cuentas y efectivo: permite elegir todas o una cuenta. Débito: muestra los movimientos de la cuenta vinculada; no identifica qué tarjeta física se usó. Si varias tarjetas apuntan a la misma cuenta, el total se cuenta una sola vez.\n\nLos reportes conservan la moneda original. En cuentas con personas, los importes tienen signo y Total suma/resta en córdobas. El recuadro indica alternativas de pago en córdobas o dólares usando la tasa que elijas. En tarjetas, Saldo incluye apertura y movimientos anteriores al período.\n\nPara compartir en iPhone, abre la web en Safari mediante HTTPS y pulsa Compartir después de preparar el archivo. Si el navegador no admite compartir archivos, descárgalo y compártelo desde Archivos. Cancelar la hoja de compartir no envía nada.',
   ),
   'settings': (
     'Configuración y tasas',
@@ -73,41 +79,58 @@ class AppHelpButton extends StatelessWidget {
           final action = await showModalBottomSheet<String>(
             context: context,
             builder: (ctx) => SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (scope != null)
-                    ListTile(
-                      leading: const Icon(Icons.explore_outlined),
-                      title: const Text('Guía interactiva'),
-                      subtitle: const Text(
-                        'Continuar el recorrido paso a paso',
+              child: SingleChildScrollView(
+                primary: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (scope != null)
+                      ListTile(
+                        leading: const Icon(Icons.explore_outlined),
+                        title: const Text('Guía interactiva'),
+                        subtitle: const Text(
+                          'Continuar el recorrido paso a paso',
+                        ),
+                        onTap: () => Navigator.pop(ctx, 'guide'),
                       ),
-                      onTap: () => Navigator.pop(ctx, 'guide'),
-                    ),
-                  if (scope != null)
+                    if (scope != null)
+                      ListTile(
+                        leading: const Icon(Icons.replay),
+                        title: const Text('Repetir guía desde el inicio'),
+                        onTap: () => Navigator.pop(ctx, 'restart'),
+                      ),
                     ListTile(
-                      leading: const Icon(Icons.replay),
-                      title: const Text('Repetir guía desde el inicio'),
-                      onTap: () => Navigator.pop(ctx, 'restart'),
+                      leading: const Icon(Icons.science_outlined),
+                      title: const Text('Practicar con un movimiento'),
+                      subtitle: const Text('Crea y edita un ejemplo'),
+                      onTap: () => Navigator.pop(ctx, 'practice'),
                     ),
-                  ListTile(
-                    leading: const Icon(Icons.help_outline),
-                    title: const Text('Leer ayuda de esta pantalla'),
-                    onTap: () => Navigator.pop(ctx, 'read'),
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.menu_book_outlined),
-                    title: const Text('Manual y todas las guías'),
-                    onTap: () => Navigator.pop(ctx, 'manual'),
-                  ),
-                ],
+                    ListTile(
+                      leading: const Icon(Icons.help_outline),
+                      title: const Text('Leer ayuda de esta pantalla'),
+                      onTap: () => Navigator.pop(ctx, 'read'),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.menu_book_outlined),
+                      title: const Text('Manual y todas las guías'),
+                      onTap: () => Navigator.pop(ctx, 'manual'),
+                    ),
+                  ],
+                ),
               ),
             ),
           );
           if (!context.mounted) return;
           if (action == 'guide' || action == 'restart') {
             await scope?.start(restart: action == 'restart');
+          }
+          if (action == 'practice') {
+            await Navigator.push<void>(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => const MovementPracticePage(),
+              ),
+            );
           }
           if (action == 'manual')
             Navigator.push(
@@ -164,12 +187,11 @@ class _AppManualPageState extends State<AppManualPage> {
           key: const PageStorageKey('mi-billete-manual-scroll-v2'),
           padding: const EdgeInsets.all(16),
           children: [
-            const Padding(
-              padding: EdgeInsets.all(12),
-              child: Text(
-                'Manual y guías interactivas · aprende con tu app',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
+            const PageIntro(
+              icon: Icons.menu_book_outlined,
+              title: 'Aprende a usar Mi Billete',
+              description:
+                  'Elige una pantalla para leer su ayuda o abrir una guía interactiva.',
             ),
             for (final entry in appHelp.entries)
               Card(

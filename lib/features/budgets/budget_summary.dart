@@ -14,7 +14,7 @@ class BudgetSummary extends StatelessWidget {
     int limit = 0, used = 0, exceeded = 0;
     for (final budget in selected) {
       final amount = moneyCents(budget['budget_amount']);
-      final key = '${budget['category_id']}|$currency';
+      final key = '${budget['id']}';
       final expense = spent[key] ?? 0;
       limit += amount;
       if (categories.add(key)) used += expense;
@@ -24,8 +24,8 @@ class BudgetSummary extends StatelessWidget {
     final colors = remaining < 0
         ? const [Color(0xFF881337), Color(0xFFBE123C)]
         : currency == 'USD'
-        ? const [Color(0xFF064E3B), Color(0xFF0D8262)]
-        : const [Color(0xFF172554), Color(0xFF2563EB)];
+        ? const [Color(0xFF064E3B), Color(0xFF166B56)]
+        : const [Color(0xFF1C4140), Color(0xFF17604E)];
 
     Widget detail(String label, int amount) => Expanded(
       child: Column(
@@ -170,10 +170,10 @@ class BudgetSummary extends StatelessWidget {
         const Padding(
           padding: EdgeInsets.symmetric(vertical: 14),
           child: Text(
-            'Solo incluye categorías presupuestadas del mes. '
+            'Incluye los presupuestos visibles y el gasto de cada uno en su período. '
             'El disponible neto puede coexistir con categorías excedidas.',
             style: TextStyle(
-              color: Color(0xFF64748B),
+              color: Color(0xFF50665B),
               fontSize: 12,
               height: 1.5,
             ),

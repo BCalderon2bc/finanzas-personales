@@ -29,7 +29,7 @@ Future<CardStatementData> loadCardStatements(String userId) async {
   final rows = await Future.wait([
     statementRows(
       'credit_card_statements',
-      'id,user_id,credit_card_id,currency,closing_date,due_date,balance_due,minimum_due,notes,is_archived,is_voided',
+      'id,user_id,credit_card_id,currency,closing_date,bonus_payment_date,due_date,statement_group_id,balance_due,minimum_due,overdue_due,notes,is_archived,is_voided',
       userId,
     ),
     statementRows(

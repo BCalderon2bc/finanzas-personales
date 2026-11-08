@@ -1,3 +1,4 @@
+import '../../widgets/page_intro.dart';
 import '../person_accounts/receipt_draft_field.dart';
 import '../../widgets/adaptive_layout.dart';
 import '../help/app_help.dart';
@@ -17,6 +18,7 @@ import 'credit_card_movements_page.dart';
 import 'credit_cards_summary.dart';
 import 'credit_card_wallet.dart';
 import 'credit_card_details.dart';
+import 'credit_card_face.dart' show cardBankName;
 
 class CreditCardsPage extends StatefulWidget {
   const CreditCardsPage({super.key});
@@ -489,7 +491,7 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
     }
   }
 
-  String cardOrder = 'debt_desc';
+  String cardOrder = 'bank';
   String orderCurrency = 'USD';
 
   List<Map<String, dynamic>> get orderedCards {
@@ -505,6 +507,14 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
     }
 
     result.sort((a, b) {
+      if (cardOrder == 'bank') {
+        final bankA = cardBankName(a).trim().toLowerCase();
+        final bankB = cardBankName(b).trim().toLowerCase();
+        // Las tarjetas sin banco aparecen después de las que sí tienen uno.
+        if (bankA.isEmpty != bankB.isEmpty) return bankA.isEmpty ? 1 : -1;
+        final byBank = bankA.compareTo(bankB);
+        return byBank != 0 ? byBank : compareNames(a, b);
+      }
       if (cardOrder == 'name') {
         return compareNames(a, b);
       }
@@ -611,7 +621,9 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
                 )
               : Center(
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1100),
+                    constraints: const BoxConstraints(
+                      maxWidth: widePageMaxWidth,
+                    ),
                     child: RefreshIndicator(
                       onRefresh: loadData,
                       child: ListView(
@@ -642,6 +654,12 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
                               ),
                             )
                           else ...[
+                            const PageIntro(
+                              icon: Icons.credit_card_outlined,
+                              title: 'Tu tarjetero',
+                              description:
+                                  'Elige una tarjeta para consultar su deuda, movimientos y fechas de pago.',
+                            ),
                             AdaptiveColumns(
                               minColumnWidth: 235,
                               children: [
@@ -653,6 +671,10 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
                                     prefixIcon: Icon(Icons.sort_rounded),
                                   ),
                                   items: const [
+                                    DropdownMenuItem(
+                                      value: 'bank',
+                                      child: Text('Banco A–Z'),
+                                    ),
                                     DropdownMenuItem(
                                       value: 'debt_desc',
                                       child: Text('Mayor deuda primero'),
@@ -672,7 +694,8 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
                                     }
                                   },
                                 ),
-                                if (cardOrder != 'name')
+                                if (cardOrder == 'debt_desc' ||
+                                    cardOrder == 'debt_asc')
                                   DropdownButtonFormField<String>(
                                     initialValue: orderCurrency,
                                     isExpanded: true,
@@ -749,44 +772,51 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
                                       : () => payCard(selected),
                                 ),
                               ),
-                            if (selected != null && statementData != null) ...[
-                              const SizedBox(height: 12),
-                              GuideAnchor(
-                                id: 'periods',
-                                child: CreditCardPeriodSummary(
-                                  cardId: '${selected['id']}',
-                                  data: statementData!,
-                                  onManage: saving
-                                      ? null
-                                      : () async {
-                                          await Navigator.push(
-                                            context,
-                                            MaterialPageRoute<void>(
-                                              builder: (_) =>
-                                                  CreditCardStatementsPage(
-                                                    card: selected,
-                                                  ),
-                                            ),
-                                          );
-                                          if (mounted) {
-                                            await loadData();
-                                          }
-                                        },
+                            const SizedBox(height: 16),
+                            Align(
+                              alignment: Alignment.topCenter,
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 1080,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    if (selected != null &&
+                                        statementData != null) ...[
+                                      GuideAnchor(
+                                        id: 'periods',
+                                        child: CreditCardPeriodSummary(
+                                          cardId: '${selected['id']}',
+                                          data: statementData!,
+                                          onManage: saving
+                                              ? null
+                                              : () async {
+                                                  await Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute<void>(
+                                                      builder: (_) =>
+                                                          CreditCardStatementsPage(
+                                                            card: selected,
+                                                          ),
+                                                    ),
+                                                  );
+                                                  if (mounted) {
+                                                    await loadData();
+                                                  }
+                                                },
+                                        ),
+                                      ),
+                                    ],
+                                    const SizedBox(height: 24),
+                                    CreditCardsSummary(
+                                      cards: cards,
+                                      balanceFor: balanceFor,
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ],
-                            const SizedBox(height: 26),
-                            const Text(
-                              'Resumen de todas tus tarjetas',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            CreditCardsSummary(
-                              cards: cards,
-                              balanceFor: balanceFor,
                             ),
                           ],
                         ],

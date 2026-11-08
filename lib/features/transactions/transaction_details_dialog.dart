@@ -80,6 +80,8 @@ class TransactionDetailsDialog extends StatelessWidget {
                 _detail('Tasa C\$ por US\$ 1', '${tx['exchange_rate']}'),
               ],
               _detail('Categoría', category),
+              if (tx['expense_kind'] == 'card_insurance')
+                _detail('Tipo de gasto', 'Seguro de tarjeta'),
               _detail('Descripción', tx['description']?.toString()),
               _detail('Referencia', tx['reference']?.toString()),
               if (receipt != null)

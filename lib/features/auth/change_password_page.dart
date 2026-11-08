@@ -46,8 +46,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       return 'Debes volver a iniciar sesión antes de cambiar tu contraseña.';
     }
     if (message.contains('password')) {
-      return 'La contraseña no cumple los requisitos de la cuenta. '
-          'Prueba una más larga que combine letras, números y símbolos.';
+      return 'El servicio de acceso rechazó la contraseña. ${exception.message}';
     }
     return 'No se pudo cambiar la contraseña. Comprueba tu conexión e intenta nuevamente.';
   }
@@ -167,9 +166,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
   @override
   Widget build(BuildContext context) {
-    const blue = Color(0xFF2563EB),
-        green = Color(0xFF087F5B),
-        muted = Color(0xFF64748B);
+    const blue = Color(0xFF17604E),
+        green = Color(0xFF14684D),
+        muted = Color(0xFF50665B);
     return PopScope(
       canPop: !saving,
       child: Scaffold(
@@ -243,7 +242,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                                   ),
                                   const SizedBox(height: 8),
                                   const Text(
-                                    'Ingresa tu contraseña actual y confirma la nueva. Usa al menos 8 caracteres.',
+                                    'Ingresa tu contraseña actual y confirma la nueva.',
                                     style: TextStyle(color: muted, height: 1.5),
                                   ),
                                   const SizedBox(height: 24),
@@ -267,8 +266,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                                     toggle: () =>
                                         setState(() => hideNew = !hideNew),
                                     validator: (v) {
-                                      if ((v ?? '').length < 8) {
-                                        return 'Usa al menos 8 caracteres';
+                                      if ((v ?? '').isEmpty) {
+                                        return 'Ingresa la nueva contraseña';
                                       }
                                       if (v == currentPassword.text) {
                                         return 'Debe ser diferente de la contraseña actual';

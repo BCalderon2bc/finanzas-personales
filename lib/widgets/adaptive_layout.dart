@@ -5,6 +5,9 @@ bool compactLayout(BuildContext context) =>
 
 double pageGutter(BuildContext context) => compactLayout(context) ? 12 : 24;
 
+/// Use the monitor's width while keeping very wide windows readable.
+const double widePageMaxWidth = 1680;
+
 /// Keeps the same children mounted when the viewport switches column count.
 class AdaptiveColumns extends StatelessWidget {
   const AdaptiveColumns({
@@ -26,7 +29,12 @@ class AdaptiveColumns extends StatelessWidget {
       if (children.isEmpty) return const SizedBox.shrink();
       final available = constraints.maxWidth;
       final limit = children.length < maxColumns ? children.length : maxColumns;
-      final columns = ((available + spacing) / (minColumnWidth + spacing))
+      final textScale = (MediaQuery.textScalerOf(context).scale(14) / 14).clamp(
+        1.0,
+        1.8,
+      );
+      final columnWidth = minColumnWidth * textScale;
+      final columns = ((available + spacing) / (columnWidth + spacing))
           .floor()
           .clamp(1, limit)
           .toInt();
@@ -69,6 +77,25 @@ class CompactActionBar extends StatelessWidget {
           icon: Icon(icon),
           label: Text(label, textAlign: TextAlign.center),
         ),
+      ),
+    ),
+  );
+}
+
+/// Centers scrollable content and gives dense lists a readable desktop width.
+class PageFrame extends StatelessWidget {
+  const PageFrame({super.key, required this.child, this.maxWidth = 1080});
+
+  final Widget child;
+  final double maxWidth;
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+    top: false,
+    child: Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: SizedBox(width: double.infinity, child: child),
       ),
     ),
   );

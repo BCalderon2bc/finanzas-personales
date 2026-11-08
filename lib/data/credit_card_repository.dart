@@ -7,7 +7,7 @@ Future<List<Map<String, dynamic>>> loadUserCardExpenses(String userId) async {
     final result = await supabase
         .from('credit_card_transactions')
         .select(
-          'id, transaction_type, amount, currency, transaction_date, created_at, category_id, description, reference, credit_cards(name)',
+          'id, transaction_type, charge_kind, amount, currency, transaction_date, created_at, category_id, description, reference, credit_cards(name)',
         )
         .eq('user_id', userId)
         .eq('is_voided', false)
@@ -30,6 +30,7 @@ Future<List<Map<String, dynamic>>> loadUserCardExpenses(String userId) async {
         'reference': tx['reference'],
         'source': 'credit_card',
         'card_transaction_type': tx['transaction_type'],
+        'charge_kind': tx['charge_kind'],
         'card_name': tx['credit_cards'] is Map
             ? tx['credit_cards']['name']?.toString()
             : null,

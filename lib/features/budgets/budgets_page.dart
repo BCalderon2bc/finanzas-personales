@@ -1,3 +1,6 @@
+import '../../widgets/page_intro.dart';
+import '../../widgets/date_period_field.dart';
+import '../../data/period_logic.dart';
 import '../../widgets/adaptive_layout.dart';
 import '../help/app_help.dart';
 import 'package:flutter/material.dart';
@@ -18,6 +21,10 @@ class BudgetsPage extends StatefulWidget {
 
 class _BudgetsPageState extends State<BudgetsPage> {
   DateTime month = DateTime(DateTime.now().year, DateTime.now().month);
+  DateTime get periodStart => month;
+  DateTime? customEnd;
+  DateTime get periodEnd =>
+      customEnd ?? DateTime(month.year, month.month + 1, 0);
   List<Map<String, dynamic>> budgets = [], categories = [];
   Map<String, int> spent = {};
   bool loading = true, saving = false;
@@ -38,7 +45,7 @@ class _BudgetsPageState extends State<BudgetsPage> {
 
   Future<void> loadData() async {
     final request = ++requestId;
-    final selectedMonth = month;
+    final from = periodStart, until = periodEnd;
     setState(() {
       loading = true;
       error = null;
@@ -64,13 +71,12 @@ class _BudgetsPageState extends State<BudgetsPage> {
       for (var offset = 0; ; offset += 500) {
         final result = await supabase
             .from('budgets')
-            .select('id, category_id, currency, budget_amount, month')
-            .eq('user_id', user.id)
-            .gte('month', monthDate(selectedMonth))
-            .lt(
-              'month',
-              monthDate(DateTime(selectedMonth.year, selectedMonth.month + 1)),
+            .select(
+              'id, category_id, currency, budget_amount, month, start_date, end_date',
             )
+            .eq('user_id', user.id)
+            .lte('start_date', isoDay(until))
+            .gte('end_date', isoDay(from))
             .order('id')
             .range(offset, offset + 499);
         final page = List<Map<String, dynamic>>.from(result);
@@ -81,19 +87,10 @@ class _BudgetsPageState extends State<BudgetsPage> {
         ...await loadUserTransactions(user.id),
         ...await loadUserCardExpenses(user.id),
       ];
-      final totals = <String, int>{};
-      for (final tx in transactions) {
-        if (tx['transaction_type'] != 'expense' || tx['category_id'] == null)
-          continue;
-        final date = DateTime.tryParse('${tx['transaction_date']}')?.toLocal();
-        if (date == null)
-          throw FormatException('Un gasto tiene una fecha inválida.');
-        if (date.year != selectedMonth.year ||
-            date.month != selectedMonth.month)
-          continue;
-        final key = '${tx['category_id']}|${tx['currency']}';
-        totals[key] = (totals[key] ?? 0) + moneyCents(tx['amount']);
-      }
+      final totals = {
+        for (final budget in budgetRows)
+          '${budget['id']}': budgetSpent(budget, transactions),
+      };
       if (!mounted || request != requestId) return;
       setState(() {
         categories = categoryRows;
@@ -113,7 +110,10 @@ class _BudgetsPageState extends State<BudgetsPage> {
 
   Future<void> changeMonth(int offset) async {
     if (loading || saving) return;
-    setState(() => month = DateTime(month.year, month.month + offset));
+    setState(() {
+      month = DateTime(month.year, month.month + offset);
+      customEnd = null;
+    });
     await loadData();
   }
 
@@ -141,32 +141,29 @@ class _BudgetsPageState extends State<BudgetsPage> {
     }
     final data = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (_) => BudgetFormDialog(categories: available, budget: budget),
+      builder: (_) => BudgetFormDialog(
+        categories: available,
+        budget: budget,
+        initialStart: periodStart,
+        initialEnd: periodEnd,
+      ),
     );
     if (data == null || !mounted) return;
-    if (budget == null &&
-        budgets.any(
-          (b) =>
-              b['category_id'].toString() == data['category_id'] &&
-              b['currency'] == data['currency'],
-        )) {
-      message('Ya existe ese presupuesto este mes. Tócalo para editarlo.');
-      return;
-    }
     final user = supabase.auth.currentUser;
     if (user == null) return;
     setState(() => saving = true);
     try {
       if (budget == null) {
-        await supabase.from('budgets').insert({
-          ...data,
-          'user_id': user.id,
-          'month': monthDate(month),
-        });
+        await supabase.from('budgets').insert({...data, 'user_id': user.id});
       } else {
         await supabase
             .from('budgets')
-            .update({'budget_amount': data['budget_amount']})
+            .update({
+              'budget_amount': data['budget_amount'],
+              'start_date': data['start_date'],
+              'end_date': data['end_date'],
+              'month': data['month'],
+            })
             .eq('id', budget['id'])
             .eq('user_id', user.id)
             .select('id')
@@ -179,7 +176,7 @@ class _BudgetsPageState extends State<BudgetsPage> {
       if (mounted) {
         message(
           e.code == '23505'
-              ? 'Ya existe ese presupuesto este mes.'
+              ? 'Ya existe un presupuesto con estas fechas o superpuesto.'
               : 'No se pudo guardar: ${e.message}',
         );
       }
@@ -197,7 +194,7 @@ class _BudgetsPageState extends State<BudgetsPage> {
       builder: (context) => AlertDialog(
         title: const Text('Eliminar presupuesto'),
         content: const Text(
-          'Se eliminará este límite mensual. Los movimientos registrados se conservan.',
+          'Se eliminará este límite del período. Los movimientos registrados se conservan.',
         ),
         actions: [
           TextButton(
@@ -246,14 +243,23 @@ class _BudgetsPageState extends State<BudgetsPage> {
         break;
       }
     }
-    return BudgetCard(
-      name: categoryStyle?['name']?.toString() ?? 'Categoría no disponible',
-      currency: currency,
-      categoryStyle: categoryStyle,
-      limitCents: moneyCents(budget['budget_amount']),
-      usedCents: spent['$categoryId|$currency'] ?? 0,
-      onEdit: saving ? null : () => editBudget(budget),
-      onDelete: saving ? null : () => deleteBudget(budget),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Desde ${isoDay(budgetStart(budget))} hasta ${isoDay(budgetEnd(budget))}',
+          style: const TextStyle(fontSize: 12),
+        ),
+        BudgetCard(
+          name: categoryStyle?['name']?.toString() ?? 'Categoría no disponible',
+          currency: currency,
+          categoryStyle: categoryStyle,
+          limitCents: moneyCents(budget['budget_amount']),
+          usedCents: spent['${budget['id']}'] ?? 0,
+          onEdit: saving ? null : () => editBudget(budget),
+          onDelete: saving ? null : () => deleteBudget(budget),
+        ),
+      ],
     );
   }
 
@@ -296,84 +302,86 @@ class _BudgetsPageState extends State<BudgetsPage> {
                 label: Text(saving ? 'Guardando...' : 'Nuevo presupuesto'),
               ),
             ),
-      body: Column(
-        children: [
-          GuideAnchor(
-            id: 'month',
-            child: Row(
-              children: [
-                IconButton(
-                  onPressed: loading || saving ? null : () => changeMonth(-1),
-                  tooltip: 'Mes anterior',
-                  icon: const Icon(Icons.chevron_left),
-                ),
-                Expanded(
-                  child: Text(
-                    '${month.month.toString().padLeft(2, '0')}/${month.year}',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-                IconButton(
-                  onPressed: loading || saving ? null : () => changeMonth(1),
-                  tooltip: 'Mes siguiente',
-                  icon: const Icon(Icons.chevron_right),
-                ),
-              ],
+      body: PageFrame(
+        maxWidth: 1150,
+        child: Column(
+          children: [
+            GuideAnchor(
+              id: 'month',
+              child: DatePeriodField(
+                start: periodStart,
+                end: periodEnd,
+                enabled: !loading && !saving,
+                onChanged: (range) {
+                  setState(() {
+                    month = range.start;
+                    customEnd = range.end;
+                  });
+                  loadData();
+                },
+              ),
             ),
-          ),
-          Expanded(
-            child: loading
-                ? const Center(child: CircularProgressIndicator())
-                : error != null
-                ? Center(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
+            Expanded(
+              child: loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : error != null
+                  ? Center(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              'No se pudieron cargar los presupuestos.',
+                            ),
+                            SelectableText(error!),
+                            TextButton(
+                              onPressed: loadData,
+                              child: const Text('Reintentar'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: loadData,
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: EdgeInsets.fromLTRB(
+                          16,
+                          8,
+                          16,
+                          compactLayout(context) ? 24 : 100,
+                        ),
                         children: [
-                          const Text('No se pudieron cargar los presupuestos.'),
-                          SelectableText(error!),
-                          TextButton(
-                            onPressed: loadData,
-                            child: const Text('Reintentar'),
+                          const PageIntro(
+                            icon: Icons.savings_outlined,
+                            title: 'Controla tus límites',
+                            description:
+                                'Compara el gasto del período con el monto de cada presupuesto.',
                           ),
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 12),
+                            child: Text(
+                              'El gasto neto incluye cuentas y tarjetas de la misma categoría y moneda dentro de las fechas de cada presupuesto, descontando devoluciones.',
+                            ),
+                          ),
+                          if (budgets.isEmpty)
+                            const Padding(
+                              padding: EdgeInsets.all(24),
+                              child: Text(
+                                'No hay presupuestos que coincidan con estas fechas.',
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          BudgetSummary(budgets: budgets, spent: spent),
+                          ...budgets.map(budgetCard),
                         ],
                       ),
                     ),
-                  )
-                : RefreshIndicator(
-                    onRefresh: loadData,
-                    child: ListView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: EdgeInsets.fromLTRB(
-                        16,
-                        8,
-                        16,
-                        compactLayout(context) ? 24 : 100,
-                      ),
-                      children: [
-                        const Padding(
-                          padding: EdgeInsets.only(bottom: 12),
-                          child: Text(
-                            'El gasto neto incluye cuentas y tarjetas de la misma categoría, moneda y mes, descontando devoluciones.',
-                          ),
-                        ),
-                        if (budgets.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.all(24),
-                            child: Text(
-                              'No hay presupuestos para este mes.',
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        BudgetSummary(budgets: budgets, spent: spent),
-                        ...budgets.map(budgetCard),
-                      ],
-                    ),
-                  ),
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     ),
   );

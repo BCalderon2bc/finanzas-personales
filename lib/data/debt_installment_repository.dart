@@ -13,7 +13,7 @@ Future<DebtInstallmentData> loadDebtInstallments(String userId) async {
     _links(userId),
     statementRows(
       'debt_payments',
-      'id,debt_id,account_id,currency,principal_amount,interest_amount,fee_amount,payment_date,reference,is_voided',
+      'id,debt_id,account_id,currency,principal_amount,interest_amount,fee_amount,insurance_amount,payment_date,reference,is_voided',
       userId,
     ),
   ]);

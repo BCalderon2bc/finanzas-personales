@@ -12,6 +12,7 @@ import '../../data/exchange_rate.dart';
 import '../../utils/money.dart';
 import 'person_account_form_dialog.dart';
 import 'person_entry_dialog.dart';
+import 'person_entry_changes_dialog.dart';
 import 'person_share_dialog.dart';
 import 'person_receipts_dialog.dart';
 
@@ -456,6 +457,15 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
     if (mounted) await load();
   }
 
+  Future<void> openChanges([String? entryId]) => showDialog<void>(
+    context: context,
+    builder: (_) => PersonEntryChangesDialog(
+      accountId: '${account['id']}',
+      isOwner: isOwner,
+      entryId: entryId,
+    ),
+  );
+
   Widget entryCard(Map<String, dynamic> row, int running) {
     final visibleRow = fromViewer(row);
     final plus = '${visibleRow['direction']}' == '1',
@@ -464,15 +474,16 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
         ? Theme.of(context).colorScheme.onSurfaceVariant
         : plus
         ? Theme.of(context).colorScheme.error
-        : const Color(0xFF087F5B);
+        : const Color(0xFF14684D);
     return Card(
+      key: ValueKey(row['id']),
+      margin: const EdgeInsets.only(bottom: 10),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
                   row['kind'] == 'payment'
@@ -489,19 +500,27 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
-                if (!voided &&
-                    account['is_active'] == true &&
-                    !isClosed(row) &&
-                    canEdit(row))
-                  PopupMenuButton<String>(
-                    enabled: !saving,
-                    onSelected: (v) {
-                      if (v == 'edit')
-                        editEntry(row);
-                      else
-                        voidEntry(row);
-                    },
-                    itemBuilder: (_) => [
+                PopupMenuButton<String>(
+                  tooltip: 'Opciones del movimiento',
+                  enabled: !saving,
+                  onSelected: (action) {
+                    if (action == 'history') {
+                      openChanges('${row['id']}');
+                    } else if (action == 'edit') {
+                      editEntry(row);
+                    } else {
+                      voidEntry(row);
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(
+                      value: 'history',
+                      child: Text('Ver cambios'),
+                    ),
+                    if (!voided &&
+                        account['is_active'] == true &&
+                        !isClosed(row) &&
+                        canEdit(row)) ...[
                       const PopupMenuItem(value: 'edit', child: Text('Editar')),
                       if (isOwner)
                         const PopupMenuItem(
@@ -509,75 +528,100 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
                           child: Text('Anular'),
                         ),
                     ],
-                  ),
+                  ],
+                ),
               ],
             ),
-            if ('${row['description'] ?? ''}'.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text('${row['description']}'),
-              ),
-            const SizedBox(height: 6),
-            Text(
-              '${dateText(row['entry_date'])}${voided ? ' · ANULADO' : ''}${isClosed(row) ? ' · CERRADO' : ''}',
-            ),
-            Text('Registrado por: ${entryAuthor(row)}'),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                icon: const Icon(Icons.attach_file),
-                label: Text(
-                  (receiptCounts?[receiptFolder(row)] ?? 0) == 0
-                      ? 'Comprobantes'
-                      : 'Comprobantes (${receiptCounts![receiptFolder(row)]})',
+            AdaptiveColumns(
+              minColumnWidth: 245,
+              spacing: 18,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if ('${row['description'] ?? ''}'.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text('${row['description']}'),
+                      ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${dateText(row['entry_date'])}${voided ? ' · ANULADO' : ''}${isClosed(row) ? ' · CERRADO' : ''}',
+                    ),
+                    Text('Registrado por: ${entryAuthor(row)}'),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        icon: const Icon(Icons.attach_file),
+                        label: Text(
+                          (receiptCounts?[receiptFolder(row)] ?? 0) == 0
+                              ? 'Comprobantes'
+                              : 'Comprobantes (${receiptCounts![receiptFolder(row)]})',
+                        ),
+                        onPressed: saving
+                            ? null
+                            : () async {
+                                final writable =
+                                    !voided &&
+                                    account['is_active'] == true &&
+                                    !isClosed(row);
+                                final editable = writable && canEdit(row);
+                                await showDialog<void>(
+                                  context: context,
+                                  builder: (_) => PersonReceiptsDialog(
+                                    accountId: '${account['id']}',
+                                    entryId: '${row['id']}',
+                                    canAdd:
+                                        editable ||
+                                        (writable &&
+                                            canAdd &&
+                                            row['created_by'] == viewerId),
+                                    canRemove: editable,
+                                  ),
+                                );
+                                if (mounted) await refreshReceiptCounts();
+                              },
+                      ),
+                    ),
+                  ],
                 ),
-                onPressed: saving
-                    ? null
-                    : () async {
-                        final writable =
-                            !voided &&
-                            account['is_active'] == true &&
-                            !isClosed(row);
-                        final editable = writable && canEdit(row);
-                        await showDialog<void>(
-                          context: context,
-                          builder: (_) => PersonReceiptsDialog(
-                            accountId: '${account['id']}',
-                            entryId: '${row['id']}',
-                            canAdd:
-                                editable ||
-                                (writable &&
-                                    canAdd &&
-                                    row['created_by'] == viewerId),
-                            canRemove: editable,
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${plus ? '+' : '−'}${formatMoneyCents(moneyCents(row['amount']), '${row['currency']}')}',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: color,
+                          decoration: voided
+                              ? TextDecoration.lineThrough
+                              : null,
+                        ),
+                      ),
+                      if (row['currency'] == 'USD')
+                        Text(
+                          'Tasa: C\$${row['exchange_rate']} / US\$1 · Equivalente: ${formatMoneyCents(moneyCents(row['amount_nio']), 'NIO')}',
+                        ),
+                      if (!voided)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            'Saldo tras el movimiento: ${personBalanceLabel(running)} ${formatMoneyCents(running.abs(), 'NIO')}',
+                            style: const TextStyle(fontSize: 12),
                           ),
-                        );
-                        if (mounted) await refreshReceiptCounts();
-                      },
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '${plus ? '+' : '−'}${formatMoneyCents(moneyCents(row['amount']), '${row['currency']}')}',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: color,
-                decoration: voided ? TextDecoration.lineThrough : null,
-              ),
-            ),
-            if (row['currency'] == 'USD')
-              Text(
-                'Tasa: C\$${row['exchange_rate']} / US\$1 · Equivalente: ${formatMoneyCents(moneyCents(row['amount_nio']), 'NIO')}',
-              ),
-            if (!voided)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  'Saldo después: ${personBalanceLabel(running)} ${formatMoneyCents(running.abs(), 'NIO')}',
-                  style: const TextStyle(fontSize: 12),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
+              ],
+            ),
           ],
         ),
       ),
@@ -600,6 +644,143 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
     );
   }
 
+  Widget accountSummary(int balance, Color color) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      GuideAnchor(
+        id: 'balance',
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: color.withAlpha(16),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                personBalanceLabel(balance),
+                style: TextStyle(fontSize: 18, color: color),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                formatMoneyCents(balance.abs(), 'NIO'),
+                style: TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text('Saldo actual en córdobas'),
+              if (!isOwner)
+                Text(
+                  canAdd ||
+                          access?['can_edit_own'] == true ||
+                          access?['can_edit_all'] == true
+                      ? 'Cuenta compartida'
+                      : 'Cuenta compartida · Solo ver',
+                ),
+              if (account['is_active'] != true) const Text('Cuenta archivada'),
+            ],
+          ),
+        ),
+      ),
+      const SizedBox(height: 8),
+      OutlinedButton.icon(
+        onPressed: saving ? null : () => openChanges(),
+        icon: const Icon(Icons.history_rounded),
+        label: const Text('Historial de cambios'),
+      ),
+      if (isOwner) ...[
+        const SizedBox(height: 8),
+        GuideAnchor(
+          id: 'closures',
+          child: Card(
+            child: ListTile(
+              leading: const Icon(Icons.handshake_outlined),
+              title: const Text('Cierres acordados'),
+              subtitle: Text(
+                closures.isEmpty
+                    ? 'Revisar y acordar el saldo'
+                    : 'Último: ${dateText(closures.first['until_date'])} · ${personBalanceLabel(moneyCents(closures.first['balance_nio']))} ${formatMoneyCents(moneyCents(closures.first['balance_nio']).abs(), 'NIO')}',
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: saving ? null : openClosures,
+            ),
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: loading || saving ? null : deleteAccount,
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('Eliminar cuenta'),
+          ),
+        ),
+      ],
+      if ('${account['notes'] ?? ''}'.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Text('${account['notes']}'),
+        ),
+    ],
+  );
+
+  Widget movementHistory(
+    Iterable<Map<String, dynamic>> visibleHistory,
+    Map<String, int> running,
+  ) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Text(
+        'Historial de movimientos',
+        style: Theme.of(context).textTheme.titleLarge,
+      ),
+      const SizedBox(height: 4),
+      Text(
+        'Últimos movimientos ingresados primero',
+        style: Theme.of(context).textTheme.bodySmall,
+      ),
+      const SizedBox(height: 10),
+      AdaptiveColumns(
+        minColumnWidth: 235,
+        children: [
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Mostrar anulados'),
+            value: showVoided,
+            onChanged: (v) => setState(() => showVoided = v),
+          ),
+          if (receiptCounts != null)
+            ReceiptFilterField(
+              value: receiptFilter,
+              onChanged: (value) => setState(() => receiptFilter = value),
+            ),
+        ],
+      ),
+      const SizedBox(height: 10),
+      if (entries.isEmpty)
+        const Padding(
+          padding: EdgeInsets.all(24),
+          child: Text(
+            'Registra la primera compra o el saldo anterior para comenzar.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      if (entries.isNotEmpty && visibleHistory.isEmpty)
+        const Padding(
+          padding: EdgeInsets.all(20),
+          child: Text('No hay movimientos que coincidan con los filtros.'),
+        ),
+      for (final row in visibleHistory)
+        entryCard(row, running['${row['id']}']!),
+    ],
+  );
+
   @override
   Widget build(BuildContext context) {
     final compact = compactLayout(context);
@@ -611,15 +792,36 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
         : () => editEntry();
     var balance = 0;
     final running = <String, int>{};
-    // entries se ordena de reciente a antiguo; recorrer al revés da el saldo histórico.
+    // El saldo por movimiento sigue su fecha contable, aunque el historial
+    // se muestre por fecha de registro.
     for (final row in entries.reversed) {
       balance += personAccountBalance([fromViewer(row)]);
       running['${row['id']}'] = balance;
     }
+    final history = [...entries]
+      ..sort((a, b) {
+        final aCreated = DateTime.tryParse('${a['created_at']}');
+        final bCreated = DateTime.tryParse('${b['created_at']}');
+        if (aCreated != null && bCreated != null) {
+          final byCreated = bCreated.compareTo(aCreated);
+          if (byCreated != 0) return byCreated;
+        } else if (aCreated != null || bCreated != null) {
+          return aCreated != null ? -1 : 1;
+        }
+
+        final byDate = '${b['entry_date']}'.compareTo('${a['entry_date']}');
+        return byDate != 0 ? byDate : '${b['id']}'.compareTo('${a['id']}');
+      });
+    final visibleHistory = history.where(
+      (row) =>
+          (showVoided || row['is_voided'] != true) &&
+          (receiptCounts == null ||
+              receiptFilter.matches(receiptCounts?[receiptFolder(row)] ?? 0)),
+    );
     final color = balance > 0
         ? Theme.of(context).colorScheme.error
         : balance < 0
-        ? const Color(0xFF087F5B)
+        ? const Color(0xFF14684D)
         : Theme.of(context).colorScheme.primary;
     return GuideScope(
       topic: 'person_detail',
@@ -724,7 +926,7 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
           top: false,
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 800),
+              constraints: const BoxConstraints(maxWidth: 1240),
               child: loading
                   ? const Center(child: CircularProgressIndicator())
                   : error != null
@@ -749,128 +951,30 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
                           compact ? 24 : 110,
                         ),
                         children: [
-                          GuideAnchor(
-                            id: 'balance',
-                            child: Container(
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                color: color.withAlpha(16),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              final wide = constraints.maxWidth >= 880;
+                              return Wrap(
+                                spacing: 24,
+                                runSpacing: 18,
                                 children: [
-                                  Text(
-                                    personBalanceLabel(balance),
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      color: color,
+                                  SizedBox(
+                                    width: wide ? 300 : constraints.maxWidth,
+                                    child: accountSummary(balance, color),
+                                  ),
+                                  SizedBox(
+                                    width: wide
+                                        ? constraints.maxWidth - 324
+                                        : constraints.maxWidth,
+                                    child: movementHistory(
+                                      visibleHistory,
+                                      running,
                                     ),
                                   ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    formatMoneyCents(balance.abs(), 'NIO'),
-                                    style: TextStyle(
-                                      fontSize: 30,
-                                      fontWeight: FontWeight.w800,
-                                      color: color,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    balance > 0
-                                        ? 'Tu saldo es positivo (+).'
-                                        : balance < 0
-                                        ? 'Tu saldo es negativo (−).'
-                                        : 'No hay saldo pendiente.',
-                                  ),
-                                  if (!isOwner)
-                                    Text(
-                                      canAdd ||
-                                              access?['can_edit_own'] == true ||
-                                              access?['can_edit_all'] == true
-                                          ? 'Cuenta compartida'
-                                          : 'Cuenta compartida · Solo ver',
-                                    ),
-                                  if (account['is_active'] != true)
-                                    const Text('Cuenta archivada'),
                                 ],
-                              ),
-                            ),
+                              );
+                            },
                           ),
-                          if (isOwner)
-                            GuideAnchor(
-                              id: 'closures',
-                              child: Card(
-                                child: ListTile(
-                                  leading: const Icon(Icons.handshake_outlined),
-                                  title: const Text('Cierres acordados'),
-                                  subtitle: Text(
-                                    closures.isEmpty
-                                        ? 'Revisar y acordar el saldo'
-                                        : 'Último: ${dateText(closures.first['until_date'])} · ${personBalanceLabel(moneyCents(closures.first['balance_nio']))} ${formatMoneyCents(moneyCents(closures.first['balance_nio']).abs(), 'NIO')}',
-                                  ),
-                                  trailing: const Icon(Icons.chevron_right),
-                                  onTap: saving ? null : openClosures,
-                                ),
-                              ),
-                            ),
-                          if (isOwner)
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton.icon(
-                                style: TextButton.styleFrom(
-                                  foregroundColor: Theme.of(
-                                    context,
-                                  ).colorScheme.error,
-                                ),
-                                onPressed: loading || saving
-                                    ? null
-                                    : deleteAccount,
-                                icon: const Icon(Icons.delete_outline),
-                                label: const Text('Eliminar cuenta'),
-                              ),
-                            ),
-                          if ('${account['notes'] ?? ''}'.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              child: Text('${account['notes']}'),
-                            ),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'Compras de la otra persona (+) · Compras tuyas (−). Pagos tuyos (−) · Pagos que recibes (+).',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                          SwitchListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('Mostrar anulados'),
-                            value: showVoided,
-                            onChanged: (v) => setState(() => showVoided = v),
-                          ),
-                          if (receiptCounts != null)
-                            ReceiptFilterField(
-                              value: receiptFilter,
-                              onChanged: (value) =>
-                                  setState(() => receiptFilter = value),
-                            ),
-                          if (entries.isEmpty)
-                            const Padding(
-                              padding: EdgeInsets.all(24),
-                              child: Text(
-                                'Registra la primera compra o el saldo anterior para comenzar.',
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ...entries
-                              .where(
-                                (r) =>
-                                    (showVoided || r['is_voided'] != true) &&
-                                    (receiptCounts == null ||
-                                        receiptFilter.matches(
-                                          receiptCounts?[receiptFolder(r)] ?? 0,
-                                        )),
-                              )
-                              .map((r) => entryCard(r, running['${r['id']}']!)),
                         ],
                       ),
                     ),

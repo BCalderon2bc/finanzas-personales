@@ -12,7 +12,7 @@ import '../../core/supabase_client.dart';
 import '../../data/person_account_repository.dart';
 import '../../widgets/adaptive_layout.dart';
 import 'receipt_file_picker.dart'
-if (dart.library.js_interop) 'receipt_file_picker_web.dart';
+    if (dart.library.js_interop) 'receipt_file_picker_web.dart';
 
 const _types = {
   'jpg': 'image/jpeg',
@@ -30,12 +30,13 @@ const _types = {
   'txt': 'text/plain',
 };
 
-Future<bool?> _showReceiptPreview(
+Future<bool?> showFilePreview(
   BuildContext context, {
   required String label,
   required String sourceName,
   required Future<Uint8List> Function() load,
   bool allowDownload = false,
+  bool expanded = false,
 }) {
   final extension = label.split('.').last.toLowerCase();
   final mimeType = _types[extension];
@@ -48,64 +49,62 @@ Future<bool?> _showReceiptPreview(
 
   return showDialog<bool>(
     context: context,
-    builder: (context) => AlertDialog(
-      insetPadding: const EdgeInsets.all(16),
-      title: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis),
-      content: SizedBox(
-        width: 760,
-        height: supported ? MediaQuery.sizeOf(context).height * .65 : null,
-        child: supported
-            ? FutureBuilder<Uint8List>(
-                future: bytes,
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return const Center(
-                      child: Text('No se pudo cargar el comprobante.'),
-                    );
-                  }
-                  final data = snapshot.data;
-                  if (data == null) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (isOffice) {
-                    return OfficeReceiptPreview(
-                      bytes: data,
-                      extension: extension,
-                    );
-                  }
-                  if (isPdf) {
-                    return PdfViewer.data(data, sourceName: sourceName);
-                  }
-                  if (isText) {
-                    return SingleChildScrollView(
-                      child: SelectableText(
-                        utf8.decode(data, allowMalformed: true),
-                      ),
-                    );
-                  }
-                  return InteractiveViewer(
-                    maxScale: 5,
-                    child: SizedBox.expand(
-                      child: Image.memory(
-                        data,
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, _, _) => const Center(
-                          child: Text(
-                            'Este dispositivo no puede mostrar la imagen.',
-                          ),
+    builder: (context) {
+      final preview = supported
+          ? FutureBuilder<Uint8List>(
+              future: bytes,
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return const Center(
+                    child: Text('No se pudo cargar el archivo.'),
+                  );
+                }
+                final data = snapshot.data;
+                if (data == null) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (isOffice) {
+                  return OfficeReceiptPreview(
+                    bytes: data,
+                    extension: extension,
+                  );
+                }
+                if (isPdf) {
+                  return _PdfFilePreview(
+                    bytes: data,
+                    sourceName: sourceName,
+                    showControls: expanded,
+                  );
+                }
+                if (isText) {
+                  return SingleChildScrollView(
+                    child: SelectableText(
+                      utf8.decode(data, allowMalformed: true),
+                    ),
+                  );
+                }
+                return InteractiveViewer(
+                  maxScale: 5,
+                  child: SizedBox.expand(
+                    child: Image.memory(
+                      data,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, _, _) => const Center(
+                        child: Text(
+                          'Este dispositivo no puede mostrar la imagen.',
                         ),
                       ),
                     ),
-                  );
-                },
-              )
-            : Text(
-                allowDownload
-                    ? 'Este formato solo está disponible para descarga.'
-                    : 'Este formato no tiene vista previa. Puedes adjuntarlo al guardar.',
-              ),
-      ),
-      actions: [
+                  ),
+                );
+              },
+            )
+          : Text(
+              allowDownload
+                  ? 'Este formato solo está disponible para descarga.'
+                  : 'Este formato no tiene vista previa. Puedes adjuntarlo al guardar.',
+            );
+      final actions = [
         TextButton(
           onPressed: () => Navigator.pop(context, false),
           child: const Text('Cerrar'),
@@ -116,9 +115,136 @@ Future<bool?> _showReceiptPreview(
             icon: const Icon(Icons.download_outlined),
             label: const Text('Descargar'),
           ),
-      ],
-    ),
+      ];
+      if (!expanded) {
+        return AlertDialog(
+          insetPadding: const EdgeInsets.all(16),
+          title: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis),
+          content: SizedBox(
+            width: 760,
+            height: supported ? MediaQuery.sizeOf(context).height * .65 : null,
+            child: preview,
+          ),
+          actions: actions,
+        );
+      }
+
+      final size = MediaQuery.sizeOf(context);
+      final content = Column(
+        children: [
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 16, end: 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                if (allowDownload) actions.last,
+                IconButton(
+                  tooltip: 'Cerrar',
+                  onPressed: () => Navigator.pop(context, false),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(child: preview),
+        ],
+      );
+      final compact = size.width < 600 || size.height < 480;
+      return Dialog(
+        insetPadding: compact ? EdgeInsets.zero : const EdgeInsets.all(20),
+        constraints: const BoxConstraints(),
+        shape: compact ? const RoundedRectangleBorder() : null,
+        clipBehavior: Clip.antiAlias,
+        child: SizedBox.expand(child: content),
+      );
+    },
   );
+}
+
+class _PdfFilePreview extends StatefulWidget {
+  const _PdfFilePreview({
+    required this.bytes,
+    required this.sourceName,
+    required this.showControls,
+  });
+
+  final Uint8List bytes;
+  final String sourceName;
+  final bool showControls;
+
+  @override
+  State<_PdfFilePreview> createState() => _PdfFilePreviewState();
+}
+
+class _PdfFilePreviewState extends State<_PdfFilePreview> {
+  final _controller = PdfViewerController();
+  bool _ready = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final viewer = PdfViewer.data(
+      widget.bytes,
+      sourceName: widget.sourceName,
+      controller: widget.showControls ? _controller : null,
+      params: PdfViewerParams(
+        errorBannerBuilder: (_, _, _, _) =>
+            const Center(child: Text('No se pudo mostrar el PDF.')),
+        calculateInitialZoom: widget.showControls
+            ? (_, controller, _, _) =>
+                  (controller.viewSize.width - controller.params.margin * 2) /
+                  controller.layout.pageLayouts.first.width
+            : null,
+        onViewerReady: widget.showControls
+            ? (_, _) {
+                if (mounted) setState(() => _ready = true);
+              }
+            : null,
+      ),
+    );
+    if (!widget.showControls) return viewer;
+
+    final canZoom = _ready && _controller.isReady;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            IconButton(
+              tooltip: 'Alejar',
+              onPressed: canZoom ? () => _controller.zoomDown() : null,
+              icon: const Icon(Icons.zoom_out),
+            ),
+            IconButton(
+              tooltip: 'Ajustar al ancho',
+              onPressed: canZoom
+                  ? () => _controller.goTo(
+                      _controller.calcMatrixFitWidthForPage(
+                        pageNumber: _controller.pageNumber ?? 1,
+                      ),
+                    )
+                  : null,
+              icon: const Icon(Icons.fit_screen_outlined),
+            ),
+            IconButton(
+              tooltip: 'Acercar',
+              onPressed: canZoom ? () => _controller.zoomUp() : null,
+              icon: const Icon(Icons.zoom_in),
+            ),
+          ],
+        ),
+        Expanded(child: viewer),
+      ],
+    );
+  }
 }
 
 /// A validated selection held locally until its movement has been saved.
@@ -162,8 +288,19 @@ class PendingReceipt {
     return PendingReceipt._(file.name, '${id}_$base.$extension', type, bytes);
   }
 
+  Future<String?> readFirstPdfPage() async {
+    if (_type != 'application/pdf') return null;
+    final document = await PdfDocument.openData(_bytes, sourceName: _name);
+    try {
+      if (document.pages.isEmpty) return null;
+      return (await document.pages.first.loadText()).fullText;
+    } finally {
+      await document.dispose();
+    }
+  }
+
   Future<void> preview(BuildContext context) async {
-    await _showReceiptPreview(
+    await showFilePreview(
       context,
       label: label,
       sourceName: _name,
@@ -188,7 +325,8 @@ class PersonReceiptsDialog extends StatefulWidget {
     required this.entryId,
     required this.canAdd,
     required this.canRemove,
-  }) : movementTable = null;
+  }) : movementTable = null,
+       statementDocuments = const {};
 
   const PersonReceiptsDialog.movement({
     super.key,
@@ -196,10 +334,22 @@ class PersonReceiptsDialog extends StatefulWidget {
     required this.entryId,
     required bool writable,
   }) : movementTable = table,
+       statementDocuments = const {},
        accountId = '',
        canAdd = writable,
        canRemove = writable;
 
+  const PersonReceiptsDialog.statement({
+    super.key,
+    required this.entryId,
+    required this.statementDocuments,
+  }) : accountId = '',
+       movementTable = 'credit_card_statements',
+       canAdd = false,
+       canRemove = false;
+
+  /// Document IDs and their write permissions, including older per-currency IDs.
+  final Map<String, bool> statementDocuments;
   final String accountId, entryId;
   final String? movementTable;
   final bool canAdd, canRemove;
@@ -210,10 +360,17 @@ class PersonReceiptsDialog extends StatefulWidget {
 
 class _PersonReceiptsDialogState extends State<PersonReceiptsDialog> {
   late final String _uid;
-  final _files = <String>[];
+  final _files = <({String folder, String name, bool writable})>[];
+  bool _loaded = false;
   bool _busy = false;
   String? _notice;
 
+  bool get _isStatement => widget.statementDocuments.isNotEmpty;
+  bool get _canAdd => _isStatement
+      ? _loaded &&
+            _files.isEmpty &&
+            widget.statementDocuments[widget.entryId] == true
+      : widget.canAdd;
   String get _folder =>
       '${widget.movementTable ?? widget.accountId}/${widget.entryId}';
   StorageFileApi get _bucket => supabase.storage.from(
@@ -244,22 +401,36 @@ class _PersonReceiptsDialogState extends State<PersonReceiptsDialog> {
   }
 
   Future<void> _load() async {
-    final files = <String>[];
-    for (var offset = 0; ; offset += 100) {
-      final page = await _bucket.list(
-        path: _folder,
-        searchOptions: SearchOptions(limit: 100, offset: offset),
-      );
-      checkPersonSession(_uid);
-      files.addAll(page.map((file) => file.name));
-      if (page.length < 100) break;
+    final folders = _isStatement
+        ? {
+            for (final entry in widget.statementDocuments.entries)
+              'credit_card_statements/${entry.key}': entry.value,
+          }
+        : {_folder: widget.canRemove};
+    final files = <({String folder, String name, bool writable})>[];
+    for (final folder in folders.entries) {
+      for (var offset = 0; ; offset += 100) {
+        final page = await _bucket.list(
+          path: folder.key,
+          searchOptions: SearchOptions(limit: 100, offset: offset),
+        );
+        checkPersonSession(_uid);
+        files.addAll(
+          page.map(
+            (file) =>
+                (folder: folder.key, name: file.name, writable: folder.value),
+          ),
+        );
+        if (page.length < 100) break;
+      }
     }
     if (!mounted) return;
-    setState(
-      () => _files
+    setState(() {
+      _loaded = true;
+      _files
         ..clear()
-        ..addAll(files),
-    );
+        ..addAll(files);
+    });
   }
 
   String _label(String name) =>
@@ -268,20 +439,24 @@ class _PersonReceiptsDialogState extends State<PersonReceiptsDialog> {
   Future<void> _add() => _run(() async {
     final receipt = await PendingReceipt.pick();
     if (receipt == null || !mounted) return;
+    if (_isStatement) {
+      await _load();
+      if (!mounted || !_canAdd) return;
+    }
     await receipt.upload(_bucket, _folder, _uid);
     await _load();
   });
 
-  Future<void> _preview(String name) async {
-    final path = '$_folder/$name';
-    final download = await _showReceiptPreview(
+  Future<void> _preview(String folder, String name) async {
+    final path = '$folder/$name';
+    final download = await showFilePreview(
       context,
       label: _label(name),
       sourceName: path,
       load: () => _runPreviewLoad(path),
       allowDownload: true,
     );
-    if (download == true && mounted) await _download(name);
+    if (download == true && mounted) await _download(folder, name);
   }
 
   Future<Uint8List> _runPreviewLoad(String path) async {
@@ -291,12 +466,12 @@ class _PersonReceiptsDialogState extends State<PersonReceiptsDialog> {
     return bytes;
   }
 
-  Future<void> _download(String name) => _run(() async {
+  Future<void> _download(String folder, String name) => _run(() async {
     final display = _label(name);
     final dot = display.lastIndexOf('.');
     final ext = display.substring(dot + 1);
     final base = display.substring(0, dot);
-    final bytes = await _bucket.download('$_folder/$name');
+    final bytes = await _bucket.download('$folder/$name');
     if (!mounted) return;
     checkPersonSession(_uid);
     final saver = FileSaver.instance;
@@ -326,11 +501,11 @@ class _PersonReceiptsDialogState extends State<PersonReceiptsDialog> {
       setState(() => _notice = 'Descarga solicitada.');
   });
 
-  Future<void> _remove(String name) => _run(() async {
+  Future<void> _remove(String folder, String name) => _run(() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Quitar comprobante'),
+        title: Text(_isStatement ? 'Quitar documento' : 'Quitar comprobante'),
         content: Text(_label(name)),
         actions: [
           TextButton(
@@ -346,7 +521,7 @@ class _PersonReceiptsDialogState extends State<PersonReceiptsDialog> {
     );
     if (confirmed != true || !mounted) return;
     checkPersonSession(_uid);
-    await _bucket.remove(['$_folder/$name']);
+    await _bucket.remove(['$folder/$name']);
     await _load();
   });
 
@@ -356,7 +531,7 @@ class _PersonReceiptsDialogState extends State<PersonReceiptsDialog> {
       horizontal: compactLayout(context) ? 12 : 40,
       vertical: 20,
     ),
-    title: const Text('Comprobantes'),
+    title: Text(_isStatement ? 'Documento del banco' : 'Comprobantes'),
     content: SizedBox(
       width: 440,
       child: SingleChildScrollView(
@@ -367,35 +542,39 @@ class _PersonReceiptsDialogState extends State<PersonReceiptsDialog> {
             if (_busy) const LinearProgressIndicator(),
             if (_notice != null) Text(_notice!),
             if (_files.isEmpty && !_busy && _notice == null)
-              const Text('Este movimiento todavía no tiene comprobantes.'),
-            for (final name in _files)
+              Text(
+                _isStatement
+                    ? 'Todavía no hay un documento para este corte.'
+                    : 'Este movimiento todavía no tiene comprobantes.',
+              ),
+            for (final (:folder, :name, :writable) in _files)
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(_label(name)),
                 leading: const Icon(Icons.attach_file),
-                onTap: _busy ? null : () => _preview(name),
+                onTap: _busy ? null : () => _preview(folder, name),
                 trailing: Wrap(
                   children: [
                     IconButton(
                       tooltip: 'Vista previa',
-                      onPressed: _busy ? null : () => _preview(name),
+                      onPressed: _busy ? null : () => _preview(folder, name),
                       icon: const Icon(Icons.visibility_outlined),
                     ),
                     IconButton(
                       tooltip: 'Descargar',
-                      onPressed: _busy ? null : () => _download(name),
+                      onPressed: _busy ? null : () => _download(folder, name),
                       icon: const Icon(Icons.download_outlined),
                     ),
-                    if (widget.canRemove)
+                    if (writable)
                       IconButton(
                         tooltip: 'Quitar',
-                        onPressed: _busy ? null : () => _remove(name),
+                        onPressed: _busy ? null : () => _remove(folder, name),
                         icon: const Icon(Icons.delete_outline),
                       ),
                   ],
                 ),
               ),
-            if (widget.canAdd)
+            if (_canAdd)
               const Padding(
                 padding: EdgeInsets.only(top: 12),
                 child: Text(
@@ -416,11 +595,11 @@ class _PersonReceiptsDialogState extends State<PersonReceiptsDialog> {
         onPressed: _busy ? null : () => _run(_load),
         icon: const Icon(Icons.refresh),
       ),
-      if (widget.canAdd)
+      if (_canAdd)
         FilledButton.icon(
           onPressed: _busy ? null : _add,
           icon: const Icon(Icons.upload_file),
-          label: const Text('Adjuntar'),
+          label: Text(_isStatement ? 'Adjuntar documento' : 'Adjuntar'),
         ),
     ],
   );

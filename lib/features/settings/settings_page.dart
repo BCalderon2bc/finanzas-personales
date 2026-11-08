@@ -131,7 +131,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                 children: [
                                   const Icon(
                                     Icons.currency_exchange_rounded,
-                                    color: Color(0xFF2563EB),
+                                    color: Color(0xFF17604E),
                                     size: 36,
                                   ),
                                   const SizedBox(height: 14),
@@ -190,7 +190,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                     'tarjetas o movimientos. Tampoco registra ganancias o pérdidas cambiarias. '
                                     'Se aplica la misma tasa al mes seleccionado y al mes anterior.',
                                     style: TextStyle(
-                                      color: Color(0xFF64748B),
+                                      color: Color(0xFF50665B),
                                       height: 1.5,
                                     ),
                                   ),
@@ -199,7 +199,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                     Text(
                                       'Última actualización: ${date.day}/${date.month}/${date.year}',
                                       style: const TextStyle(
-                                        color: Color(0xFF64748B),
+                                        color: Color(0xFF50665B),
                                         fontSize: 12,
                                       ),
                                     ),

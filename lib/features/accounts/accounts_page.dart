@@ -1,3 +1,4 @@
+import '../../widgets/page_intro.dart';
 import '../../widgets/adaptive_layout.dart';
 import '../help/app_help.dart';
 import 'package:flutter/material.dart';
@@ -323,7 +324,7 @@ class _AccountsPageState extends State<AccountsPage> {
               const Icon(
                 Icons.account_balance_wallet_outlined,
                 size: 64,
-                color: Color(0xFF2563EB),
+                color: Color(0xFF17604E),
               ),
               const SizedBox(height: 16),
               const Text(
@@ -351,7 +352,7 @@ class _AccountsPageState extends State<AccountsPage> {
     final selected = selectedAccount;
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1100),
+        constraints: const BoxConstraints(maxWidth: widePageMaxWidth),
         child: RefreshIndicator(
           onRefresh: loadAccounts,
           child: ListView(
@@ -365,6 +366,12 @@ class _AccountsPageState extends State<AccountsPage> {
               compactLayout(context) ? 24 : 110,
             ),
             children: [
+              const PageIntro(
+                icon: Icons.account_balance_wallet_outlined,
+                title: 'Cuentas y efectivo',
+                description:
+                    'Consulta cuánto tienes y revisa los datos de cada cuenta.',
+              ),
               GuideAnchor(
                 id: 'wallet',
                 child: AccountWallet(

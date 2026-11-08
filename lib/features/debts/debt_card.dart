@@ -52,7 +52,7 @@ class DebtCard extends StatelessWidget {
     children: [
       Text(
         label,
-        style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+        style: const TextStyle(color: Color(0xFF50665B), fontSize: 12),
       ),
       const SizedBox(height: 6),
       FittedBox(
@@ -61,7 +61,7 @@ class DebtCard extends StatelessWidget {
         child: Text(
           money(amount),
           style: const TextStyle(
-            color: Color(0xFF172033),
+            color: Color(0xFF182B24),
             fontSize: 17,
             fontWeight: FontWeight.w700,
           ),
@@ -72,12 +72,12 @@ class DebtCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const blue = Color(0xFF2563EB);
-    const green = Color(0xFF087F5B);
-    const red = Color(0xFFB42318);
+    const blue = Color(0xFF17604E);
+    const green = Color(0xFF14684D);
+    const red = Color(0xFFA2322C);
     const amber = Color(0xFFB45309);
-    const muted = Color(0xFF64748B);
-    const border = Color(0xFFE2E8F0);
+    const muted = Color(0xFF50665B);
+    const border = Color(0xFFD9E3DA);
     final original = moneyCents(debt['original_amount']);
     final pending = original - paidCents;
     final status = debt['status']?.toString() ?? '';
@@ -165,7 +165,7 @@ class DebtCard extends StatelessWidget {
                             style: const TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF172033),
+                              color: Color(0xFF182B24),
                             ),
                           ),
                           if (creditor.isNotEmpty) ...[
@@ -243,7 +243,7 @@ class DebtCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
+                    color: const Color(0xFFF8FAF7),
                     borderRadius: BorderRadius.circular(15),
                   ),
                   child: Column(

@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../widgets/category_style.dart';
+import '../../widgets/adaptive_layout.dart';
 import 'dashboard_overview.dart';
 
-const _blue = Color(0xFF2563EB);
-const _green = Color(0xFF087F5B);
-const _red = Color(0xFFB42318);
-const _muted = Color(0xFF64748B);
-const _border = Color(0xFFE2E8F0);
+const _blue = Color(0xFF17604E);
+const _green = Color(0xFF14684D);
+const _red = Color(0xFFA2322C);
+const _muted = Color(0xFF50665B);
+const _border = Color(0xFFD9E3DA);
 
 class DashboardMetrics extends StatelessWidget {
   const DashboardMetrics({
@@ -52,23 +53,11 @@ class DashboardMetrics extends StatelessWidget {
         footerColor: c.net >= c.previousNet ? _green : _red,
       ),
     ];
-    return LayoutBuilder(
-      builder: (context, box) {
-        final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
-        final columns = box.maxWidth >= 1050
-            ? 4
-            : box.maxWidth >= 350 * scale
-            ? 2
-            : 1;
-        final width = (box.maxWidth - 14 * (columns - 1)) / columns;
-        return Wrap(
-          spacing: 14,
-          runSpacing: 14,
-          children: cards
-              .map((card) => SizedBox(width: width, child: card))
-              .toList(),
-        );
-      },
+    return AdaptiveColumns(
+      minColumnWidth: 230,
+      maxColumns: 4,
+      spacing: 14,
+      children: cards,
     );
   }
 }
@@ -97,7 +86,7 @@ class _Metric extends StatelessWidget {
         color: hero ? null : Colors.white,
         gradient: hero
             ? const LinearGradient(
-                colors: [Color(0xFF153E9E), Color(0xFF2563EB)],
+                colors: [Color(0xFF124737), Color(0xFF17604E)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               )
@@ -154,7 +143,7 @@ class _Metric extends StatelessWidget {
                 fontSize: 30,
                 fontWeight: FontWeight.w800,
                 letterSpacing: -0.8,
-                color: hero ? Colors.white : const Color(0xFF172033),
+                color: hero ? Colors.white : const Color(0xFF182B24),
               ),
             ),
           ),
@@ -354,7 +343,7 @@ class DashboardPanels extends StatelessWidget {
                                 fontWeight: FontWeight.w700,
                                 color: entry.value < 0
                                     ? _green
-                                    : const Color(0xFF172033),
+                                    : const Color(0xFF182B24),
                               ),
                             ),
                             Text(
@@ -375,7 +364,7 @@ class DashboardPanels extends StatelessWidget {
                             value: ratio.clamp(0.0, 1.0).toDouble(),
                             minHeight: 7,
                             color: color,
-                            backgroundColor: const Color(0xFFF1F5F9),
+                            backgroundColor: const Color(0xFFF0F4EF),
                           ),
                         ),
                       ],
@@ -497,7 +486,7 @@ class DashboardPanels extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
+                  color: const Color(0xFFF8FAF7),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: exceeded ? color.withAlpha(65) : _border,

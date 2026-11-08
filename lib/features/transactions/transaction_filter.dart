@@ -48,7 +48,9 @@ class TransactionFilter {
     if (reconciled != null && (external || tx['is_reconciled'] != reconciled)) {
       return false;
     }
-    if (type != 'all' && tx['transaction_type'] != type) {
+    if (type == 'insurance'
+        ? tx['expense_kind'] != 'card_insurance'
+        : type != 'all' && tx['transaction_type'] != type) {
       return false;
     }
     if (accountId != null) {

@@ -8,7 +8,11 @@ import 'person_account_export_report.dart';
 
 Uint8List reportExcel(ExportReport report) {
   final excel = x.Excel.createExcel();
-  excel.rename(excel.getDefaultSheet()!, 'Resumen');
+  final firstSheet = report.showTotalsSummary
+      ? 'Resumen'
+      : report.tables.firstOrNull?.name ?? 'Resumen';
+  excel.rename(excel.getDefaultSheet()!, firstSheet);
+  excel.setDefaultSheet(firstSheet);
   final summary = excel['Resumen'];
   final person = report is PersonAccountExportReport ? report : null;
   summary.appendRow([x.TextCellValue('Mi Billete · ${report.title}')]);
@@ -47,7 +51,7 @@ Uint8List reportExcel(ExportReport report) {
 
     summary.appendRow([]);
   }
-  if (person == null) {
+  if (person == null && report.showTotalsSummary) {
     summary.appendRow([
       x.TextCellValue('Moneda'),
       x.TextCellValue('Concepto'),
@@ -390,7 +394,7 @@ Future<Uint8List> reportPdf(
           ),
           pw.SizedBox(height: 12),
         ],
-        if (person == null)
+        if (person == null && report.showTotalsSummary)
           pw.TableHelper.fromTextArray(
             headers: ['Concepto', 'Córdobas C\$', 'Dólares US\$'],
             data: [
@@ -419,8 +423,10 @@ Future<Uint8List> reportPdf(
           ),
           pw.SizedBox(height: 6),
           if (table.rows.isEmpty && person == null)
-            pw.Text('Sin registros.', style: const pw.TextStyle(fontSize: 9))
-          else
+            pw.Text('Sin registros.', style: const pw.TextStyle(fontSize: 9)),
+          if (table.rows.isNotEmpty ||
+              table.footerRows.isNotEmpty ||
+              person != null)
             pw.TableHelper.fromTextArray(
               headers: table.columns,
               data: _pdfRows(_exportTableRows(table, person != null)),
@@ -451,7 +457,8 @@ Future<Uint8List> reportPdf(
               },
               cellAlignments: {
                 for (var n = 0; n < table.columns.length; n++)
-                  if (table.rows.any((r) => r[n] is MoneyCell))
+                  if (table.rows.any((r) => r[n] is MoneyCell) ||
+                      table.footerRows.any((r) => r[n] is MoneyCell))
                     n: pw.Alignment.centerRight,
               },
               headerStyle: pw.TextStyle(
@@ -502,6 +509,7 @@ String _totalLabel(ExportReport report, String label, String currency) {
 // Total al pie del detalle. Suma únicamente las columnas de importes visibles;
 // la tasa no se suma y el saldo neto conserva su cálculo independiente.
 List<List<Object?>> _exportTableRows(ReportTable table, bool person) {
+  if (table.footerRows.isNotEmpty) return [...table.rows, ...table.footerRows];
   if (!person) return table.rows;
   final amountColumns = <int>[
     for (var i = 0; i < table.columns.length; i++)

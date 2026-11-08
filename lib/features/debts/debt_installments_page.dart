@@ -196,15 +196,14 @@ class _DebtInstallmentsPageState extends State<DebtInstallmentsPage> {
     final linked = v['installment_id'];
     final receipt = v.remove(receiptDraftKey) as PendingReceipt?;
     final saved = await supabase.rpc(
-      linked == null
-          ? 'register_debt_payment'
-          : 'register_debt_payment_for_installment',
+      'register_debt_payment_breakdown',
       params: {
         'p_debt_id': debtId,
         'p_account_id': v['account_id'],
         'p_principal_amount': v['principal_amount'],
         'p_interest_amount': v['interest_amount'],
         'p_fee_amount': v['fee_amount'],
+        'p_insurance_amount': v['insurance_amount'],
         'p_payment_date': v['payment_date'],
         'p_reference': v['reference'],
         if (linked != null) 'p_installment_id': linked,
@@ -504,7 +503,7 @@ class _DebtInstallmentsPageState extends State<DebtInstallmentsPage> {
                           'Si liquidaste el préstamo anticipadamente, revisa y archiva las cuotas futuras que ya no correspondan.',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Color(0xFF64748B),
+                            color: Color(0xFF50665B),
                           ),
                         ),
                       ],

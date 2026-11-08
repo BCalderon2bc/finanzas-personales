@@ -53,7 +53,7 @@ Future<DashboardOverview> loadDashboardOverview(
     _dashboardRows('categories', 'id, name, icon, color', user.id),
     _dashboardRows(
       'budgets',
-      'id, category_id, currency, budget_amount, month',
+      'id, category_id, currency, budget_amount, month, start_date, end_date',
       user.id,
     ),
     _dashboardRows(
@@ -64,7 +64,7 @@ Future<DashboardOverview> loadDashboardOverview(
     _dashboardRows(
       'debt_payments',
       'id, debt_id, account_id, principal_amount, interest_amount, '
-          'fee_amount, currency, payment_date, is_voided',
+          'fee_amount, insurance_amount, currency, payment_date, is_voided',
       user.id,
     ),
     _dashboardRows(

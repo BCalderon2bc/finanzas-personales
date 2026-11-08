@@ -1,3 +1,4 @@
+import '../../widgets/adaptive_layout.dart';
 import '../person_accounts/receipt_history.dart';
 import 'package:flutter/material.dart';
 import '../person_accounts/person_receipts_dialog.dart';
@@ -16,7 +17,7 @@ class DebtPaymentsPage extends StatefulWidget {
 class _DebtPaymentsPageState extends State<DebtPaymentsPage> {
   List<Map<String, dynamic>> payments = [];
   String description = '', currency = 'NIO';
-  int original = 0, principal = 0, interest = 0, fees = 0;
+  int original = 0, principal = 0, interest = 0, fees = 0, insurance = 0;
   bool loading = true;
   String? error;
   int requestId = 0;
@@ -75,7 +76,7 @@ class _DebtPaymentsPageState extends State<DebtPaymentsPage> {
         final result = await supabase
             .from('debt_payments')
             .select(
-              'id, principal_amount, interest_amount, fee_amount, currency, payment_date, reference, is_voided, void_reason, voided_at',
+              'id, principal_amount, interest_amount, fee_amount, insurance_amount, currency, payment_date, reference, is_voided, void_reason, voided_at',
             )
             .eq('debt_id', widget.debtId)
             .eq('user_id', user.id)
@@ -106,6 +107,12 @@ class _DebtPaymentsPageState extends State<DebtPaymentsPage> {
         principal = capital;
         interest = interests;
         fees = commissions;
+        insurance = rows
+            .where((p) => p['is_voided'] != true)
+            .fold<int>(
+              0,
+              (total, p) => total + moneyCents(p['insurance_amount'] ?? 0),
+            );
         loading = false;
       });
       await refreshReceiptCounts();
@@ -209,7 +216,11 @@ class _DebtPaymentsPageState extends State<DebtPaymentsPage> {
             const SizedBox(height: 8),
             amountRow('Capital', capital),
             amountRow('Intereses', interests),
-            amountRow('Comisiones', commissions),
+            amountRow('Seguro', moneyCents(payment['insurance_amount'] ?? 0)),
+            amountRow(
+              'Otros cargos y comisiones',
+              commissions - moneyCents(payment['insurance_amount'] ?? 0),
+            ),
             const Divider(),
             amountRow(
               'Total del abono',
@@ -257,91 +268,99 @@ class _DebtPaymentsPageState extends State<DebtPaymentsPage> {
         ),
       ],
     ),
-    body: loading
-        ? const Center(child: CircularProgressIndicator())
-        : error != null
-        ? Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+    body: PageFrame(
+      maxWidth: 960,
+      child: loading
+          ? const Center(child: CircularProgressIndicator())
+          : error != null
+          ? Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('No se pudo cargar el historial.'),
+                    SelectableText(error!),
+                    TextButton(
+                      onPressed: loadData,
+                      child: const Text('Reintentar'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: loadData,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
                 children: [
-                  const Text('No se pudo cargar el historial.'),
-                  SelectableText(error!),
-                  TextButton(
-                    onPressed: loadData,
-                    child: const Text('Reintentar'),
+                  Text(
+                    description,
+                    style: Theme.of(context).textTheme.headlineSmall,
                   ),
+                  const SizedBox(height: 12),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          amountRow('Capital original', original),
+                          amountRow('Capital abonado', principal),
+                          amountRow(
+                            'Capital pendiente',
+                            original - principal,
+                            bold: true,
+                          ),
+                          const Divider(),
+                          amountRow('Intereses pagados', interest),
+                          amountRow('Seguro pagado', insurance),
+                          amountRow(
+                            'Otros cargos y comisiones',
+                            fees - insurance,
+                          ),
+                          amountRow(
+                            'Total pagado',
+                            principal + interest + fees,
+                            bold: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      'El capital pendiente no incluye intereses ni comisiones por pagar.',
+                    ),
+                  ),
+                  Text('${payments.length} abonos registrados'),
+                  const SizedBox(height: 8),
+                  if (payments.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text(
+                        'Esta deuda todavía no tiene abonos.',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  if (receiptCounts != null)
+                    ReceiptFilterField(
+                      value: receiptFilter,
+                      onChanged: (value) =>
+                          setState(() => receiptFilter = value),
+                    ),
+                  ...payments
+                      .where(
+                        (p) =>
+                            receiptCounts == null ||
+                            receiptFilter.matches(countFor(p)),
+                      )
+                      .map(paymentCard),
                 ],
               ),
             ),
-          )
-        : RefreshIndicator(
-            onRefresh: loadData,
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
-              children: [
-                Text(
-                  description,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 12),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        amountRow('Capital original', original),
-                        amountRow('Capital abonado', principal),
-                        amountRow(
-                          'Capital pendiente',
-                          original - principal,
-                          bold: true,
-                        ),
-                        const Divider(),
-                        amountRow('Intereses pagados', interest),
-                        amountRow('Comisiones pagadas', fees),
-                        amountRow(
-                          'Total pagado',
-                          principal + interest + fees,
-                          bold: true,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 8),
-                  child: Text(
-                    'El capital pendiente no incluye intereses ni comisiones por pagar.',
-                  ),
-                ),
-                Text('${payments.length} abonos registrados'),
-                const SizedBox(height: 8),
-                if (payments.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Text(
-                      'Esta deuda todavía no tiene abonos.',
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                if (receiptCounts != null)
-                  ReceiptFilterField(
-                    value: receiptFilter,
-                    onChanged: (value) => setState(() => receiptFilter = value),
-                  ),
-                ...payments
-                    .where(
-                      (p) =>
-                          receiptCounts == null ||
-                          receiptFilter.matches(countFor(p)),
-                    )
-                    .map(paymentCard),
-              ],
-            ),
-          ),
+    ),
   );
 }

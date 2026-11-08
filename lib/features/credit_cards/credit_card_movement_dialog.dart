@@ -27,11 +27,13 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
   String? categoryId;
   DateTime date = DateTime.now();
   bool get editing => widget.movement != null;
-  bool get usesCategory => type == 'purchase' || type == 'refund';
+  bool get usesCategory =>
+      type == 'purchase' || type == 'refund' || type == 'insurance';
   static const types = {
     'purchase': 'Compra',
     'interest': 'Intereses',
     'fee': 'Comisión',
+    'insurance': 'Seguro de tarjeta',
     'refund': 'Devolución de compra',
   };
   @override
@@ -42,7 +44,9 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
     if (tx == null) {
       return;
     }
-    type = tx['transaction_type'].toString();
+    type = tx['charge_kind'] == 'insurance'
+        ? 'insurance'
+        : tx['transaction_type'].toString();
     categoryId = tx['category_id']?.toString();
     amount.text = tx['amount'].toString();
     description.text = tx['description']?.toString() ?? '';
@@ -65,7 +69,8 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
     }
     Navigator.pop(context, <String, dynamic>{
       ..._receipt.fields,
-      'transaction_type': type,
+      'transaction_type': type == 'insurance' ? 'fee' : type,
+      'charge_kind': type == 'insurance' ? 'insurance' : null,
       'currency': currency,
       'amount': double.parse(amount.text.trim().replaceAll(',', '.')),
       'category_id': usesCategory ? categoryId : null,

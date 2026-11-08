@@ -29,6 +29,7 @@ class _DebtPaymentDialogState extends State<DebtPaymentDialog> {
   final formKey = GlobalKey<FormState>();
   final principal = TextEditingController(text: '0.00');
   final interest = TextEditingController(text: '0.00');
+  final insurance = TextEditingController(text: '0.00');
   final fee = TextEditingController(text: '0.00');
   final reference = TextEditingController();
   DateTime date = DateTime.now();
@@ -49,6 +50,7 @@ class _DebtPaymentDialogState extends State<DebtPaymentDialog> {
     principal.dispose();
     interest.dispose();
     fee.dispose();
+    insurance.dispose();
     reference.dispose();
     super.dispose();
   }
@@ -66,6 +68,7 @@ class _DebtPaymentDialogState extends State<DebtPaymentDialog> {
       controller: controller,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       decoration: InputDecoration(labelText: label),
+      onChanged: (_) => setState(() {}),
       validator: (value) {
         final text = (value ?? '').trim();
         final amount = double.tryParse(text.replaceAll(',', '.'));
@@ -85,8 +88,9 @@ class _DebtPaymentDialogState extends State<DebtPaymentDialog> {
     if (!formKey.currentState!.validate()) return;
     final capital = cents(principal),
         interests = cents(interest),
-        fees = cents(fee);
-    if (capital + interests + fees <= 0) {
+        fees = cents(fee),
+        insured = cents(insurance);
+    if (capital + interests + fees + insured <= 0) {
       setState(() => error = 'El abono total debe ser mayor que cero.');
       return;
     }
@@ -94,6 +98,7 @@ class _DebtPaymentDialogState extends State<DebtPaymentDialog> {
       ..._receipt.fields,
       'principal_amount': capital / 100,
       'interest_amount': interests / 100,
+      'insurance_amount': insured / 100,
       'fee_amount': fees / 100,
       'payment_date': DateTime(
         date.year,
@@ -152,7 +157,7 @@ class _DebtPaymentDialogState extends State<DebtPaymentDialog> {
                     padding: const EdgeInsets.only(bottom: 12),
                     child: Text(
                       'Cuota pendiente: ${formatMoneyCents(widget.expectedTotalCents!, widget.currency)}. '
-                      'Indica el desglose real de capital, intereses y comisiones.',
+                      'Indica el desglose real de capital, intereses, seguro y otros cargos.',
                     ),
                   ),
                 amountField(
@@ -161,7 +166,15 @@ class _DebtPaymentDialogState extends State<DebtPaymentDialog> {
                   capital: true,
                 ),
                 amountField('Intereses pagados ($symbol)', interest),
-                amountField('Comisiones pagadas ($symbol)', fee),
+                amountField('Seguro pagado ($symbol)', insurance),
+                amountField('Otros cargos y comisiones ($symbol)', fee),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    'Total del abono: ${formatMoneyCents([principal, interest, insurance, fee].fold<int>(0, (total, c) => total + ((double.tryParse(c.text.replaceAll(',', '.')) ?? 0) * 100).round()), widget.currency)}',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
                 OutlinedButton.icon(
                   icon: const Icon(Icons.calendar_month),
                   label: Text(
@@ -214,7 +227,7 @@ class _DebtPaymentDialogState extends State<DebtPaymentDialog> {
                   const SizedBox(height: 10),
                 ],
                 const Text(
-                  'Se descontará de la cuenta el total de capital, intereses y comisiones.',
+                  'Se descontará de la cuenta el total de capital, intereses, seguro y otros cargos.',
                 ),
                 if (error != null)
                   Text(

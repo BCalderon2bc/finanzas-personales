@@ -46,8 +46,8 @@ class CreditCardWallet extends StatelessWidget {
             borderRadius: BorderRadius.circular(22),
             side: BorderSide(
               color: selected
-                  ? const Color(0xFF2563EB)
-                  : const Color(0xFFE2E8F0),
+                  ? const Color(0xFF17604E)
+                  : const Color(0xFFD9E3DA),
             ),
           ),
           clipBehavior: Clip.antiAlias,
@@ -90,7 +90,7 @@ class CreditCardWallet extends StatelessWidget {
                   Text(
                     card['is_active'] == true ? 'Activa' : 'Inactiva',
                     style: const TextStyle(
-                      color: Color(0xFF64748B),
+                      color: Color(0xFF50665B),
                       fontSize: 13,
                     ),
                   ),

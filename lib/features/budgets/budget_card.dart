@@ -22,17 +22,17 @@ class BudgetCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const muted = Color(0xFF64748B);
-    const border = Color(0xFFE2E8F0);
+    const muted = Color(0xFF50665B);
+    const border = Color(0xFFD9E3DA);
     final remaining = limitCents - usedCents;
     final exceeded = remaining < 0;
     final ratio = limitCents > 0 ? usedCents / limitCents : 0.0;
     final nearLimit = !exceeded && limitCents > 0 && ratio >= 0.8;
     final color = exceeded
-        ? const Color(0xFFB42318)
+        ? const Color(0xFFA2322C)
         : nearLimit
         ? const Color(0xFFB45309)
-        : const Color(0xFF087F5B);
+        : const Color(0xFF14684D);
 
     final categoryAccent = categoryStyle == null
         ? color
@@ -68,7 +68,7 @@ class BudgetCard extends StatelessWidget {
             child: Text(
               money(amount),
               style: const TextStyle(
-                color: Color(0xFF172033),
+                color: Color(0xFF182B24),
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
               ),
@@ -117,7 +117,7 @@ class BudgetCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF172033),
+                        color: Color(0xFF182B24),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -163,7 +163,7 @@ class BudgetCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: const Color(0xFFF8FAF7),
               borderRadius: BorderRadius.circular(15),
             ),
             child: Column(

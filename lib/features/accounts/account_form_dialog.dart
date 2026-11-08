@@ -392,7 +392,7 @@ class _AccountFormDialogState extends State<AccountFormDialog> {
                     padding: EdgeInsets.only(top: 8),
                     child: Text(
                       'El tipo y la moneda se conservan al editar.',
-                      style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
+                      style: TextStyle(color: Color(0xFF50665B), fontSize: 12),
                     ),
                   ),
                 const SizedBox(height: 12),

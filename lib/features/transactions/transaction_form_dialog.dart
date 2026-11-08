@@ -11,11 +11,13 @@ class TransactionFormDialog extends StatefulWidget {
     required this.accounts,
     required this.categories,
     this.transaction,
+    this.practice = false,
   });
 
   final List<Map<String, dynamic>> accounts;
   final List<Map<String, dynamic>> categories;
   final Map<String, dynamic>? transaction;
+  final bool practice;
 
   @override
   State<TransactionFormDialog> createState() => _TransactionFormDialogState();
@@ -45,7 +47,9 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
         accountId = widget.accounts.first['id'].toString();
       return;
     }
-    transactionType = tx['transaction_type'].toString();
+    transactionType = tx['expense_kind'] == 'card_insurance'
+        ? 'insurance'
+        : tx['transaction_type'].toString();
     accountId = tx['account_id'].toString();
     destinationAccountId = tx['destination_account_id']?.toString();
     categoryId = tx['category_id']?.toString();
@@ -77,7 +81,11 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
   }
 
   List<Map<String, dynamic>> get filteredCategories => widget.categories
-      .where((c) => c['category_type'] == transactionType)
+      .where(
+        (c) =>
+            c['category_type'] ==
+            (transactionType == 'insurance' ? 'expense' : transactionType),
+      )
       .toList();
 
   List<Map<String, dynamic>> get availableDestinations =>
@@ -145,7 +153,13 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
           ? destinationAccountId
           : null,
       'category_id': transactionType == 'transfer' ? null : categoryId,
-      'transaction_type': transactionType,
+      'transaction_type': transactionType == 'insurance'
+          ? 'expense'
+          : transactionType,
+      if (transactionType != 'transfer')
+        'expense_kind': transactionType == 'insurance'
+            ? 'card_insurance'
+            : null,
       'amount': amount,
       'currency': selectedCurrency,
       'transaction_date': DateTime(
@@ -186,80 +200,95 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
         title: Row(
           children: [
             Expanded(
-              child: Text(editing ? 'Editar movimiento' : 'Nuevo movimiento'),
+              child: Text(
+                widget.practice
+                    ? (editing
+                          ? 'Editar movimiento de práctica'
+                          : 'Nuevo movimiento de práctica')
+                    : (editing ? 'Editar movimiento' : 'Nuevo movimiento'),
+              ),
             ),
-            const AppHelpButton(topic: 'movements'),
+            if (!widget.practice) const AppHelpButton(topic: 'movements'),
           ],
         ),
         content: SizedBox(
-          width: 460,
+          width: 680,
           child: SingleChildScrollView(
             child: Form(
               key: formKey,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  GuideAnchor(
-                    id: 'type',
-                    child: DropdownButtonFormField<String>(
-                      initialValue: transactionType,
-                      decoration: const InputDecoration(
-                        labelText: 'Tipo de movimiento',
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'income',
-                          child: Text('Ingreso'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'expense',
-                          child: Text('Gasto'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'transfer',
-                          child: Text('Transferencia'),
-                        ),
-                      ],
-                      onChanged: editing
-                          ? null
-                          : (value) {
-                              if (value == null) return;
-                              setState(() {
-                                transactionType = value;
-                                categoryId = null;
-                                destinationAccountId = null;
-                              });
-                            },
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  GuideAnchor(
-                    id: 'origin',
-                    child: DropdownButtonFormField<String>(
-                      initialValue: accountId,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Cuenta de origen',
-                      ),
-                      items: widget.accounts
-                          .map(
-                            (a) => DropdownMenuItem(
-                              value: a['id'].toString(),
-                              child: Text(
-                                '${a['name']} (${a['currency'] == 'USD' ? 'US\$' : 'C\$'})',
-                              ),
+                  AdaptiveColumns(
+                    minColumnWidth: 235,
+                    children: [
+                      GuideAnchor(
+                        id: 'type',
+                        child: DropdownButtonFormField<String>(
+                          initialValue: transactionType,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Tipo de movimiento',
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'income',
+                              child: Text('Ingreso'),
                             ),
-                          )
-                          .toList(),
-                      onChanged: editing
-                          ? null
-                          : (value) => setState(() {
-                              accountId = value;
-                              destinationAccountId = null;
-                            }),
-                      validator: (value) =>
-                          value == null ? 'Selecciona una cuenta' : null,
-                    ),
+                            DropdownMenuItem(
+                              value: 'expense',
+                              child: Text('Gasto'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'insurance',
+                              child: Text('Seguro de tarjeta'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'transfer',
+                              child: Text('Transferencia'),
+                            ),
+                          ],
+                          onChanged: editing
+                              ? null
+                              : (value) {
+                                  if (value == null) return;
+                                  setState(() {
+                                    transactionType = value;
+                                    categoryId = null;
+                                    destinationAccountId = null;
+                                  });
+                                },
+                        ),
+                      ),
+                      GuideAnchor(
+                        id: 'origin',
+                        child: DropdownButtonFormField<String>(
+                          initialValue: accountId,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Cuenta de origen',
+                          ),
+                          items: widget.accounts
+                              .map(
+                                (a) => DropdownMenuItem(
+                                  value: a['id'].toString(),
+                                  child: Text(
+                                    '${a['name']} (${a['currency'] == 'USD' ? 'US\$' : 'C\$'})',
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: editing
+                              ? null
+                              : (value) => setState(() {
+                                  accountId = value;
+                                  destinationAccountId = null;
+                                }),
+                          validator: (value) =>
+                              value == null ? 'Selecciona una cuenta' : null,
+                        ),
+                      ),
+                    ],
                   ),
                   if (transactionType == 'transfer') ...[
                     const SizedBox(height: 14),
@@ -408,44 +437,51 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  GuideAnchor(
-                    id: 'date',
-                    child: InkWell(
-                      onTap: () async {
-                        final selected = await showDatePicker(
-                          context: context,
-                          initialDate: transactionDate,
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime(2100),
-                        );
-                        if (selected != null && mounted)
-                          setState(() => transactionDate = selected);
-                      },
-                      child: InputDecorator(
-                        decoration: const InputDecoration(
-                          labelText: 'Fecha del movimiento',
-                          suffixIcon: Icon(Icons.calendar_month),
-                        ),
-                        child: Text(
-                          '${transactionDate.day.toString().padLeft(2, '0')}/${transactionDate.month.toString().padLeft(2, '0')}/${transactionDate.year}',
+                  AdaptiveColumns(
+                    minColumnWidth: 235,
+                    children: [
+                      GuideAnchor(
+                        id: 'date',
+                        child: InkWell(
+                          onTap: () async {
+                            final selected = await showDatePicker(
+                              context: context,
+                              initialDate: transactionDate,
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                            );
+                            if (selected != null && mounted)
+                              setState(() => transactionDate = selected);
+                          },
+                          child: InputDecorator(
+                            decoration: const InputDecoration(
+                              labelText: 'Fecha del movimiento',
+                              suffixIcon: Icon(Icons.calendar_month),
+                            ),
+                            child: Text(
+                              '${transactionDate.day.toString().padLeft(2, '0')}/${transactionDate.month.toString().padLeft(2, '0')}/${transactionDate.year}',
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                      TextFormField(
+                        controller: referenceController,
+                        decoration: const InputDecoration(
+                          labelText: 'Referencia (opcional)',
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: referenceController,
-                    decoration: const InputDecoration(
-                      labelText: 'Referencia (opcional)',
-                    ),
-                  ),
+                  if (!widget.practice && widget.transaction == null) ...[
+                    const SizedBox(height: 12),
+                    ReceiptDraftField(draft: _receipt),
+                  ],
                 ],
               ),
             ),
           ),
         ),
         actions: [
-          if (widget.transaction == null) ReceiptDraftField(draft: _receipt),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancelar'),
@@ -455,7 +491,7 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
             child: FilledButton.icon(
               onPressed: save,
               icon: const Icon(Icons.save_outlined),
-              label: const Text('Guardar'),
+              label: Text(widget.practice ? 'Guardar simulación' : 'Guardar'),
             ),
           ),
         ],

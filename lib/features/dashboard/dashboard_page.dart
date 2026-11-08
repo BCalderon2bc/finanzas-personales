@@ -131,13 +131,13 @@ class _DashboardPageState extends State<DashboardPage> {
     setState(() {
       period = from
           ? DashboardPeriod(
-        selected,
-        selected.isAfter(period.end) ? selected : period.end,
-      )
+              selected,
+              selected.isAfter(period.end) ? selected : period.end,
+            )
           : DashboardPeriod(
-        selected.isBefore(period.start) ? selected : period.start,
-        selected,
-      );
+              selected.isBefore(period.start) ? selected : period.start,
+              selected,
+            );
     });
     await loadData();
   }
@@ -194,7 +194,7 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void updateScrollButton() {
-    if (!mounted || !scrollController.hasClients) {
+    if (!mounted || scrollController.positions.length != 1) {
       return;
     }
 
@@ -206,7 +206,7 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void backToTop() {
-    if (!scrollController.hasClients) {
+    if (scrollController.positions.length != 1) {
       return;
     }
 
@@ -301,10 +301,10 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
         floatingActionButton: showBackToTop
             ? FloatingActionButton.small(
-          tooltip: 'Volver arriba',
-          onPressed: backToTop,
-          child: const Icon(Icons.keyboard_arrow_up_rounded),
-        )
+                tooltip: 'Volver arriba',
+                onPressed: backToTop,
+                child: const Icon(Icons.keyboard_arrow_up_rounded),
+              )
             : null,
         body: SafeArea(
           top: false,
@@ -312,11 +312,12 @@ class _DashboardPageState extends State<DashboardPage> {
             onRefresh: loadData,
             child: SingleChildScrollView(
               controller: scrollController,
+              primary: false,
               physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.fromLTRB(gutter, 12, gutter, 80),
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1240),
+                  constraints: const BoxConstraints(maxWidth: widePageMaxWidth),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -331,7 +332,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           onCurrent: () {
                             final now = DateTime.now();
                             setState(
-                                  () => period = DashboardPeriod.forMonth(now),
+                              () => period = DashboardPeriod.forMonth(now),
                             );
                             loadData();
                           },
@@ -339,60 +340,6 @@ class _DashboardPageState extends State<DashboardPage> {
                               setState(() => currency = value),
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      if (!loading)
-                        Container(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 4, 8),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surface,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Totales en ${currency == 'USD' ? 'dólares' : 'córdobas'}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 5),
-                                    Text(
-                                      rate == null
-                                          ? 'Configura la tasa para combinar NIO y USD.'
-                                          : '1 USD = C\$ ${rate.decimal} · Incluye ambas monedas',
-                                      style: const TextStyle(
-                                        color: Color(0xFF64748B),
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                    if (settingsError != null)
-                                      const Text(
-                                        'No se pudo cargar la tasa.',
-                                        style: TextStyle(
-                                          color: Color(0xFFB42318),
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              IconButton(
-                                tooltip: 'Configurar tasa de cambio',
-                                onPressed: openSettings,
-                                icon: const Icon(
-                                  Icons.currency_exchange_rounded,
-                                  color: Color(0xFF2563EB),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       if (loading)
                         const Padding(
                           padding: EdgeInsets.all(32),
@@ -424,7 +371,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           error == null &&
                           current != null &&
                           presented != null) ...[
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 12),
                         GuideAnchor(
                           id: 'metrics',
                           child: DashboardMetrics(
@@ -444,12 +391,69 @@ class _DashboardPageState extends State<DashboardPage> {
                             onDebt: (debt) => pushPage(
                               DebtsPage(
                                 initialSearch:
-                                debt['description']?.toString() ?? '',
+                                    debt['description']?.toString() ?? '',
                               ),
                             ),
                           ),
                         ),
                         const SizedBox(height: 20),
+                      ],
+                      const SizedBox(height: 12),
+                      if (!loading)
+                        Container(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 4, 8),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surface,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFD9E3DA)),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Totales en ${currency == 'USD' ? 'dólares' : 'córdobas'}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 5),
+                                    Text(
+                                      rate == null
+                                          ? 'Configura la tasa para combinar NIO y USD.'
+                                          : '1 USD = C\$ ${rate.decimal} · Incluye ambas monedas',
+                                      style: const TextStyle(
+                                        color: Color(0xFF50665B),
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    if (settingsError != null)
+                                      const Text(
+                                        'No se pudo cargar la tasa.',
+                                        style: TextStyle(
+                                          color: Color(0xFFA2322C),
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'Configurar tasa de cambio',
+                                onPressed: openSettings,
+                                icon: const Icon(
+                                  Icons.currency_exchange_rounded,
+                                  color: Color(0xFF17604E),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (!loading && error == null && presented != null) ...[
+                        const SizedBox(height: 16),
                         DashboardFinancialHealth(
                           data: presented,
                           currency: currency,
@@ -493,12 +497,12 @@ class _DashboardPageState extends State<DashboardPage> {
                         const SizedBox(height: 14),
                         Text(
                           'Actualizado a las '
-                              '${current.loadedAt.hour.toString().padLeft(2, '0')}:'
-                              '${current.loadedAt.minute.toString().padLeft(2, '0')} · '
-                              '${presented.currencies[currency]!.movements} '
-                              'movimientos en el rango',
+                          '${current.loadedAt.hour.toString().padLeft(2, '0')}:'
+                          '${current.loadedAt.minute.toString().padLeft(2, '0')} · '
+                          '${presented.currencies[currency]!.movements} '
+                          'movimientos en el rango',
                           style: const TextStyle(
-                            color: Color(0xFF64748B),
+                            color: Color(0xFF50665B),
                             fontSize: 12,
                           ),
                         ),

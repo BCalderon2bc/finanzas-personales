@@ -1,3 +1,5 @@
+import '../../widgets/page_intro.dart';
+import '../../widgets/adaptive_layout.dart';
 import '../help/app_help.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -162,111 +164,123 @@ class _CategoriesPageState extends State<CategoriesPage> {
         icon: const Icon(Icons.add),
         label: Text(saving ? 'Guardando...' : 'Nueva categoría'),
       ),
-      body: loading
-          ? const Center(child: CircularProgressIndicator())
-          : error != null
-          ? Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+      body: PageFrame(
+        maxWidth: 940,
+        child: loading
+            ? const Center(child: CircularProgressIndicator())
+            : error != null
+            ? Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('No se pudieron cargar las categorías.'),
+                      const SizedBox(height: 8),
+                      SelectableText(error!),
+                      TextButton(
+                        onPressed: loadCategories,
+                        child: const Text('Reintentar'),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : RefreshIndicator(
+                onRefresh: loadCategories,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
                   children: [
-                    const Text('No se pudieron cargar las categorías.'),
-                    const SizedBox(height: 8),
-                    SelectableText(error!),
-                    TextButton(
-                      onPressed: loadCategories,
-                      child: const Text('Reintentar'),
+                    const PageIntro(
+                      icon: Icons.category_outlined,
+                      title: 'Organiza tus movimientos',
+                      description:
+                          'Usa categorías para separar ingresos y gastos en tus reportes.',
                     ),
+                    DropdownButtonFormField<String>(
+                      initialValue: filter,
+                      decoration: const InputDecoration(
+                        labelText: 'Mostrar categorías',
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'all', child: Text('Todas')),
+                        DropdownMenuItem(
+                          value: 'income',
+                          child: Text('Ingresos'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'expense',
+                          child: Text('Gastos'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) setState(() => filter = value);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    if (visible.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text(
+                          'No hay categorías. Crea una como Salario, Alimentación o Transporte.',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+
+                    for (final type in ['income', 'expense'])
+                      if (visible.any((c) => c['category_type'] == type)) ...[
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(2, 16, 2, 12),
+                          child: Row(
+                            children: [
+                              Icon(
+                                type == 'income'
+                                    ? Icons.south_west_rounded
+                                    : Icons.north_east_rounded,
+                                size: 18,
+                                color: type == 'income'
+                                    ? const Color(0xFF047857)
+                                    : const Color(0xFF17604E),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  type == 'income' ? 'Ingresos' : 'Gastos',
+                                  style: const TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                '${visible.where((c) => c['category_type'] == type).length}',
+                                style: const TextStyle(
+                                  color: Color(0xFF50665B),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        ...visible
+                            .where((c) => c['category_type'] == type)
+                            .map(
+                              (category) => CategoryTile(
+                                category: category,
+                                onEdit: saving
+                                    ? null
+                                    : () => editCategory(category),
+                                onToggle: saving
+                                    ? null
+                                    : () => toggleCategory(category),
+                              ),
+                            ),
+                      ],
                   ],
                 ),
               ),
-            )
-          : RefreshIndicator(
-              onRefresh: loadCategories,
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-                children: [
-                  DropdownButtonFormField<String>(
-                    initialValue: filter,
-                    decoration: const InputDecoration(
-                      labelText: 'Mostrar categorías',
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'all', child: Text('Todas')),
-                      DropdownMenuItem(
-                        value: 'income',
-                        child: Text('Ingresos'),
-                      ),
-                      DropdownMenuItem(value: 'expense', child: Text('Gastos')),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) setState(() => filter = value);
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  if (visible.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Text(
-                        'No hay categorías. Crea una como Salario, Alimentación o Transporte.',
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-
-                  for (final type in ['income', 'expense'])
-                    if (visible.any((c) => c['category_type'] == type)) ...[
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(2, 16, 2, 12),
-                        child: Row(
-                          children: [
-                            Icon(
-                              type == 'income'
-                                  ? Icons.south_west_rounded
-                                  : Icons.north_east_rounded,
-                              size: 18,
-                              color: type == 'income'
-                                  ? const Color(0xFF047857)
-                                  : const Color(0xFF2563EB),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                type == 'income' ? 'Ingresos' : 'Gastos',
-                                style: const TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              '${visible.where((c) => c['category_type'] == type).length}',
-                              style: const TextStyle(
-                                color: Color(0xFF64748B),
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      ...visible
-                          .where((c) => c['category_type'] == type)
-                          .map(
-                            (category) => CategoryTile(
-                              category: category,
-                              onEdit: saving
-                                  ? null
-                                  : () => editCategory(category),
-                              onToggle: saving
-                                  ? null
-                                  : () => toggleCategory(category),
-                            ),
-                          ),
-                    ],
-                ],
-              ),
-            ),
+      ),
     );
   }
 }

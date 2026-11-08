@@ -158,7 +158,7 @@ class _PersonEntryDialogState extends State<PersonEntryDialog> {
           ],
         ),
         content: SizedBox(
-          width: 440,
+          width: 740,
           child: SingleChildScrollView(
             child: Form(
               key: form,
@@ -166,142 +166,184 @@ class _PersonEntryDialogState extends State<PersonEntryDialog> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('Cuenta con ${widget.personName}'),
-                  const SizedBox(height: 14),
-                  GuideAnchor(
-                    id: 'kind',
-                    child: DropdownButtonFormField<String>(
-                      initialValue: kind,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Qué vas a registrar',
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'purchase',
-                          child: Text('Compra'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'payment',
-                          child: Text('Pago para saldar la cuenta'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'opening',
-                          child: Text('Saldo anterior'),
-                        ),
-                      ],
-                      onChanged: (v) {
-                        if (v != null) setState(() => kind = v);
-                      },
-                    ),
+                  Text(
+                    'Cuenta con ${widget.personName}',
+                    style: Theme.of(context).textTheme.titleSmall,
                   ),
                   const SizedBox(height: 14),
-                  GuideAnchor(
-                    id: 'direction',
-                    child: DropdownButtonFormField<int>(
-                      key: ValueKey(kind),
-                      initialValue: direction,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Quién / efecto',
+                  AdaptiveColumns(
+                    minColumnWidth: 246,
+                    children: [
+                      GuideAnchor(
+                        id: 'kind',
+                        child: DropdownButtonFormField<String>(
+                          initialValue: kind,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Qué vas a registrar',
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'purchase',
+                              child: Text('Compra'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'payment',
+                              child: Text(
+                                'Pago',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: 'opening',
+                              child: Text('Saldo anterior'),
+                            ),
+                          ],
+                          onChanged: (v) {
+                            if (v != null) setState(() => kind = v);
+                          },
+                        ),
                       ),
-                      items: [
-                        DropdownMenuItem(
-                          value: 1,
-                          child: Text(
-                            plus,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                      GuideAnchor(
+                        id: 'direction',
+                        child: DropdownButtonFormField<int>(
+                          key: ValueKey(kind),
+                          initialValue: direction,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Quién y cómo afecta el saldo',
+                          ),
+                          items: [
+                            DropdownMenuItem(
+                              value: 1,
+                              child: Text(
+                                plus,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: -1,
+                              child: Text(
+                                minus,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                          onChanged: (v) {
+                            if (v != null) setState(() => direction = v);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  AdaptiveColumns(
+                    minColumnWidth: 246,
+                    children: [
+                      GuideAnchor(
+                        id: 'currency',
+                        child: DropdownButtonFormField<String>(
+                          initialValue: currency,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Moneda del movimiento',
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'NIO',
+                              child: Text('Córdobas (C\$)'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'USD',
+                              child: Text('Dólares (US\$)'),
+                            ),
+                          ],
+                          onChanged: (v) {
+                            if (v != null) setState(() => currency = v);
+                          },
+                        ),
+                      ),
+                      GuideAnchor(
+                        id: 'amount',
+                        child: TextFormField(
+                          controller: amount,
+                          autofocus: !compactLayout(context),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          onChanged: (_) => setState(() {}),
+                          decoration: const InputDecoration(
+                            labelText: 'Monto',
+                            hintText: 'Ej. 1250.50',
+                            helperText:
+                                'Escribe un monto positivo, sin separadores de miles.',
+                            helperMaxLines: 2,
+                            errorMaxLines: 3,
+                          ),
+                          validator: (v) {
+                            final text = (v ?? '').trim();
+                            final n = num.tryParse(text.replaceAll(',', '.'));
+                            return !RegExp(
+                                      r'^\d+([.,]\d{1,2})?$',
+                                    ).hasMatch(text) ||
+                                    n == null ||
+                                    !n.isFinite ||
+                                    n <= 0 ||
+                                    n > 1000000000
+                                ? 'Introduce un monto mayor que cero, con máximo dos decimales'
+                                : null;
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  AdaptiveColumns(
+                    minColumnWidth: 246,
+                    children: [
+                      if (currency == 'USD')
+                        GuideAnchor(
+                          id: 'rate',
+                          child: TextFormField(
+                            controller: rate,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: const InputDecoration(
+                              labelText: 'Córdobas por US\$1',
+                              helperText:
+                                  'Esta tasa queda guardada solo en este movimiento.',
+                              helperMaxLines: 2,
+                              errorMaxLines: 3,
+                            ),
+                            onChanged: (_) => setState(() {}),
+                            validator: (v) =>
+                                ExchangeRate.tryParse(v ?? '') == null
+                                ? 'Introduce una tasa positiva, con máximo seis decimales'
+                                : null,
                           ),
                         ),
-                        DropdownMenuItem(
-                          value: -1,
-                          child: Text(
-                            minus,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.calendar_month),
+                        label: Text(
+                          'Fecha · ${date.day}/${date.month}/${date.year}',
                         ),
-                      ],
-                      onChanged: (v) {
-                        if (v != null) setState(() => direction = v);
-                      },
-                    ),
+                        onPressed: () async {
+                          final selected = await showDatePicker(
+                            context: context,
+                            initialDate: date,
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime(2100),
+                          );
+                          if (selected != null && mounted)
+                            setState(() => date = selected);
+                        },
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 14),
-                  GuideAnchor(
-                    id: 'currency',
-                    child: DropdownButtonFormField<String>(
-                      initialValue: currency,
-                      decoration: const InputDecoration(
-                        labelText: 'Moneda del movimiento',
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'NIO',
-                          child: Text('Córdobas (C\$)'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'USD',
-                          child: Text('Dólares (US\$)'),
-                        ),
-                      ],
-                      onChanged: (v) {
-                        if (v != null) setState(() => currency = v);
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  GuideAnchor(
-                    id: 'amount',
-                    child: TextFormField(
-                      controller: amount,
-                      autofocus: true,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      onChanged: (_) => setState(() {}),
-                      decoration: const InputDecoration(
-                        labelText: 'Monto positivo',
-                        hintText: 'Ej. 1250.50',
-                        helperText:
-                            'Sin separadores de miles. El signo lo determina la opción elegida.',
-                      ),
-                      validator: (v) {
-                        final text = (v ?? '').trim();
-                        final n = num.tryParse(text.replaceAll(',', '.'));
-                        return !RegExp(r'^\d+([.,]\d{1,2})?$').hasMatch(text) ||
-                                n == null ||
-                                !n.isFinite ||
-                                n <= 0 ||
-                                n > 1000000000
-                            ? 'Introduce un monto mayor que cero, con máximo dos decimales'
-                            : null;
-                      },
-                    ),
-                  ),
-                  if (currency == 'USD') ...[
-                    const SizedBox(height: 14),
-                    GuideAnchor(
-                      id: 'rate',
-                      child: TextFormField(
-                        controller: rate,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: const InputDecoration(
-                          labelText: 'Córdobas por US\$1',
-                          helperText:
-                              'Esta tasa queda guardada solo en este movimiento.',
-                          helperMaxLines: 2,
-                        ),
-                        onChanged: (_) => setState(() {}),
-                        validator: (v) => ExchangeRate.tryParse(v ?? '') == null
-                            ? 'Introduce una tasa positiva, con máximo seis decimales'
-                            : null,
-                      ),
-                    ),
-                  ],
                   const SizedBox(height: 14),
                   Container(
                     padding: const EdgeInsets.all(14),
@@ -311,7 +353,9 @@ class _PersonEntryDialogState extends State<PersonEntryDialog> {
                     ),
                     child: Text(
                       cents == null
-                          ? 'Ingresa el monto y la tasa'
+                          ? currency == 'USD'
+                                ? 'Ingresa el monto y la tasa para ver el efecto en el saldo.'
+                                : 'Ingresa el monto para ver el efecto en el saldo.'
                           : '${direction > 0 ? '+' : '−'}${formatMoneyCents(cents, 'NIO')}\n${direction > 0 ? 'Suma al saldo de la cuenta' : 'Resta al saldo de la cuenta'}',
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
@@ -324,20 +368,6 @@ class _PersonEntryDialogState extends State<PersonEntryDialog> {
                     decoration: const InputDecoration(
                       labelText: 'Descripción (opcional)',
                     ),
-                  ),
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.calendar_month),
-                    label: Text('${date.day}/${date.month}/${date.year}'),
-                    onPressed: () async {
-                      final selected = await showDatePicker(
-                        context: context,
-                        initialDate: date,
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime(2100),
-                      );
-                      if (selected != null && mounted)
-                        setState(() => date = selected);
-                    },
                   ),
                   if (widget.entry == null) ...[
                     const SizedBox(height: 10),
@@ -394,7 +424,7 @@ class _PersonEntryDialogState extends State<PersonEntryDialog> {
                   ],
                   const SizedBox(height: 10),
                   const Text(
-                    'Este registro lleva la cuenta con la persona. No modifica saldos bancarios, tarjetas ni gastos del presupuesto.',
+                    'El movimiento se registra en el saldo de esta cuenta personal.',
                     style: TextStyle(fontSize: 12),
                   ),
                 ],

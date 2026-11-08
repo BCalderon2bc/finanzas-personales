@@ -1,3 +1,4 @@
+import '../recurring_expenses/recurring_expenses_page.dart';
 import '../help/app_help.dart';
 import '../../widgets/app_version_footer.dart';
 import 'package:flutter/material.dart';
@@ -34,200 +35,169 @@ class DashboardNavigation extends StatelessWidget {
           },
         );
 
+    Widget action(String title, IconData icon, VoidCallback? callback) =>
+        ListTile(
+          leading: Icon(icon),
+          title: Text(title),
+          enabled: callback != null,
+          trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+          onTap: callback == null
+              ? null
+              : () {
+                  Navigator.pop(context);
+                  callback();
+                },
+        );
+
+    Widget group(
+      String title,
+      IconData icon,
+      List<Widget> children, {
+      bool expanded = false,
+    }) => ExpansionTile(
+      key: PageStorageKey('navigation-group-$title'),
+      initiallyExpanded: expanded,
+      leading: Icon(icon),
+      title: Text(title),
+      childrenPadding: const EdgeInsets.only(left: 12),
+      children: children,
+    );
+
     return Drawer(
-      child: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(12),
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(16, 20, 16, 24),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: Color(0xFFDBEAFE),
-                          child: Icon(
-                            Icons.account_balance_wallet_outlined,
-                            color: Color(0xFF2563EB),
-                          ),
+      child: PrimaryScrollController.none(
+        child: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView(
+                  // The drawer must not inherit the dashboard guide controller.
+                  primary: false,
+                  padding: const EdgeInsets.all(12),
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(16, 20, 16, 20),
+                      child: Text(
+                        'Mi Billete',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
                         ),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Mi Billete',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(
-                                'Tu espacio financiero',
-                                style: TextStyle(
-                                  color: Color(0xFF64748B),
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
+                      ),
+                    ),
+                    ListTile(
+                      selected: true,
+                      leading: const Icon(Icons.dashboard_outlined),
+                      title: const Text('Resumen principal'),
+                      onTap: () => Navigator.pop(context),
+                    ),
+                    group(
+                      'Tu dinero',
+                      Icons.account_balance_wallet_outlined,
+                      [
+                        destination(
+                          'Cuentas y efectivo',
+                          Icons.account_balance_outlined,
+                          DashboardTarget.accounts,
+                        ),
+                        destination(
+                          'Movimientos',
+                          Icons.swap_horiz_rounded,
+                          DashboardTarget.transactions,
+                        ),
+                        destination(
+                          'Tarjetas de crédito',
+                          Icons.credit_card_outlined,
+                          DashboardTarget.cards,
                         ),
                       ],
+                      expanded: true,
                     ),
-                  ),
-                  ListTile(
-                    selected: true,
-                    selectedTileColor: const Color(0xFFEFF6FF),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    leading: const Icon(Icons.dashboard_outlined),
-                    title: const Text('Resumen principal'),
-                    onTap: () => Navigator.pop(context),
-                  ),
-                  const SizedBox(height: 8),
-                  destination(
-                    'Cuentas y efectivo',
-                    Icons.account_balance_outlined,
-                    DashboardTarget.accounts,
-                  ),
-                  destination(
-                    'Movimientos',
-                    Icons.swap_horiz_rounded,
-                    DashboardTarget.transactions,
-                  ),
-                  destination(
-                    'Tarjetas de crédito',
-                    Icons.credit_card_outlined,
-                    DashboardTarget.cards,
-                  ),
-                  destination(
-                    'Deudas y préstamos',
-                    Icons.handshake_outlined,
-                    DashboardTarget.debts,
-                  ),
-                  ListTile(
-                    enabled: onOpenReceivables != null,
-                    leading: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
+                    group('Deudas y personas', Icons.handshake_outlined, [
+                      destination(
+                        'Deudas y préstamos',
+                        Icons.handshake_outlined,
+                        DashboardTarget.debts,
                       ),
-                      child: const Icon(
+                      action(
+                        'Préstamos por cobrar',
                         Icons.payments_outlined,
-                        color: Color(0xFF2563EB),
-                        size: 21,
+                        onOpenReceivables,
                       ),
-                    ),
-                    title: const Text('Préstamos por cobrar'),
-                    trailing: const Icon(Icons.chevron_right_rounded, size: 20),
-                    onTap: onOpenReceivables == null
-                        ? null
-                        : () {
-                            Navigator.pop(context);
-                            onOpenReceivables?.call();
-                          },
-                  ),
-                  ListTile(
-                    enabled: onPersonAccounts != null,
-                    leading: const Icon(Icons.people_alt_outlined),
-                    title: const Text('Cuentas con personas'),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: onPersonAccounts == null
-                        ? null
-                        : () {
-                            Navigator.pop(context);
-                            onPersonAccounts?.call();
-                          },
-                  ),
-                  const Divider(height: 24),
-                  destination(
-                    'Presupuestos',
-                    Icons.savings_outlined,
-                    DashboardTarget.budgets,
-                  ),
-                  destination(
-                    'Categorías',
-                    Icons.category_outlined,
-                    DashboardTarget.categories,
-                  ),
-                  destination(
-                    'Reporte de gastos',
-                    Icons.pie_chart_outline_rounded,
-                    DashboardTarget.reports,
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.file_download_outlined),
-                    title: const Text('Exportar Excel / PDF'),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    enabled: onExport != null,
-                    onTap: onExport == null
-                        ? null
-                        : () {
-                            Navigator.pop(context);
-                            onExport?.call();
-                          },
-                  ),
-                  const Divider(height: 24),
-                  ListTile(
-                    enabled: onSettings != null,
-                    leading: const Icon(Icons.settings_outlined),
-                    title: const Text('Configuraciones'),
-                    subtitle: const Text('Tasa de cambio'),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: onSettings == null
-                        ? null
-                        : () {
-                            Navigator.pop(context);
-                            onSettings?.call();
-                          },
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.menu_book_outlined),
-                    title: const Text('Manual y ayuda'),
-                    onTap: () {
-                      final nav = Navigator.of(context);
-                      nav.pop();
-                      nav.push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const AppManualPage(),
-                        ),
-                      );
-                    },
-                  ),
-                  const Divider(height: 24),
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
-                    child: Text(
-                      'MI CUENTA',
-                      style: TextStyle(
-                        color: Color(0xFF64748B),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
+                      action(
+                        'Cuentas con personas',
+                        Icons.people_alt_outlined,
+                        onPersonAccounts,
                       ),
-                    ),
-                  ),
-                  ListTile(
-                    enabled: onChangePassword != null,
-                    leading: const Icon(Icons.lock_reset_rounded),
-                    title: const Text('Cambiar contraseña'),
-                    subtitle: const Text('Contraseña de inicio de sesión'),
-                    trailing: const Icon(Icons.chevron_right_rounded, size: 20),
-                    onTap: onChangePassword == null
-                        ? null
-                        : () {
-                            Navigator.pop(context);
-                            onChangePassword?.call();
-                          },
-                  ),
-                ],
+                    ]),
+                    group('Planificación', Icons.event_repeat_outlined, [
+                      ListTile(
+                        leading: const Icon(Icons.event_repeat_outlined),
+                        title: const Text('Gastos fijos y suscripciones'),
+                        onTap: () {
+                          final nav = Navigator.of(context);
+                          nav.pop();
+                          nav.push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const RecurringExpensesPage(),
+                            ),
+                          );
+                        },
+                      ),
+                      destination(
+                        'Presupuestos',
+                        Icons.savings_outlined,
+                        DashboardTarget.budgets,
+                      ),
+                    ]),
+                    group('Reportes', Icons.assessment_outlined, [
+                      destination(
+                        'Gastos por categoría',
+                        Icons.pie_chart_outline_rounded,
+                        DashboardTarget.reports,
+                      ),
+                      action(
+                        'Reportes PDF / Excel',
+                        Icons.file_download_outlined,
+                        onExport,
+                      ),
+                    ]),
+                    group('Configuración y ayuda', Icons.settings_outlined, [
+                      destination(
+                        'Categorías',
+                        Icons.category_outlined,
+                        DashboardTarget.categories,
+                      ),
+                      action(
+                        'Configuraciones',
+                        Icons.currency_exchange_outlined,
+                        onSettings,
+                      ),
+                      action(
+                        'Cambiar contraseña',
+                        Icons.lock_reset_rounded,
+                        onChangePassword,
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.menu_book_outlined),
+                        title: const Text('Manual y ayuda'),
+                        onTap: () {
+                          final nav = Navigator.of(context);
+                          nav.pop();
+                          nav.push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const AppManualPage(),
+                            ),
+                          );
+                        },
+                      ),
+                    ]),
+                  ],
+                ),
               ),
-            ),
-            const Divider(height: 1),
-            const AppVersionFooter(),
-          ],
+              const Divider(height: 1),
+              const AppVersionFooter(),
+            ],
+          ),
         ),
       ),
     );

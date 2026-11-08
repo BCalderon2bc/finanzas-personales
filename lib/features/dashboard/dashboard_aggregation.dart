@@ -1,3 +1,4 @@
+import '../../data/period_logic.dart';
 import '../../utils/money.dart';
 import '../credit_cards/credit_card_balances.dart';
 import 'dashboard_models.dart';
@@ -46,8 +47,6 @@ DashboardOverview buildDashboardOverview(
   final previous = period.previous;
   today = DateTime(today.year, today.month, today.day);
   final monthlyExpenses = <String, int>{};
-  String expenseKey(DateTime date, String currency, dynamic categoryId) =>
-      '${date.year}-${date.month}|$currency|${categoryId ?? 'none'}';
 
   final accountMap = {
     for (final account in accounts) account['id'].toString(): account,
@@ -72,14 +71,20 @@ DashboardOverview buildDashboardOverview(
       return;
     }
 
+    for (final budget in rows[3]) {
+      if (budget['category_id'] == categoryId &&
+          budget['currency'] == currency &&
+          includesDay(date, budgetStart(budget), budgetEnd(budget))) {
+        final key = '${budget['id']}';
+        monthlyExpenses[key] = (monthlyExpenses[key] ?? 0) + cents;
+      }
+    }
     final total = metric(currency);
 
     if (period.contains(date)) {
       total.expense += cents;
       final key = categoryId?.toString() ?? 'none';
       total.categories[key] = (total.categories[key] ?? 0) + cents;
-      final monthKey = expenseKey(date, currency, categoryId);
-      monthlyExpenses[monthKey] = (monthlyExpenses[monthKey] ?? 0) + cents;
     } else if (previous.contains(date)) {
       total.previousExpense += cents;
     }
@@ -363,20 +368,14 @@ DashboardOverview buildDashboardOverview(
   }
 
   for (final budget in rows[3]) {
-    final budgetMonth = _dashboardDate(budget['month']);
-    if (!period.overlapsMonth(budgetMonth)) {
+    final start = budgetStart(budget), end = budgetEnd(budget);
+    if (end.isBefore(period.start) || start.isAfter(period.end)) {
       continue;
     }
 
     final total = metric(budget['currency'].toString());
     final limit = moneyCents(budget['budget_amount']);
-    final spent =
-        monthlyExpenses[expenseKey(
-          budgetMonth,
-          budget['currency'].toString(),
-          budget['category_id'],
-        )] ??
-        0;
+    final spent = monthlyExpenses['${budget['id']}'] ?? 0;
 
     if (spent > limit) {
       total.exceededBudgets++;
@@ -385,7 +384,7 @@ DashboardOverview buildDashboardOverview(
     data.budgets.add({
       ...budget,
       'name':
-          '${data.categoryNames[budget['category_id'].toString()] ?? 'Categoría no disponible'} · ${dashboardMonth(budgetMonth)}',
+          '${data.categoryNames[budget['category_id'].toString()] ?? 'Categoría no disponible'} · ${isoDay(start)} a ${isoDay(end)}',
       'limit_cents': limit,
       'spent_cents': spent,
     });

@@ -4,7 +4,7 @@
 // ignore_for_file: lines_longer_than_80_chars
 class AssetsRes {
   static const String PLUGIN_NAME = 'finanzas_personales';
-  static const String PLUGIN_VERSION = '1.1.0+6';
+  static const String PLUGIN_VERSION = '1.1.1+9';
   static const String ATLANTIDA = 'assets/banks/atlantida.png';
   static const String AVANZ = 'assets/banks/avanz.svg';
   static const String BAC = 'assets/banks/bac.svg';

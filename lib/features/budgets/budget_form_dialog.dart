@@ -1,9 +1,18 @@
+import '../../widgets/date_period_field.dart';
+import '../../data/period_logic.dart';
 import 'package:flutter/material.dart';
 
 class BudgetFormDialog extends StatefulWidget {
-  const BudgetFormDialog({super.key, required this.categories, this.budget});
+  const BudgetFormDialog({
+    super.key,
+    required this.categories,
+    this.budget,
+    this.initialStart,
+    this.initialEnd,
+  });
   final List<Map<String, dynamic>> categories;
   final Map<String, dynamic>? budget;
+  final DateTime? initialStart, initialEnd;
   @override
   State<BudgetFormDialog> createState() => _BudgetFormDialogState();
 }
@@ -13,13 +22,20 @@ class _BudgetFormDialogState extends State<BudgetFormDialog> {
   final amountController = TextEditingController();
   String? categoryId;
   String currency = 'NIO';
+  late DateTime start, end;
   bool get editing => widget.budget != null;
 
   @override
   void initState() {
     super.initState();
+    start =
+        widget.initialStart ??
+        DateTime(DateTime.now().year, DateTime.now().month);
+    end = widget.initialEnd ?? DateTime(start.year, start.month + 1, 0);
     final budget = widget.budget;
     if (budget != null) {
+      start = budgetStart(budget);
+      end = budgetEnd(budget);
       categoryId = budget['category_id'].toString();
       currency = budget['currency'].toString();
       amountController.text = budget['budget_amount'].toString();
@@ -35,6 +51,9 @@ class _BudgetFormDialogState extends State<BudgetFormDialog> {
   void save() {
     if (!formKey.currentState!.validate()) return;
     Navigator.pop(context, <String, dynamic>{
+      'start_date': isoDay(start),
+      'end_date': isoDay(end),
+      'month': isoDay(DateTime(start.year, start.month)),
       'category_id': categoryId,
       'currency': currency,
       'budget_amount': double.parse(
@@ -54,6 +73,15 @@ class _BudgetFormDialogState extends State<BudgetFormDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              DatePeriodField(
+                start: start,
+                end: end,
+                onChanged: (range) => setState(() {
+                  start = range.start;
+                  end = range.end;
+                }),
+              ),
+
               DropdownButtonFormField<String>(
                 initialValue: categoryId,
                 isExpanded: true,
@@ -97,7 +125,9 @@ class _BudgetFormDialogState extends State<BudgetFormDialog> {
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
-                decoration: const InputDecoration(labelText: 'Límite mensual'),
+                decoration: const InputDecoration(
+                  labelText: 'Límite del período',
+                ),
                 validator: (value) {
                   final text = (value ?? '').trim();
                   final amount = double.tryParse(text.replaceAll(',', '.'));
