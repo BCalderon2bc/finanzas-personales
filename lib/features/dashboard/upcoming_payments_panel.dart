@@ -6,6 +6,7 @@ import '../../data/card_statement_repository.dart';
 import '../../data/payment_agenda_logic.dart';
 import '../../data/debt_installment_repository.dart';
 import '../../utils/money.dart';
+import '../../widgets/adaptive_layout.dart';
 
 class UpcomingPaymentsPanel extends StatefulWidget {
   const UpcomingPaymentsPanel({
@@ -100,6 +101,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
   }
 
   Widget agendaRow(AgendaItem item) {
+    final compact = compactLayout(context);
     final days = daysUntil(item.date, DateTime.now());
     final isCut = item.kind == AgendaKind.cardCut;
     final loan =
@@ -108,15 +110,15 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
     final coveredMinimum =
         item.kind == AgendaKind.cardPayment && item.minimumRemaining == 0;
     final color = isCut
-        ? const Color(0xFF17604E)
+        ? const Color(0xFF3C70AA)
         : days < 0 &&
               (loan || (!coveredMinimum && item.minimumRemaining != null))
-        ? const Color(0xFFA2322C)
+        ? const Color(0xFFA3453D)
         : days <= 0
-        ? const Color(0xFFB45309)
-        : const Color(0xFF17604E);
+        ? const Color(0xFF886128)
+        : const Color(0xFF3C70AA);
     final when = days < 0
-        ? 'Fecha pasada · hace ${-days} días'
+        ? '${isCut ? 'Pasó' : 'Venció'} hace ${-days} ${days == -1 ? 'día' : 'días'}'
         : days == 0
         ? 'Hoy'
         : days == 1
@@ -130,7 +132,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
         ? 'Vencimiento de capital'
         : 'Pago de tarjeta';
     return Padding(
-      padding: const EdgeInsets.only(top: 10),
+      padding: EdgeInsets.only(top: compact ? 8 : 10),
       child: Material(
         color: color.withAlpha(9),
         borderRadius: BorderRadius.circular(14),
@@ -146,7 +148,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
             }
           },
           child: Padding(
-            padding: const EdgeInsets.all(14),
+            padding: EdgeInsets.all(compact ? 10 : 14),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -157,9 +159,9 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
                       ? Icons.handshake_outlined
                       : Icons.credit_card_outlined,
                   color: color,
-                  size: 22,
+                  size: compact ? 18 : 22,
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: compact ? 8 : 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -192,7 +194,11 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                           Text(
-                            '${isCut ? 'Corte' : 'Fecha límite'} · ${shortStatementDate(item.date.toIso8601String())} · $when',
+                            '${isCut ? 'Corte' : 'Fecha límite'} · ${shortStatementDate(item.date.toIso8601String())}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          Text(
+                            when,
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(
                                   color: color,
@@ -235,7 +241,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
                   child: Icon(
                     Icons.chevron_right_rounded,
                     size: 20,
-                    color: Color(0xFF50665B),
+                    color: Color(0xFF596B7D),
                   ),
                 ),
               ],
@@ -250,7 +256,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
   Widget build(BuildContext context) => Card(
     margin: EdgeInsets.zero,
     child: Padding(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(compactLayout(context) ? 12 : 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -258,7 +264,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
             children: [
               const Icon(
                 Icons.event_available_outlined,
-                color: Color(0xFF17604E),
+                color: Color(0xFF3C70AA),
               ),
               const SizedBox(width: 9),
               const Expanded(
@@ -276,7 +282,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
           ),
           const Text(
             'Fechas pasadas, hoy y próximos 7 días. Importes en la moneda del pago.',
-            style: TextStyle(color: Color(0xFF50665B), fontSize: 12),
+            style: TextStyle(color: Color(0xFF596B7D), fontSize: 12),
           ),
           if (loading)
             const Padding(
@@ -324,7 +330,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
                   'el capital pendiente si no hay cuotas configuradas. Con un calendario vigente, muestra sus cuotas pendientes, sin sumarlas otra vez al capital. Los pagos cubiertos no aparecen como pendientes. '
                   'La agenda se calcula al actualizar el inicio y es independiente del mes del reporte.',
                   style: TextStyle(
-                    color: Color(0xFF50665B),
+                    color: Color(0xFF596B7D),
                     fontSize: 12,
                     height: 1.5,
                   ),

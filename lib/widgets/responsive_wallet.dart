@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
-/// Billetera horizontal: una tarjeta y parte de la siguiente en celular.
+/// Billetera horizontal con una tarjeta completa por página en celular.
 class ResponsiveWallet extends StatefulWidget {
   const ResponsiveWallet({
     super.key,
@@ -31,7 +31,9 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
   final controller = ScrollController();
   final measurements = <String, double>{};
   int visibleIndex = 0;
-  double itemExtent = 1;
+  double? mobilePageWidth;
+  int? lastSelectedIndex;
+  bool aligning = false;
 
   @override
   void initState() {
@@ -40,16 +42,62 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
   }
 
   void trackVisible() {
-    if (!mounted || !controller.hasClients || widget.items.isEmpty) {
+    final width = mobilePageWidth;
+    if (!mounted ||
+        width == null ||
+        !controller.hasClients ||
+        widget.items.isEmpty) {
       return;
     }
-    final index = (controller.offset / itemExtent)
+    final index = (controller.offset / width)
         .round()
         .clamp(0, widget.items.length - 1)
         .toInt();
     if (index != visibleIndex) {
       setState(() => visibleIndex = index);
     }
+  }
+
+  void alignMobilePage(double width, int index) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          !controller.hasClients ||
+          mobilePageWidth != width ||
+          lastSelectedIndex != index)
+        return;
+      final target = (index * width)
+          .clamp(0.0, controller.position.maxScrollExtent)
+          .toDouble();
+      if ((controller.offset - target).abs() < 0.5) return;
+      aligning = true;
+      try {
+        controller.jumpTo(target);
+      } finally {
+        aligning = false;
+      }
+    });
+  }
+
+  bool selectSettledPage(ScrollEndNotification notification) {
+    if (notification.depth != 0 ||
+        aligning ||
+        mobilePageWidth == null ||
+        widget.onSelected == null ||
+        widget.items.isEmpty)
+      return false;
+    final index = visibleIndex.clamp(0, widget.items.length - 1).toInt();
+    final id = '${widget.items[index]['id']}';
+    if (id != widget.selectedId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted ||
+            mobilePageWidth == null ||
+            visibleIndex >= widget.items.length ||
+            '${widget.items[visibleIndex]['id']}' != id)
+          return;
+        widget.onSelected?.call(id);
+      });
+    }
+    return false;
   }
 
   @override
@@ -59,11 +107,14 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
     super.dispose();
   }
 
-  void move(int direction, double itemWidth) {
+  void move(int direction, double itemExtent) {
     if (!controller.hasClients) {
       return;
     }
-    final target = (controller.offset + direction * (itemWidth + 14))
+    final start = mobilePageWidth == null
+        ? controller.offset
+        : (controller.offset / itemExtent).round() * itemExtent;
+    final target = (start + direction * itemExtent)
         .clamp(0.0, controller.position.maxScrollExtent)
         .toDouble();
     controller.animateTo(
@@ -89,12 +140,24 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
                 .toInt();
         final desktopWidth =
             (box.maxWidth - 14 * (desktopColumns - 1)) / desktopColumns;
-        final itemWidth = mobile && widget.items.length > 1
-            ? (box.maxWidth * 0.87).clamp(0.0, 360.0).toDouble()
-            : mobile
-            ? box.maxWidth
-            : desktopWidth;
-        itemExtent = itemWidth + 14;
+        final itemWidth = mobile ? box.maxWidth : desktopWidth;
+        final itemExtent = mobile ? itemWidth : itemWidth + 14;
+        final selectedIndex = widget.items.indexWhere(
+          (item) => '${item['id']}' == widget.selectedId,
+        );
+        if (mobile && itemWidth > 0) {
+          final targetIndex = selectedIndex < 0 ? 0 : selectedIndex;
+          if (mobilePageWidth != itemWidth ||
+              lastSelectedIndex != targetIndex) {
+            mobilePageWidth = itemWidth;
+            lastSelectedIndex = targetIndex;
+            visibleIndex = targetIndex;
+            alignMobilePage(itemWidth, targetIndex);
+          }
+        } else {
+          mobilePageWidth = null;
+          lastSelectedIndex = null;
+        }
         final index = visibleIndex.clamp(0, widget.items.length - 1).toInt();
         final activeId = '${widget.items[index]['id']}';
         final cards = Row(
@@ -107,7 +170,9 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
               .map(
                 (entry) => Padding(
                   padding: EdgeInsets.only(
-                    right: entry.key == widget.items.length - 1 ? 0 : 14,
+                    right: mobile || entry.key == widget.items.length - 1
+                        ? 0
+                        : 14,
                   ),
                   child: SizedBox(
                     width: itemWidth,
@@ -128,7 +193,9 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
         final strip = SingleChildScrollView(
           controller: controller,
           primary: false,
-          physics: const ClampingScrollPhysics(),
+          physics: mobile
+              ? const PageScrollPhysics(parent: ClampingScrollPhysics())
+              : const ClampingScrollPhysics(),
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.only(bottom: 12),
           child: mobile ? cards : IntrinsicHeight(child: cards),
@@ -138,7 +205,7 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
           children: [
             Row(
               children: [
-                Icon(widget.icon, color: const Color(0xFF17604E), size: 23),
+                Icon(widget.icon, color: const Color(0xFF3C70AA), size: 23),
                 const SizedBox(width: 9),
                 Expanded(
                   child: Text(
@@ -152,12 +219,16 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
                 if (widget.items.length > (mobile ? 1 : desktopColumns)) ...[
                   IconButton(
                     tooltip: 'Anteriores',
-                    onPressed: () => move(-1, itemWidth),
+                    onPressed: mobile && index == 0
+                        ? null
+                        : () => move(-1, itemExtent),
                     icon: const Icon(Icons.chevron_left_rounded),
                   ),
                   IconButton(
                     tooltip: 'Siguientes',
-                    onPressed: () => move(1, itemWidth),
+                    onPressed: mobile && index == widget.items.length - 1
+                        ? null
+                        : () => move(1, itemExtent),
                     icon: const Icon(Icons.chevron_right_rounded),
                   ),
                 ],
@@ -165,10 +236,10 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
             ),
             const SizedBox(height: 6),
             Text(
-              mobile
-                  ? 'Desliza para ver más. Toca una tarjeta para ver sus detalles.'
+              mobile && widget.items.length > 1
+                  ? '${index + 1} de ${widget.items.length} · Desliza o usa las flechas'
                   : 'Selecciona una tarjeta para ver sus detalles.',
-              style: const TextStyle(color: Color(0xFF50665B), fontSize: 13),
+              style: const TextStyle(color: Color(0xFF596B7D), fontSize: 13),
             ),
             const SizedBox(height: 14),
             ClipRect(
@@ -176,7 +247,10 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
                 activeId: mobile ? activeId : null,
                 measurements: measurements,
                 bottomPadding: 12,
-                child: strip,
+                child: NotificationListener<ScrollEndNotification>(
+                  onNotification: selectSettledPage,
+                  child: strip,
+                ),
               ),
             ),
           ],

@@ -866,7 +866,7 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
                               'Usa Aplicar reversión con las reducciones confirmadas por el banco. El saldo y mínimo informados conservan sus importes originales; no descuentes de nuevo esas reducciones al editar el corte. '
                               'Cubrir el mínimo no significa liquidar la deuda ni garantiza evitar intereses.',
                               style: TextStyle(
-                                color: Color(0xFF50665B),
+                                color: Color(0xFF596B7D),
                                 fontSize: 12,
                                 height: 1.5,
                               ),

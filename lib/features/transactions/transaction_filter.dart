@@ -1,3 +1,5 @@
+import '../../utils/card_cash_advance.dart';
+
 class TransactionFilter {
   const TransactionFilter({
     this.type = 'all',
@@ -44,6 +46,7 @@ class TransactionFilter {
       'credit_card_payment',
       'debt_payment',
       'receivable_loan',
+      cashAdvanceDepositSource,
     ].contains(tx['source']);
     if (reconciled != null && (external || tx['is_reconciled'] != reconciled)) {
       return false;

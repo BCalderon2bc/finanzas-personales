@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../utils/money.dart';
 import '../../widgets/bank_brand.dart';
+import '../../widgets/adaptive_layout.dart';
 
 const debitDesignLabels = {
   'classic': 'Color del banco',
@@ -32,6 +33,7 @@ class AccountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = compactLayout(context);
     final raw = account['card_design'];
     final design = raw is Map
         ? Map<String, dynamic>.from(raw)
@@ -71,7 +73,7 @@ class AccountCard extends StatelessWidget {
     };
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(compact ? 14 : 16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: colors,
@@ -93,8 +95,8 @@ class AccountCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 112,
-                height: 42,
+                width: compact ? 88 : 112,
+                height: compact ? 36 : 42,
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -119,7 +121,7 @@ class AccountCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: compact ? 8 : 12),
           Text(
             account['name']?.toString() ?? 'Mi cuenta',
             style: const TextStyle(
@@ -135,7 +137,7 @@ class AccountCard extends StatelessWidget {
                 : '$bank · ${types[type] ?? 'Cuenta'}',
             style: TextStyle(color: Colors.white.withAlpha(205), fontSize: 13),
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: compact ? 9 : 14),
           Text(
             balanceLabel,
             style: TextStyle(color: Colors.white.withAlpha(205), fontSize: 13),
@@ -155,9 +157,9 @@ class AccountCard extends StatelessWidget {
             ),
           ),
           if (debit) ...[
-            const SizedBox(height: 14),
+            SizedBox(height: compact ? 9 : 14),
             Divider(color: Colors.white.withAlpha(40), height: 1),
-            const SizedBox(height: 10),
+            SizedBox(height: compact ? 7 : 10),
             Row(
               children: [
                 Expanded(

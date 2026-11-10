@@ -59,7 +59,7 @@ class _AppVersionFooterState extends State<AppVersionFooter> {
             else
               Center(
                 child: Text(
-                  'Versión $version${build.isEmpty ? '' : ' · compilación $build'}',
+                  'Versión $version${build.isEmpty ? '' : '.$build'}',
                   style: TextStyle(
                     fontSize: 12,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,

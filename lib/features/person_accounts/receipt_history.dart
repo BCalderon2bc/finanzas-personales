@@ -1,3 +1,4 @@
+import '../../utils/card_cash_advance.dart';
 import 'package:flutter/material.dart';
 import '../../core/supabase_client.dart';
 import '../../data/person_account_repository.dart';
@@ -24,7 +25,8 @@ FinancialReceiptRef? financialReceiptRef(Map<String, dynamic> row) {
   if (id == null || id.isEmpty) return null;
   final parts = id.split(':');
   return switch (row['source']) {
-    'credit_card_payment' => (table: 'credit_card_transactions', id: id),
+    'credit_card_payment' ||
+    cashAdvanceDepositSource => (table: 'credit_card_transactions', id: id),
     'debt_payment' => (table: 'debt_payments', id: id),
     'fx_transfer' => (table: 'app_fx_transfers', id: id),
     'receivable_loan' when parts.length >= 3 => (

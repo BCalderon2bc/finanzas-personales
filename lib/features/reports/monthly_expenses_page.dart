@@ -207,7 +207,7 @@ class _MonthlyExpensesPageState extends State<MonthlyExpensesPage> {
               count: counts[group.key] ?? 0,
               positiveTotalCents: positiveTotal,
               color: group.key == 'uncategorized'
-                  ? const Color(0xFF50665B)
+                  ? const Color(0xFF596B7D)
                   : categoryColor(style?['color']),
               icon: switch (group.key) {
                 'debt_costs' => Icons.payments_outlined,

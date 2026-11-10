@@ -1,3 +1,4 @@
+import '../../widgets/mobile_navigation.dart';
 import '../../widgets/adaptive_layout.dart';
 import '../help/app_help.dart';
 import '../person_accounts/person_accounts_page.dart';
@@ -7,7 +8,7 @@ import '../../data/financial_settings_repository.dart';
 import '../settings/settings_page.dart';
 import 'dashboard_header.dart';
 import 'dashboard_conversion.dart';
-import '../auth/change_password_page.dart';
+import '../auth/change_name_page.dart' show fetchProfileName;
 import '../accounts/accounts_page.dart';
 import '../transactions/transactions_page.dart';
 import '../categories/categories_page.dart';
@@ -44,6 +45,9 @@ class _DashboardPageState extends State<DashboardPage> {
   String? settingsError;
   String? error;
   bool loading = true;
+  bool signingOut = false;
+  String? activeName;
+  int profileRequestId = 0;
   int requestId = 0;
 
   final scrollController = ScrollController();
@@ -54,6 +58,7 @@ class _DashboardPageState extends State<DashboardPage> {
     super.initState();
     scrollController.addListener(updateScrollButton);
     loadData();
+    loadProfileName();
   }
 
   @override
@@ -116,7 +121,13 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  Future<void> openSettings() => pushPage(const SettingsPage());
+  Future<void> openSettings() async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(builder: (_) => const SettingsPage()),
+    );
+    if (mounted) await Future.wait([loadData(), loadProfileName()]);
+  }
 
   Future<void> chooseDate(bool from) async {
     if (loading) return;
@@ -182,6 +193,8 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> logout() async {
+    if (signingOut) return;
+    setState(() => signingOut = true);
     try {
       await supabase.auth.signOut();
     } catch (e) {
@@ -190,6 +203,25 @@ class _DashboardPageState extends State<DashboardPage> {
           context,
         ).showSnackBar(SnackBar(content: Text('No se pudo cerrar sesión: $e')));
       }
+    } finally {
+      if (mounted) setState(() => signingOut = false);
+    }
+  }
+
+  Future<void> loadProfileName() async {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    final request = ++profileRequestId;
+    try {
+      final name = await fetchProfileName(userId);
+      if (mounted &&
+          request == profileRequestId &&
+          supabase.auth.currentUser?.id == userId &&
+          activeName != name) {
+        setState(() => activeName = name);
+      }
+    } catch (_) {
+      // El correo sigue identificando la cuenta si el perfil no está disponible.
     }
   }
 
@@ -225,21 +257,32 @@ class _DashboardPageState extends State<DashboardPage> {
         ? current
         : convertDashboard(current, currency, rate);
 
+    final email = supabase.auth.currentUser?.email?.trim();
+    final activeEmail = email == null || email.isEmpty
+        ? 'Correo no disponible'
+        : email;
     final gutter = pageGutter(context);
+    final compact = compactLayout(context);
     return GuideScope(
       topic: 'dashboard',
       ready: !loading && error == null,
       welcome: true,
       scrollController: scrollController,
       child: Scaffold(
+        key: dashboardScaffoldKey,
+        bottomNavigationBar: compact
+            ? MobileNavigation(index: 0, onReturn: loadData)
+            : null,
+        onDrawerChanged: (open) {
+          if (open) loadProfileName();
+        },
         drawer: DashboardNavigation(
+          activeEmail: activeEmail,
+          activeName: activeName,
           onOpen: openTarget,
           onSettings: openSettings,
           onExport: () => pushPage(const ExportReportsPage()),
           onPersonAccounts: () => pushPage(const PersonAccountsPage()),
-          onChangePassword: () {
-            pushPage(const ChangePasswordPage());
-          },
           onOpenReceivables: () {
             openReceivableLoans();
           },
@@ -263,25 +306,33 @@ class _DashboardPageState extends State<DashboardPage> {
               onPressed: openSettings,
               icon: const Icon(Icons.settings_outlined),
             ),
-            if (compactLayout(context))
+            if (compact)
               PopupMenuButton<String>(
                 tooltip: 'Más opciones',
                 onSelected: (value) {
                   if (value == 'refresh') {
                     loadData();
+                  } else if (value == 'top') {
+                    backToTop();
                   } else {
                     logout();
                   }
                 },
                 itemBuilder: (_) => [
+                  if (showBackToTop)
+                    const PopupMenuItem(
+                      value: 'top',
+                      child: Text('Volver arriba'),
+                    ),
                   PopupMenuItem(
                     value: 'refresh',
                     enabled: !loading,
                     child: const Text('Actualizar'),
                   ),
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'logout',
-                    child: Text('Cerrar sesión'),
+                    enabled: !signingOut,
+                    child: const Text('Cerrar sesión'),
                   ),
                 ],
               )
@@ -293,13 +344,13 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
               IconButton(
                 tooltip: 'Cerrar sesión',
-                onPressed: logout,
+                onPressed: signingOut ? null : logout,
                 icon: const Icon(Icons.logout_rounded),
               ),
             ],
           ],
         ),
-        floatingActionButton: showBackToTop
+        floatingActionButton: showBackToTop && !compact
             ? FloatingActionButton.small(
                 tooltip: 'Volver arriba',
                 onPressed: backToTop,
@@ -314,7 +365,12 @@ class _DashboardPageState extends State<DashboardPage> {
               controller: scrollController,
               primary: false,
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: EdgeInsets.fromLTRB(gutter, 12, gutter, 80),
+              padding: EdgeInsets.fromLTRB(
+                gutter,
+                12,
+                gutter,
+                compact ? 24 : 80,
+              ),
               child: Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: widePageMaxWidth),
@@ -405,7 +461,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           decoration: BoxDecoration(
                             color: Theme.of(context).colorScheme.surface,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFFD9E3DA)),
+                            border: Border.all(color: const Color(0xFFDCE3EB)),
                           ),
                           child: Row(
                             children: [
@@ -426,7 +482,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                           ? 'Configura la tasa para combinar NIO y USD.'
                                           : '1 USD = C\$ ${rate.decimal} · Incluye ambas monedas',
                                       style: const TextStyle(
-                                        color: Color(0xFF50665B),
+                                        color: Color(0xFF596B7D),
                                         fontSize: 12,
                                       ),
                                     ),
@@ -434,7 +490,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                       const Text(
                                         'No se pudo cargar la tasa.',
                                         style: TextStyle(
-                                          color: Color(0xFFA2322C),
+                                          color: Color(0xFFA3453D),
                                           fontSize: 12,
                                         ),
                                       ),
@@ -446,7 +502,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                 onPressed: openSettings,
                                 icon: const Icon(
                                   Icons.currency_exchange_rounded,
-                                  color: Color(0xFF17604E),
+                                  color: Color(0xFF3C70AA),
                                 ),
                               ),
                             ],
@@ -502,7 +558,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           '${presented.currencies[currency]!.movements} '
                           'movimientos en el rango',
                           style: const TextStyle(
-                            color: Color(0xFF50665B),
+                            color: Color(0xFF596B7D),
                             fontSize: 12,
                           ),
                         ),

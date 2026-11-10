@@ -1,3 +1,5 @@
+import '../credit_cards/credit_card_balances.dart'
+    show cardPointsRedemption, cardPointsRedemptionLabel;
 import 'package:flutter/material.dart';
 import '../../utils/money.dart';
 import '../../data/expense_report_categories.dart';
@@ -52,8 +54,8 @@ class ExpenseReportSummary extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: total < 0
-              ? const [Color(0xFF064E3B), Color(0xFF166B56)]
-              : const [Color(0xFF1C4140), Color(0xFF17604E)],
+              ? const [Color(0xFF3E6D66), Color(0xFF4B7B72)]
+              : const [Color(0xFF315E91), Color(0xFF3C70AA)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -142,7 +144,7 @@ class ExpenseCategoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final refund = amountCents < 0;
-    final accent = refund ? const Color(0xFF14684D) : color;
+    final accent = refund ? const Color(0xFF35745C) : color;
     final ratio = amountCents > 0 && positiveTotalCents > 0
         ? amountCents / positiveTotalCents
         : 0.0;
@@ -152,7 +154,7 @@ class ExpenseCategoryCard extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: const BorderSide(color: Color(0xFFD9E3DA)),
+        side: const BorderSide(color: Color(0xFFDCE3EB)),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -181,7 +183,7 @@ class ExpenseCategoryCard extends StatelessWidget {
                         Text(
                           name,
                           style: const TextStyle(
-                            color: Color(0xFF182B24),
+                            color: Color(0xFF243447),
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
                           ),
@@ -190,7 +192,7 @@ class ExpenseCategoryCard extends StatelessWidget {
                         Text(
                           '$count movimientos',
                           style: const TextStyle(
-                            color: Color(0xFF50665B),
+                            color: Color(0xFF596B7D),
                             fontSize: 12,
                           ),
                         ),
@@ -199,7 +201,7 @@ class ExpenseCategoryCard extends StatelessWidget {
                   ),
                   const Icon(
                     Icons.chevron_right_rounded,
-                    color: Color(0xFF50665B),
+                    color: Color(0xFF596B7D),
                     size: 20,
                   ),
                 ],
@@ -248,7 +250,7 @@ class ExpenseCategoryCard extends StatelessWidget {
                   value: ratio.clamp(0.0, 1.0).toDouble(),
                   minHeight: 7,
                   color: accent,
-                  backgroundColor: const Color(0xFFF0F4EF),
+                  backgroundColor: const Color(0xFFF0F3F7),
                 ),
               ),
             ],
@@ -275,7 +277,7 @@ class ExpenseDetailTile extends StatelessWidget {
     final debt = tx['source'] == 'debt_payment';
     final amount = moneyCents(tx['amount']);
     final refund = amount < 0;
-    final color = refund ? const Color(0xFF14684D) : const Color(0xFF17604E);
+    final color = refund ? const Color(0xFF35745C) : const Color(0xFF3C70AA);
     final description = tx['description']?.toString().trim() ?? '';
     final reference = tx['reference']?.toString().trim() ?? '';
     final cardName = tx['card_name']?.toString().trim() ?? '';
@@ -296,6 +298,8 @@ class ExpenseDetailTile extends StatelessWidget {
         ? 'Abono de deuda'
         : isCardInsuranceExpense(tx)
         ? 'Seguro de tarjeta'
+        : card && tx['charge_kind'] == cardPointsRedemption
+        ? cardPointsRedemptionLabel
         : card
         ? cardTypes[tx['card_transaction_type']] ?? 'Tarjeta'
         : 'Gasto de cuenta';
@@ -304,7 +308,7 @@ class ExpenseDetailTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAF7),
+        color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -334,7 +338,7 @@ class ExpenseDetailTile extends StatelessWidget {
                 Text(
                   '$dateText · $label',
                   style: const TextStyle(
-                    color: Color(0xFF50665B),
+                    color: Color(0xFF596B7D),
                     fontSize: 12,
                   ),
                 ),
@@ -342,7 +346,7 @@ class ExpenseDetailTile extends StatelessWidget {
                   Text(
                     cardName,
                     style: const TextStyle(
-                      color: Color(0xFF50665B),
+                      color: Color(0xFF596B7D),
                       fontSize: 12,
                     ),
                   ),
@@ -377,7 +381,7 @@ class ExpenseDetailTile extends StatelessWidget {
                   SelectableText(
                     'Referencia: $reference',
                     style: const TextStyle(
-                      color: Color(0xFF50665B),
+                      color: Color(0xFF596B7D),
                       fontSize: 12,
                     ),
                   ),

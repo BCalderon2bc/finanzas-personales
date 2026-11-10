@@ -20,8 +20,8 @@ class AccountDetails extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const muted = Color(0xFF50665B);
-    const border = Color(0xFFD9E3DA);
+    const muted = Color(0xFF596B7D);
+    const border = Color(0xFFDCE3EB);
     final active = account['is_active'] != false;
     final type = account['account_type']?.toString() ?? '';
     final institution = account['financial_institutions'];
@@ -39,9 +39,9 @@ class AccountDetails extends StatelessWidget {
     final opening = moneyCents(account['opening_balance'] ?? 0);
     final difference = balanceCents - opening;
     final color = balanceCents < 0
-        ? const Color(0xFFA2322C)
+        ? const Color(0xFFA3453D)
         : type == 'cash'
-        ? const Color(0xFF14684D)
+        ? const Color(0xFF35745C)
         : bankGradient(bank).first;
     const types = {
       'savings': 'Cuenta de ahorro',
@@ -55,7 +55,7 @@ class AccountDetails extends StatelessWidget {
     Widget detail(String label, String value, IconData icon) => Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAF7),
+        color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: border),
       ),
@@ -123,13 +123,13 @@ class AccountDetails extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: active
                         ? const Color(0xFFECFDF5)
-                        : const Color(0xFFF0F4EF),
+                        : const Color(0xFFF0F3F7),
                     borderRadius: BorderRadius.circular(9),
                   ),
                   child: Text(
                     active ? 'Activa' : 'Inactiva',
                     style: TextStyle(
-                      color: active ? const Color(0xFF14684D) : muted,
+                      color: active ? const Color(0xFF35745C) : muted,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),

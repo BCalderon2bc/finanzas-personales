@@ -15,6 +15,7 @@ class CreditCardDetails extends StatelessWidget {
     this.onMovement,
     this.onPayment,
     this.onPlans,
+    this.onAdditionals,
   });
   final Map<String, dynamic> card;
   final Map<String, int?> balances;
@@ -23,12 +24,13 @@ class CreditCardDetails extends StatelessWidget {
       onHistory,
       onMovement,
       onPayment,
-      onPlans;
+      onPlans,
+      onAdditionals;
   @override
   Widget build(BuildContext context) {
-    const blue = Color(0xFF17604E),
-        green = Color(0xFF14684D),
-        muted = Color(0xFF50665B);
+    const blue = Color(0xFF3C70AA),
+        green = Color(0xFF35745C),
+        muted = Color(0xFF596B7D);
     final active = card['is_active'] == true;
     final base = card['currency'].toString();
     final limit = moneyCents(card['credit_limit']);
@@ -191,7 +193,7 @@ class CreditCardDetails extends StatelessWidget {
                       : 0,
                   color: color,
                   minHeight: 9,
-                  backgroundColor: const Color(0xFFD9E3DA),
+                  backgroundColor: const Color(0xFFDCE3EB),
                 ),
               ),
               const SizedBox(height: 8),
@@ -264,6 +266,12 @@ class CreditCardDetails extends StatelessWidget {
               onPressed: onPlans,
               icon: const Icon(Icons.calendar_month_outlined),
               label: const Text('Planes tasa cero · cuotas y pagos'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: onAdditionals,
+              icon: const Icon(Icons.group_outlined),
+              label: const Text('Tarjetas compartidas'),
             ),
             const SizedBox(height: 8),
             Wrap(

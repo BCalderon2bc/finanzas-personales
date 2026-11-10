@@ -12,8 +12,9 @@ class AuthGate extends StatelessWidget {
     return StreamBuilder<AuthState>(
       stream: supabase.auth.onAuthStateChange,
       builder: (context, snapshot) {
-        if (supabase.auth.currentSession != null) {
-          return const DashboardPage();
+        final user = supabase.auth.currentSession?.user;
+        if (user != null) {
+          return DashboardPage(key: ValueKey(user.id));
         }
 
         return const LoginPage();

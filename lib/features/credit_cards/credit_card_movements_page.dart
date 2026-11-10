@@ -1,4 +1,9 @@
+import '../../utils/card_cash_advance.dart';
+import '../../data/credit_card_additional_repository.dart';
+import '../../data/payment_agenda_labels.dart' show additionalCardLabel;
+import '../../data/period_logic.dart' show includesDay;
 import '../../widgets/adaptive_layout.dart';
+import '../../widgets/date_period_field.dart';
 import '../person_accounts/receipt_history.dart';
 import '../help/app_help.dart';
 import 'dart:convert';
@@ -15,8 +20,13 @@ import 'credit_card_movement_dialog.dart';
 import '../../widgets/void_payment_dialog.dart';
 
 class CreditCardMovementsPage extends StatefulWidget {
-  const CreditCardMovementsPage({super.key, required this.cardId});
+  const CreditCardMovementsPage({
+    super.key,
+    required this.cardId,
+    this.initialAdditionalId,
+  });
   final String cardId;
+  final String? initialAdditionalId;
   @override
   State<CreditCardMovementsPage> createState() =>
       _CreditCardMovementsPageState();
@@ -26,6 +36,9 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
   List<Map<String, dynamic>> movements = [];
   String name = '', currencyFilter = 'all', filter = 'all';
   Map<String, dynamic> cardData = {};
+  Map<String, String> accountNames = {};
+  Map<String, Map<String, dynamic>> additionalCards = {};
+  late String? additionalFilter = widget.initialAdditionalId;
   bool loading = true;
   String? error;
   int requestId = 0;
@@ -127,19 +140,27 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
 
   static const types = {
     'purchase': 'Compra',
+    cardCashAdvance: cardCashAdvanceLabel,
     'payment': 'Pago',
     'interest': 'Intereses',
     'fee': 'Comisión',
     'insurance': 'Seguro de tarjeta',
     'refund': 'Devolución',
+    cardPointsRedemption: cardPointsRedemptionLabel,
     'adjustment': 'Ajuste',
   };
 
-  String statusFilter = 'valid';
+  String statusFilter = 'all';
+  late DateTimeRange dateFilter;
 
   @override
   void initState() {
     super.initState();
+    final today = DateTime.now();
+    dateFilter = DateTimeRange(
+      start: DateTime(today.year, today.month),
+      end: DateTime(today.year, today.month + 1, 0),
+    );
     loadData();
   }
 
@@ -261,13 +282,27 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
             ..sort(
               (a, b) => a['name'].toString().compareTo(b['name'].toString()),
             );
+      final cashAccounts = <Map<String, dynamic>>[];
+      for (var offset = 0; ; offset += 500) {
+        final result = await supabase
+            .from('accounts')
+            .select('id,name,currency,is_active')
+            .eq('user_id', user.id)
+            .eq('account_type', 'cash')
+            .order('id')
+            .range(offset, offset + 499);
+        cashAccounts.addAll(List<Map<String, dynamic>>.from(result));
+        if (result.length < 500) break;
+      }
       if (!mounted) return;
       final data = await showDialog<Map<String, dynamic>>(
         context: context,
         builder: (_) => CreditCardMovementDialog(
+          cashAccounts: cashAccounts,
           currency: tx['currency'].toString(),
           categories: available,
           movement: tx,
+          additionalCards: additionalCards.values.toList(),
         ),
       );
       if (data == null || !mounted) return;
@@ -275,6 +310,9 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
         for (final key in [
           'transaction_type',
           'charge_kind',
+          'cash_advance_fee',
+          'cash_advance_account_id',
+          'additional_card_id',
           'currency',
           'amount',
           'category_id',
@@ -294,6 +332,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
           originalDate.day != selectedDate.day) {
         changes['transaction_date'] = data['transaction_date'];
       }
+      if (supabase.auth.currentUser?.id != user.id) return;
       final updated = await supabase
           .from('credit_card_transactions')
           .update(changes)
@@ -372,13 +411,14 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
           .eq('id', widget.cardId)
           .eq('user_id', user.id)
           .single();
+      final additions = await loadAdditionalCards(widget.cardId, user.id);
       final rows = <Map<String, dynamic>>[];
       for (var offset = 0; ; offset += 500) {
         final result = await supabase
             .from('credit_card_transactions')
             .select(
-              'id, transaction_type, charge_kind, amount, currency, transaction_date, created_at, '
-              'description, reference, account_id, account_debit_amount, account_debit_currency, payment_exchange_rate, category_id, is_voided, is_receivable_funding, void_reason, voided_at, accounts(name), categories(name)',
+              'id, additional_card_id, transaction_type, charge_kind, amount, currency, transaction_date, created_at, '
+              'cash_advance_fee, cash_advance_account_id, description, reference, account_id, account_debit_amount, account_debit_currency, payment_exchange_rate, category_id, is_voided, is_receivable_funding, void_reason, voided_at, categories(name)',
             )
             .eq('credit_card_id', widget.cardId)
             .eq('user_id', user.id)
@@ -389,10 +429,40 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
         rows.addAll(page);
         if (page.length < 500) break;
       }
-      if (!mounted || request != requestId) return;
+      final accountIds = rows
+          .expand(
+            (row) => [
+              row['account_id']?.toString(),
+              row['cash_advance_account_id']?.toString(),
+            ],
+          )
+          .nonNulls
+          .toSet()
+          .toList();
+      final names = <String, String>{};
+      for (var offset = 0; offset < accountIds.length; offset += 100) {
+        final accounts = await supabase
+            .from('accounts')
+            .select('id,name')
+            .eq('user_id', user.id)
+            .inFilter('id', accountIds.skip(offset).take(100).toList());
+        for (final account in accounts) {
+          names['${account['id']}'] = '${account['name']}';
+        }
+      }
+      if (!mounted ||
+          request != requestId ||
+          supabase.auth.currentUser?.id != user.id)
+        return;
       setState(() {
+        accountNames = names;
         name = card['name'].toString();
         cardData = card;
+        additionalCards = {for (final a in additions) a['id'].toString(): a};
+        if (additionalFilter != '' &&
+            !additionalCards.containsKey(additionalFilter)) {
+          additionalFilter = null;
+        }
         movements = rows;
         loading = false;
       });
@@ -455,6 +525,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
 
   Widget movementCard(Map<String, dynamic> tx) {
     final type = tx['transaction_type'].toString();
+    final displayType = cardMovementType(type, tx['charge_kind']);
     final increases = ['purchase', 'interest', 'fee'].contains(type);
     final decreases = ['payment', 'refund'].contains(type);
     final date = DateTime.tryParse('${tx['transaction_date']}')?.toLocal();
@@ -462,28 +533,31 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
         ? 'Fecha no disponible'
         : '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
     final txCurrency = tx['currency'].toString();
-    final symbol = txCurrency == 'USD' ? 'US\$' : 'C\$';
-    final amount = moneyCents(tx['amount']) / 100;
+    final amount = cardMoney(moneyCents(tx['amount']), txCurrency);
     final description = tx['description']?.toString().trim() ?? '';
     final reference = tx['reference']?.toString().trim() ?? '';
-    final account = relatedName(tx['accounts']);
+    final account = accountNames[tx['account_id']?.toString()] ?? '';
     final category = relatedName(tx['categories']);
+    final additional = additionalCards[tx['additional_card_id']?.toString()];
 
     final voided = tx['is_voided'] == true;
     final voidedAt = DateTime.tryParse('${tx['voided_at']}')?.toLocal();
+    final theme = Theme.of(context);
 
     return Card(
+      margin: const EdgeInsets.only(bottom: 10),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: Text(
-                    '${tx['charge_kind'] == 'insurance' ? 'Seguro de tarjeta' : types[type] ?? type}${voided ? ' · Anulado' : ''}',
-                    style: Theme.of(context).textTheme.titleMedium,
+                    '${types[displayType] ?? type}${voided ? ' · Anulado' : ''}',
+                    style: theme.textTheme.titleMedium,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -495,49 +569,39 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
                         ? '+'
                         : decreases
                         ? '−'
-                        : ''}$symbol ${amount.toStringAsFixed(2)}',
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: increases
-                          ? Theme.of(context).colorScheme.error
+                        : ''}$amount',
+                    textAlign: TextAlign.end,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: voided
+                          ? theme.colorScheme.onSurfaceVariant
+                          : increases
+                          ? theme.colorScheme.error
                           : decreases
-                          ? Colors.green
+                          ? theme.colorScheme.primary
                           : null,
                     ),
                   ),
                 ),
-                if (tx['is_receivable_funding'] != true &&
-                    ['purchase', 'interest', 'fee', 'refund'].contains(type))
-                  Wrap(
-                    alignment: WrapAlignment.end,
-                    spacing: 8,
-                    children: [
-                      TextButton.icon(
-                        onPressed: saving ? null : () => editMovement(tx),
-                        icon: const Icon(Icons.edit_outlined),
-                        label: const Text('Editar'),
-                      ),
-                      TextButton.icon(
-                        onPressed: saving ? null : () => deleteMovement(tx),
-                        icon: const Icon(Icons.delete_outline),
-                        label: const Text('Eliminar'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                    ],
-                  ),
               ],
             ),
-            Text(dateText),
-            MovementReceiptsButton(
-              table: 'credit_card_transactions',
-              record: tx,
-              count: countFor(tx),
-              onClosed: refreshReceiptCounts,
-            ),
-            if (description.isNotEmpty) Text(description),
+            const SizedBox(height: 4),
+            Text(dateText, style: theme.textTheme.bodySmall),
+            if (additional != null)
+              Text('Adicional · ${additionalCardLabel(additional)}')
+            else if (type != 'payment' && additionalCards.isNotEmpty)
+              const Text('Tarjeta titular'),
+            if (description.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(description),
+            ],
+            if (displayType == cardCashAdvance) ...[
+              Text(cardCashAdvanceBreakdown(tx)),
+              if (tx['cash_advance_account_id'] != null)
+                Text(
+                  'Recibido en: ${accountNames[tx['cash_advance_account_id']?.toString()] ?? 'No disponible'}',
+                ),
+            ],
             if (type == 'payment')
               Text('Cuenta: ${account.isEmpty ? 'No disponible' : account}'),
             if (type == 'payment' && tx['account_debit_amount'] != null)
@@ -570,27 +634,222 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
                 '${voidedAt.hour.toString().padLeft(2, '0')}:'
                 '${voidedAt.minute.toString().padLeft(2, '0')}',
               ),
-            if (type == 'payment' && !voided)
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: saving ? null : () => editPayment(tx),
-                  icon: const Icon(Icons.edit_outlined),
-                  label: const Text('Editar pago'),
-                ),
+            MovementReceiptsButton(
+              table: 'credit_card_transactions',
+              record: tx,
+              count: countFor(tx),
+              onClosed: refreshReceiptCounts,
+            ),
+            if (tx['is_receivable_funding'] != true &&
+                ['purchase', 'interest', 'fee', 'refund'].contains(type))
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 8,
+                children: [
+                  TextButton.icon(
+                    onPressed: saving ? null : () => editMovement(tx),
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Editar'),
+                  ),
+                  TextButton.icon(
+                    onPressed: saving ? null : () => deleteMovement(tx),
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('Eliminar'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ],
               ),
             if (type == 'payment' && !voided)
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: saving ? null : () => voidPayment(tx),
-                  icon: const Icon(Icons.cancel_outlined),
-                  label: const Text('Anular pago'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.error,
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 8,
+                children: [
+                  TextButton.icon(
+                    onPressed: saving ? null : () => editPayment(tx),
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Editar pago'),
+                  ),
+                  TextButton.icon(
+                    onPressed: saving ? null : () => voidPayment(tx),
+                    icon: const Icon(Icons.cancel_outlined),
+                    label: const Text('Anular pago'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: theme.colorScheme.error,
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget filtersPanel(BuildContext context) => Card(
+    margin: EdgeInsets.zero,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              'Filtrar movimientos',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+          DatePeriodField(
+            start: dateFilter.start,
+            end: dateFilter.end,
+            onChanged: (range) {
+              if (mounted) setState(() => dateFilter = range);
+            },
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: AdaptiveColumns(
+              minColumnWidth: 216,
+              maxColumns: additionalCards.isEmpty ? 4 : 3,
+              children: [
+                if (additionalCards.isNotEmpty)
+                  DropdownButtonFormField<String>(
+                    key: ValueKey(additionalFilter),
+                    initialValue: additionalFilter ?? 'all',
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Tarjeta del movimiento',
+                    ),
+                    items: [
+                      const DropdownMenuItem(
+                        value: 'all',
+                        child: Text('Todas'),
+                      ),
+                      const DropdownMenuItem(
+                        value: '',
+                        child: Text('Titular / cuenta compartida'),
+                      ),
+                      for (final card in additionalCards.values)
+                        DropdownMenuItem(
+                          value: card['id'].toString(),
+                          child: Text(
+                            additionalCardLabel(card),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: (value) => setState(
+                      () => additionalFilter = value == 'all' ? null : value,
+                    ),
+                  ),
+                GuideAnchor(
+                  id: 'currency',
+                  child: DropdownButtonFormField<String>(
+                    initialValue: currencyFilter,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Moneda'),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'all',
+                        child: Text('Ambas monedas'),
+                      ),
+                      DropdownMenuItem(value: 'NIO', child: Text('Córdobas')),
+                      DropdownMenuItem(value: 'USD', child: Text('Dólares')),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) {
+                        setState(() => currencyFilter = v);
+                      }
+                    },
                   ),
                 ),
-              ),
+                GuideAnchor(
+                  id: 'state',
+                  child: DropdownButtonFormField<String>(
+                    initialValue: statusFilter,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Estado del registro',
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'valid', child: Text('Vigentes')),
+                      DropdownMenuItem(
+                        value: 'voided',
+                        child: Text('Anulados'),
+                      ),
+                      DropdownMenuItem(value: 'all', child: Text('Todos')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) setState(() => statusFilter = value);
+                    },
+                  ),
+                ),
+                GuideAnchor(
+                  id: 'type',
+                  child: DropdownButtonFormField<String>(
+                    initialValue: filter,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Tipo de movimiento',
+                    ),
+                    items: [
+                      const DropdownMenuItem(
+                        value: 'all',
+                        child: Text('Todos'),
+                      ),
+                      ...types.entries.map(
+                        (e) => DropdownMenuItem(
+                          value: e.key,
+                          child: Text(e.value, overflow: TextOverflow.ellipsis),
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) setState(() => filter = value);
+                    },
+                  ),
+                ),
+                if (receiptCounts != null)
+                  ReceiptFilterField(
+                    value: receiptFilter,
+                    onChanged: (value) => setState(() => receiptFilter = value),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget balanceCard(BuildContext context, String currency) {
+    final balance = cardBalance(
+      cardData,
+      movements.map((tx) => {...tx, 'credit_card_id': widget.cardId}),
+      currency,
+    );
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              currency == 'USD' ? 'Dólares' : 'Córdobas',
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${balance != null && balance < 0 ? 'A favor' : 'Deuda'}: ${cardMoney(balance?.abs(), currency)}',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            Text(
+              'Inicial: ${cardMoney(cardOpening(cardData, currency), currency)}',
+            ),
           ],
         ),
       ),
@@ -600,15 +859,26 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
   @override
   Widget build(BuildContext context) {
     final visible = movements.where((tx) {
+      final date = DateTime.tryParse('${tx['transaction_date']}')?.toLocal();
+      if (date == null ||
+          !includesDay(date, dateFilter.start, dateFilter.end)) {
+        return false;
+      }
+      if (additionalFilter != null &&
+          (tx['additional_card_id']?.toString() ?? '') != additionalFilter) {
+        return false;
+      }
       if (receiptCounts != null && !receiptFilter.matches(countFor(tx)))
         return false;
       if (currencyFilter != 'all' && tx['currency'] != currencyFilter) {
         return false;
       }
-      if (filter == 'insurance'
-          ? tx['charge_kind'] != 'insurance'
-          : filter != 'all' && tx['transaction_type'] != filter)
+      final type = cardMovementType(tx['transaction_type'], tx['charge_kind']);
+      if (filter != 'all' &&
+          filter != type &&
+          !(filter == 'fee' && type == 'insurance')) {
         return false;
+      }
       final voided = tx['is_voided'] == true;
       if (statusFilter == 'valid' && voided) return false;
       if (statusFilter == 'voided' && !voided) return false;
@@ -658,152 +928,45 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
                   onRefresh: loadData,
                   child: ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.fromLTRB(
+                      pageGutter(context),
+                      16,
+                      pageGutter(context),
+                      24,
+                    ),
                     children: [
-                      const Text(
-                        'Últimos ingresados primero',
-                        style: TextStyle(
-                          color: Color(0xFF50665B),
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
                       Text(
                         name,
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
-                      for (final c in cardCurrencies)
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(14),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Text(
-                                  c == 'USD' ? 'Dólares' : 'Córdobas',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                Text(
-                                  'Inicial: ${cardMoney(cardOpening(cardData, c), c)}',
-                                ),
-                                Builder(
-                                  builder: (context) {
-                                    final balance = cardBalance(
-                                      cardData,
-                                      movements.map(
-                                        (tx) => {
-                                          ...tx,
-                                          'credit_card_id': widget.cardId,
-                                        },
-                                      ),
-                                      c,
-                                    );
-                                    return Text(
-                                      '${balance != null && balance < 0 ? 'A favor' : 'Deuda'}: ${cardMoney(balance?.abs(), c)}',
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      const SizedBox(height: 12),
-                      GuideAnchor(
-                        id: 'currency',
-                        child: DropdownButtonFormField<String>(
-                          initialValue: currencyFilter,
-                          decoration: const InputDecoration(
-                            labelText: 'Moneda',
-                          ),
-                          items: const [
-                            DropdownMenuItem(
-                              value: 'all',
-                              child: Text('Ambas monedas'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'NIO',
-                              child: Text('Córdobas'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'USD',
-                              child: Text('Dólares'),
-                            ),
-                          ],
-                          onChanged: (v) {
-                            if (v != null) {
-                              setState(() => currencyFilter = v);
-                            }
-                          },
-                        ),
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Text('+ aumenta la deuda · − reduce la deuda'),
-                      ),
-                      GuideAnchor(
-                        id: 'state',
-                        child: DropdownButtonFormField<String>(
-                          initialValue: statusFilter,
-                          decoration: const InputDecoration(
-                            labelText: 'Estado del registro',
-                          ),
-                          items: const [
-                            DropdownMenuItem(
-                              value: 'valid',
-                              child: Text('Vigentes'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'voided',
-                              child: Text('Anulados'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'all',
-                              child: Text('Todos'),
-                            ),
-                          ],
-                          onChanged: (value) {
-                            if (value != null)
-                              setState(() => statusFilter = value);
-                          },
-                        ),
+                      const SizedBox(height: 4),
+                      Text(
+                        additionalCards.isEmpty
+                            ? 'Saldo total de la tarjeta'
+                            : 'Saldo compartido de la tarjeta titular',
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
                       const SizedBox(height: 12),
-                      GuideAnchor(
-                        id: 'type',
-                        child: DropdownButtonFormField<String>(
-                          initialValue: filter,
-                          decoration: const InputDecoration(
-                            labelText: 'Tipo de movimiento',
-                          ),
-                          items: [
-                            const DropdownMenuItem(
-                              value: 'all',
-                              child: Text('Todos'),
-                            ),
-                            ...types.entries.map(
-                              (e) => DropdownMenuItem(
-                                value: e.key,
-                                child: Text(e.value),
-                              ),
-                            ),
-                          ],
-                          onChanged: (value) {
-                            if (value != null) setState(() => filter = value);
-                          },
-                        ),
+                      AdaptiveColumns(
+                        minColumnWidth: 216,
+                        children: [
+                          for (final currency in cardCurrencies)
+                            balanceCard(context, currency),
+                        ],
                       ),
-                      const SizedBox(height: 12),
-                      if (receiptCounts != null)
-                        ReceiptFilterField(
-                          value: receiptFilter,
-                          onChanged: (value) =>
-                              setState(() => receiptFilter = value),
-                        ),
+                      const SizedBox(height: 16),
+                      filtersPanel(context),
+                      const SizedBox(height: 20),
                       Text(
                         '${visible.length} de ${movements.length} movimientos',
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Últimos ingresados primero · + aumenta la deuda · − reduce la deuda',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 8),
                       if (visible.isEmpty)
                         const Padding(
                           padding: EdgeInsets.all(24),

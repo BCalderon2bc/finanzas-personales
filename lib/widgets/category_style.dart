@@ -22,10 +22,10 @@ const categoryIconOptions = {
 };
 
 const categoryColorOptions = [
-  '#2563EB',
-  '#7C3AED',
-  '#DB2777',
-  '#DC2626',
+  '#3C70AA',
+  '#796A9C',
+  '#A16E88',
+  '#A3453D',
   '#C2410C',
   '#A16207',
   '#047857',
@@ -44,5 +44,5 @@ Color categoryColor(dynamic value, {bool income = false}) {
   if (RegExp(r'^[a-fA-F0-9]{6}$').hasMatch(hex)) {
     return Color(int.parse('FF$hex', radix: 16));
   }
-  return income ? const Color(0xFF047857) : const Color(0xFF2563EB);
+  return income ? const Color(0xFF047857) : const Color(0xFF3C70AA);
 }

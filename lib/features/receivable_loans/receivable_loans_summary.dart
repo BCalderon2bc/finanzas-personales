@@ -49,7 +49,7 @@ class ReceivableLoansSummary extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF4C1D95), Color(0xFF7C3AED)],
+          colors: [Color(0xFF4C1D95), Color(0xFF796A9C)],
         ),
         borderRadius: BorderRadius.circular(20),
       ),
@@ -130,13 +130,13 @@ class ReceivableLoansSummary extends StatelessWidget {
           padding: EdgeInsets.only(top: 10),
           child: Text(
             'Total equivalente calculado con la tasa de Configuraciones.',
-            style: TextStyle(color: Color(0xFF50665B), fontSize: 12),
+            style: TextStyle(color: Color(0xFF596B7D), fontSize: 12),
           ),
         ),
       const SizedBox(height: 10),
       const Text(
         'Es dinero que te deben. No forma parte del efectivo ni del ahorro disponible hasta que lo recibas.',
-        style: TextStyle(color: Color(0xFF50665B), fontSize: 12),
+        style: TextStyle(color: Color(0xFF596B7D), fontSize: 12),
       ),
     ],
   );

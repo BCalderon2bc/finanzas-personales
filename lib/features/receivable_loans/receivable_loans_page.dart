@@ -510,10 +510,10 @@ class _ReceivableLoansPageState extends State<ReceivableLoansPage> {
     final voided = loan['is_voided'] == true;
     final overdue = receivableOverdue(loan, pending, DateTime.now());
     final color = voided
-        ? const Color(0xFF50665B)
+        ? const Color(0xFF596B7D)
         : overdue
-        ? const Color(0xFFA2322C)
-        : const Color(0xFF7C3AED);
+        ? const Color(0xFFA3453D)
+        : const Color(0xFF796A9C);
     final due = DateTime.tryParse('${loan['due_date']}');
     final hasPayments = payments.any(
       (p) =>
@@ -581,7 +581,7 @@ class _ReceivableLoansPageState extends State<ReceivableLoansPage> {
             const SizedBox(height: 16),
             Text(
               voided ? 'Registro sin efecto en saldos' : 'Capital que te deben',
-              style: const TextStyle(color: Color(0xFF50665B), fontSize: 12),
+              style: const TextStyle(color: Color(0xFF596B7D), fontSize: 12),
             ),
             Text(
               receivableMoney(voided ? 0 : pending, currency),
@@ -618,7 +618,7 @@ class _ReceivableLoansPageState extends State<ReceivableLoansPage> {
                   : loan['credit_card_id'] != null
                   ? 'Origen: crédito · ${creditCardName(loan['credit_card_id'])}'
                   : 'Origen: cuenta / débito · ${accountName(loan['account_id'])}',
-              style: const TextStyle(color: Color(0xFF50665B), fontSize: 12),
+              style: const TextStyle(color: Color(0xFF596B7D), fontSize: 12),
             ),
             if ((loan['reference']?.toString() ?? '').isNotEmpty)
               SelectableText('Referencia: ${loan['reference']}'),

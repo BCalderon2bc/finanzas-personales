@@ -1,70 +1,13 @@
+import '../../utils/card_cash_advance.dart';
 import 'package:flutter/material.dart';
 
 import '../../utils/money.dart';
 import '../../widgets/category_style.dart';
 
-class TransactionHistoryHeader extends StatelessWidget {
-  const TransactionHistoryHeader({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-      ),
-      child: DefaultTextStyle.merge(
-        style: TextStyle(
-          color: theme.colorScheme.onSurface,
-          fontWeight: FontWeight.w700,
-        ),
-        child: const _HistoryColumns(
-          date: Text('Fecha'),
-          description: Text('Descripción'),
-          account: Text('Cuenta'),
-          amount: Text('Monto', textAlign: TextAlign.end),
-        ),
-      ),
-    );
-  }
-}
-
-class _HistoryColumns extends StatelessWidget {
-  const _HistoryColumns({
-    required this.date,
-    required this.description,
-    required this.account,
-    required this.amount,
-    this.action = const SizedBox.shrink(),
-  });
-
-  final Widget date, description, account, amount, action;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-    child: Row(
-      children: [
-        Expanded(flex: 2, child: date),
-        const SizedBox(width: 12),
-        Expanded(flex: 5, child: description),
-        const SizedBox(width: 12),
-        Expanded(flex: 3, child: account),
-        const SizedBox(width: 12),
-        Expanded(flex: 3, child: amount),
-        const SizedBox(width: 8),
-        SizedBox(width: 20, child: action),
-      ],
-    ),
-  );
-}
-
 class TransactionTile extends StatelessWidget {
   const TransactionTile({
     super.key,
     this.receiptCount = 0,
-    this.table = false,
     required this.transaction,
     required this.label,
     required this.account,
@@ -76,7 +19,6 @@ class TransactionTile extends StatelessWidget {
 
   final Map<String, dynamic> transaction;
   final int receiptCount;
-  final bool table;
   final Map<String, dynamic>? categoryStyle;
   final String label, account, destination, category;
   final VoidCallback? onTap;
@@ -97,9 +39,10 @@ class TransactionTile extends StatelessWidget {
       'credit_card_payment',
       'debt_payment',
       'receivable_loan',
+      cashAdvanceDepositSource,
     ].contains(transaction['source']);
     final color = income
-        ? const Color(0xFF14684D)
+        ? const Color(0xFF35745C)
         : expense
         ? colors.error
         : colors.primary;
@@ -137,7 +80,9 @@ class TransactionTile extends StatelessWidget {
         : expense
         ? '−'
         : '';
-    final status = external
+    final status = transaction['source'] == cashAdvanceDepositSource
+        ? 'Retiro vinculado'
+        : external
         ? 'Pago vinculado'
         : transaction['is_reconciled'] == true
         ? 'Conciliado'
@@ -148,121 +93,70 @@ class TransactionTile extends StatelessWidget {
       if (category.isNotEmpty) category,
       status,
     ].join(' · ');
-    final chevron = Icon(
-      Icons.chevron_right_rounded,
-      color: colors.onSurfaceVariant,
-      size: 20,
-    );
-
-    Widget amount({TextAlign? align}) => Text(
-      '$sign${formatMoneyCents(cents, currency)}',
-      textAlign: align,
-      style: theme.textTheme.titleMedium?.copyWith(
-        color: color,
-        fontWeight: FontWeight.w800,
-      ),
-    );
-
-    Widget receipt() => Tooltip(
-      message: '$receiptCount comprobantes',
-      child: Icon(Icons.attach_file, size: 16, color: colors.onSurfaceVariant),
-    );
-
-    if (table) {
-      return Material(
-        color: colors.surface,
-        child: InkWell(
-          onTap: onTap,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: colors.outlineVariant)),
-            ),
-            child: _HistoryColumns(
-              date: Text(dateLabel, style: theme.textTheme.bodySmall),
-              description: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall,
-                  ),
-                  Text(
-                    subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ],
-              ),
-              account: Text(
-                accountLabel,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              amount: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  if (receiptCount > 0) receipt(),
-                  Flexible(child: amount(align: TextAlign.end)),
-                ],
-              ),
-              action: chevron,
-            ),
-          ),
-        ),
-      );
-    }
-
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: visualColor.withAlpha(18),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(visualIcon, color: visualColor, size: 19),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(visualIcon, color: visualColor, size: 19),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(title, style: theme.textTheme.titleMedium),
+                  ),
+                  const SizedBox(width: 12),
+                  Flexible(
+                    child: Text(
+                      '$sign${formatMoneyCents(cents, currency)}',
+                      textAlign: TextAlign.end,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: color,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  if (onTap != null)
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: colors.onSurfaceVariant,
+                      size: 20,
+                    ),
+                ],
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleSmall,
-                    ),
-                    const SizedBox(height: 3),
-                    amount(),
-                    const SizedBox(height: 3),
-                    Text(
-                      '$dateLabel · $accountLabel',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall,
-                    ),
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall,
-                    ),
-                  ],
+              const SizedBox(height: 6),
+              Text(dateLabel, style: theme.textTheme.bodySmall),
+              Text(accountLabel),
+              Text(subtitle, style: theme.textTheme.bodySmall),
+              if (receiptCount > 0) ...[
+                const SizedBox(height: 6),
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      WidgetSpan(
+                        alignment: PlaceholderAlignment.middle,
+                        child: Icon(
+                          Icons.attach_file,
+                          color: colors.onSurfaceVariant,
+                          size: 16,
+                        ),
+                      ),
+                      TextSpan(
+                        text: receiptCount == 1
+                            ? '  1 comprobante'
+                            : '  $receiptCount comprobantes',
+                      ),
+                    ],
+                  ),
+                  style: theme.textTheme.bodySmall,
                 ),
-              ),
-              if (receiptCount > 0) receipt(),
-              chevron,
+              ],
             ],
           ),
         ),

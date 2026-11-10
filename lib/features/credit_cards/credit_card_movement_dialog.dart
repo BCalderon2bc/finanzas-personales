@@ -1,3 +1,8 @@
+import '../../utils/money.dart';
+import '../../utils/card_cash_advance.dart';
+import 'credit_card_balances.dart'
+    show cardMovementType, cardPointsRedemption, cardPointsRedemptionLabel;
+import '../../data/payment_agenda_labels.dart' show additionalCardLabel;
 import '../person_accounts/receipt_draft_field.dart';
 import 'package:flutter/material.dart';
 
@@ -7,10 +12,14 @@ class CreditCardMovementDialog extends StatefulWidget {
     required this.currency,
     required this.categories,
     this.movement,
+    this.cashAccounts = const [],
+    this.additionalCards = const [],
   });
   final String currency;
+  final List<Map<String, dynamic>> cashAccounts;
   final List<Map<String, dynamic>> categories;
   final Map<String, dynamic>? movement;
+  final List<Map<String, dynamic>> additionalCards;
   @override
   State<CreditCardMovementDialog> createState() =>
       _CreditCardMovementDialogState();
@@ -18,6 +27,16 @@ class CreditCardMovementDialog extends StatefulWidget {
 
 class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
   final _receipt = ReceiptDraft();
+  final commission = TextEditingController(text: '0');
+  String? cashAccountId;
+  bool get cashAdvance => type == cardCashAdvance;
+
+  int? cashInputCents(String input) {
+    final text = input.trim().replaceAll(',', '.');
+    if (!RegExp(r'^\d{1,12}(\.\d{1,2})?$').hasMatch(text)) return null;
+    return moneyCents(text);
+  }
+
   final formKey = GlobalKey<FormState>();
   final amount = TextEditingController(),
       description = TextEditingController(),
@@ -25,16 +44,24 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
   String type = 'purchase';
   late String currency;
   String? categoryId;
+  String additionalId = '';
   DateTime date = DateTime.now();
   bool get editing => widget.movement != null;
-  bool get usesCategory =>
-      type == 'purchase' || type == 'refund' || type == 'insurance';
+  bool get usesCategory => const [
+    'purchase',
+    'refund',
+    'insurance',
+    cardPointsRedemption,
+    cardCashAdvance,
+  ].contains(type);
   static const types = {
     'purchase': 'Compra',
+    cardCashAdvance: cardCashAdvanceLabel,
     'interest': 'Intereses',
     'fee': 'Comisión',
     'insurance': 'Seguro de tarjeta',
     'refund': 'Devolución de compra',
+    cardPointsRedemption: cardPointsRedemptionLabel,
   };
   @override
   void initState() {
@@ -44,11 +71,14 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
     if (tx == null) {
       return;
     }
-    type = tx['charge_kind'] == 'insurance'
-        ? 'insurance'
-        : tx['transaction_type'].toString();
+    type = cardMovementType(tx['transaction_type'], tx['charge_kind']);
     categoryId = tx['category_id']?.toString();
-    amount.text = tx['amount'].toString();
+    additionalId = tx['additional_card_id']?.toString() ?? '';
+    amount.text = cashAdvance
+        ? (cardCashAdvancePrincipal(tx) / 100).toStringAsFixed(2)
+        : tx['amount'].toString();
+    commission.text = (cardCashAdvanceFee(tx) / 100).toStringAsFixed(2);
+    cashAccountId = tx['cash_advance_account_id']?.toString();
     description.text = tx['description']?.toString() ?? '';
     reference.text = tx['reference']?.toString() ?? '';
     date = DateTime.parse(tx['transaction_date'].toString()).toLocal();
@@ -56,6 +86,7 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
 
   @override
   void dispose() {
+    commission.dispose();
     amount.dispose();
     description.dispose();
     reference.dispose();
@@ -69,10 +100,26 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
     }
     Navigator.pop(context, <String, dynamic>{
       ..._receipt.fields,
-      'transaction_type': type == 'insurance' ? 'fee' : type,
-      'charge_kind': type == 'insurance' ? 'insurance' : null,
+      'transaction_type': switch (type) {
+        'insurance' => 'fee',
+        cardCashAdvance => 'purchase',
+        cardPointsRedemption => 'refund',
+        _ => type,
+      },
+      'charge_kind': switch (type) {
+        'insurance' || cardPointsRedemption || cardCashAdvance => type,
+        _ => null,
+      },
       'currency': currency,
-      'amount': double.parse(amount.text.trim().replaceAll(',', '.')),
+      'amount': cashAdvance
+          ? (cashInputCents(amount.text)! + cashInputCents(commission.text)!) /
+                100
+          : double.parse(amount.text.trim().replaceAll(',', '.')),
+      'cash_advance_fee': cashAdvance
+          ? cashInputCents(commission.text)! / 100
+          : null,
+      'cash_advance_account_id': cashAdvance ? cashAccountId : null,
+      'additional_card_id': additionalId.isEmpty ? null : additionalId,
       'category_id': usesCategory ? categoryId : null,
       'description': description.text.trim().isEmpty
           ? null
@@ -89,11 +136,29 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final cashOptions = widget.cashAccounts
+        .where(
+          (account) =>
+              account['currency'] == currency &&
+              (account['is_active'] == true ||
+                  '${account['id']}' == cashAccountId),
+        )
+        .toList();
+    final principalCents = cashInputCents(amount.text);
+    final feeCents = cashInputCents(commission.text);
     final categories = [...widget.categories];
     if (categoryId != null &&
         !categories.any((c) => c['id'].toString() == categoryId)) {
       categories.add({'id': categoryId, 'name': 'Categoría actual'});
     }
+    final selectableCards = widget.additionalCards
+        .where(
+          (card) =>
+              card['is_active'] == true ||
+              card['id'].toString() ==
+                  widget.movement?['additional_card_id']?.toString(),
+        )
+        .toList();
     return AlertDialog(
       title: Text(editing ? 'Editar movimiento' : 'Movimiento de tarjeta'),
       content: SizedBox(
@@ -105,6 +170,29 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (selectableCards.isNotEmpty) ...[
+                  DropdownButtonFormField<String>(
+                    initialValue: additionalId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Tarjeta del movimiento',
+                    ),
+                    items: [
+                      const DropdownMenuItem(value: '', child: Text('Titular')),
+                      for (final card in selectableCards)
+                        DropdownMenuItem(
+                          value: card['id'].toString(),
+                          child: Text(
+                            additionalCardLabel(card),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: (value) =>
+                        setState(() => additionalId = value ?? ''),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 DropdownButtonFormField<String>(
                   initialValue: currency,
                   decoration: const InputDecoration(
@@ -122,7 +210,10 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
                   ],
                   onChanged: (value) {
                     if (value != null) {
-                      setState(() => currency = value);
+                      setState(() {
+                        currency = value;
+                        cashAccountId = null;
+                      });
                     }
                   },
                 ),
@@ -152,11 +243,17 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: amount,
+                  onChanged: cashAdvance ? (_) => setState(() {}) : null,
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
                   decoration: InputDecoration(
-                    labelText: 'Monto (${currency == 'USD' ? 'US\$' : 'C\$'})',
+                    labelText:
+                        '${cashAdvance ? 'Efectivo recibido' : 'Monto'} (${currency == 'USD' ? 'US\$' : 'C\$'})',
+                    helperText: type == cardPointsRedemption
+                        ? 'Ingresa el importe abonado por el banco.'
+                        : null,
+                    helperMaxLines: 2,
                   ),
                   validator: (v) {
                     final text = (v ?? '').trim();
@@ -164,19 +261,82 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
                     if (n == null || !n.isFinite || n <= 0) {
                       return 'Escribe un monto mayor que cero';
                     }
+                    if (cashAdvance && cashInputCents(text) == null)
+                      return 'Usa hasta 12 enteros y dos decimales';
                     return RegExp(r'^\d+([.,]\d{1,2})?$').hasMatch(text)
                         ? null
                         : 'Usa máximo dos decimales, sin separadores de miles';
                   },
                 ),
+                if (cashAdvance) ...[
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: commission,
+                    onChanged: (_) => setState(() {}),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: InputDecoration(
+                      labelText:
+                          'Comisión del banco (${currency == 'USD' ? 'US\$' : 'C\$'})',
+                      helperText: 'Ingresa el cargo que aplicó el banco.',
+                    ),
+                    validator: (value) {
+                      return cashInputCents(value ?? '') != null
+                          ? null
+                          : 'Ingresa cero o una comisión con hasta dos decimales';
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    key: ValueKey('cash-$currency'),
+                    isExpanded: true,
+                    initialValue:
+                        cashOptions.any((a) => '${a['id']}' == cashAccountId)
+                        ? cashAccountId
+                        : '',
+                    decoration: const InputDecoration(
+                      labelText: 'Recibir en cuenta de efectivo (opcional)',
+                    ),
+                    items: [
+                      const DropdownMenuItem(
+                        value: '',
+                        child: Text('Solo registrar en la tarjeta'),
+                      ),
+                      for (final account in cashOptions)
+                        DropdownMenuItem(
+                          value: '${account['id']}',
+                          child: Text(
+                            '${account['name']}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: (value) => setState(
+                      () => cashAccountId = value == '' ? null : value,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (principalCents != null &&
+                      principalCents > 0 &&
+                      feeCents != null)
+                    Text(
+                      'Aumenta la deuda: ${formatMoneyCents(principalCents + feeCents, currency)}',
+                    ),
+                  const Text(
+                    'La comisión se registra como gasto. El efectivo se suma a la cuenta elegida.',
+                  ),
+                ],
                 if (usesCategory) ...[
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     key: ValueKey('$type-$categoryId'),
                     initialValue: categoryId ?? 'none',
                     isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Categoría (opcional)',
+                    decoration: InputDecoration(
+                      labelText: cashAdvance
+                          ? 'Categoría de la comisión (opcional)'
+                          : 'Categoría (opcional)',
                     ),
                     items: [
                       const DropdownMenuItem(

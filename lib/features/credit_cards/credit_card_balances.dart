@@ -1,3 +1,4 @@
+import '../../utils/card_cash_advance.dart';
 import '../../utils/money.dart';
 
 const cardCurrencies = ['NIO', 'USD'];
@@ -8,6 +9,17 @@ const cardEffects = {
   'payment': -1,
   'refund': -1,
 };
+
+const cardPointsRedemption = 'points_redemption';
+const cardPointsRedemptionLabel = 'Redención de puntos';
+
+String cardMovementType(Object? transactionType, Object? chargeKind) =>
+    switch (chargeKind) {
+      'insurance' => 'insurance',
+      cardCashAdvance => cardCashAdvance,
+      cardPointsRedemption => cardPointsRedemption,
+      _ => transactionType.toString(),
+    };
 
 String cardMoney(int? cents, String currency) =>
     formatMoneyCents(cents, currency);

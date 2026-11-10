@@ -166,9 +166,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
   @override
   Widget build(BuildContext context) {
-    const blue = Color(0xFF17604E),
-        green = Color(0xFF14684D),
-        muted = Color(0xFF50665B);
+    const blue = Color(0xFF3C70AA),
+        green = Color(0xFF35745C),
+        muted = Color(0xFF596B7D);
     return PopScope(
       canPop: !saving,
       child: Scaffold(

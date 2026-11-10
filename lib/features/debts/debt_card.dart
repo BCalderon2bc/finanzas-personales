@@ -52,7 +52,7 @@ class DebtCard extends StatelessWidget {
     children: [
       Text(
         label,
-        style: const TextStyle(color: Color(0xFF50665B), fontSize: 12),
+        style: const TextStyle(color: Color(0xFF596B7D), fontSize: 12),
       ),
       const SizedBox(height: 6),
       FittedBox(
@@ -61,7 +61,7 @@ class DebtCard extends StatelessWidget {
         child: Text(
           money(amount),
           style: const TextStyle(
-            color: Color(0xFF182B24),
+            color: Color(0xFF243447),
             fontSize: 17,
             fontWeight: FontWeight.w700,
           ),
@@ -72,12 +72,12 @@ class DebtCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const blue = Color(0xFF17604E);
-    const green = Color(0xFF14684D);
-    const red = Color(0xFFA2322C);
-    const amber = Color(0xFFB45309);
-    const muted = Color(0xFF50665B);
-    const border = Color(0xFFD9E3DA);
+    const blue = Color(0xFF3C70AA);
+    const green = Color(0xFF35745C);
+    const red = Color(0xFFA3453D);
+    const amber = Color(0xFF886128);
+    const muted = Color(0xFF596B7D);
+    const border = Color(0xFFDCE3EB);
     final original = moneyCents(debt['original_amount']);
     final pending = original - paidCents;
     final status = debt['status']?.toString() ?? '';
@@ -165,7 +165,7 @@ class DebtCard extends StatelessWidget {
                             style: const TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF182B24),
+                              color: Color(0xFF243447),
                             ),
                           ),
                           if (creditor.isNotEmpty) ...[
@@ -243,7 +243,7 @@ class DebtCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAF7),
+                    color: const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(15),
                   ),
                   child: Column(

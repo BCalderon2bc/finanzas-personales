@@ -200,7 +200,7 @@ class _ReceivableLoanFormDialogState extends State<ReceivableLoanFormDialog> {
                   if (sources.isEmpty)
                     const Text(
                       'No hay cuentas en esta moneda ni tarjetas de crédito activas.',
-                      style: TextStyle(color: Colors.red),
+                      style: TextStyle(color: Color(0xFFA3453D)),
                     ),
                   if (creditSource)
                     const Padding(
@@ -208,7 +208,7 @@ class _ReceivableLoanFormDialogState extends State<ReceivableLoanFormDialog> {
                       child: Text(
                         'No registres otra compra manual por este mismo préstamo. El cargo se crea al guardar.',
                         style: TextStyle(
-                          color: Color(0xFF50665B),
+                          color: Color(0xFF596B7D),
                           fontSize: 12,
                         ),
                       ),

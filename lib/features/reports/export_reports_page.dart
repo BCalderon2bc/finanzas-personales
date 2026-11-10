@@ -11,8 +11,10 @@ import '../help/app_help.dart';
 import '../person_accounts/person_receipts_dialog.dart' show showFilePreview;
 import '../../data/export_report_models.dart';
 import '../../data/export_report_repository.dart';
+import '../../data/credit_card_additional_repository.dart';
 import '../../data/card_statement_repository.dart' show statementRows;
-import '../../data/payment_agenda_labels.dart' show agendaCardLabel;
+import '../../data/payment_agenda_labels.dart'
+    show additionalCardLabel, agendaCardLabel, reportDebitCardLabel;
 import '../../data/export_report_writer.dart';
 import '../../core/supabase_client.dart';
 import '../../utils/money.dart';
@@ -30,7 +32,8 @@ class ExportReportsPage extends StatefulWidget {
 class _ExportReportsPageState extends State<ExportReportsPage> {
   String kind = 'movements', currency = 'all';
   bool busy = false, loadingPeople = true, allHistory = true;
-  String? personId, peopleError, cardId, accountId;
+  String? personId, peopleError, cardId, accountId, additionalCardFilter;
+  Future<List<Map<String, dynamic>>>? additionalCards;
   List<Map<String, dynamic>> creditCards = [],
       debitCards = [],
       bankAccounts = [];
@@ -62,19 +65,70 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
     return account['account_type'] == 'cash' ? 'Efectivo' : 'Banco sin asignar';
   }
 
-  String debitCardLabel(Map<String, dynamic> card) {
-    final account = card['accounts'];
-    final name = account is Map ? account['name'] : null;
-    final network = card['network']?.toString().trim() ?? '';
-    return agendaCardLabel({
-      'financial_institutions': {
-        'name': account is Map
-            ? accountBankLabel(account)
-            : 'Banco sin asignar',
+  Future<List<Map<String, dynamic>>> loadReportAdditionals(
+    String cardId,
+  ) async {
+    return loadAdditionalCards(cardId, personUserId());
+  }
+
+  Widget additionalCardSelector() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      key: ValueKey(cardId),
+      future: additionalCards,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const LinearProgressIndicator(
+            semanticsLabel: 'Cargando tarjetas adicionales',
+          );
+        }
+        if (snapshot.hasError) {
+          return ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text(
+              'No se pudieron cargar las tarjetas adicionales.',
+            ),
+            trailing: TextButton(
+              onPressed: busy
+                  ? null
+                  : () => setState(() {
+                      additionalCards = loadReportAdditionals(cardId!);
+                    }),
+              child: const Text('Reintentar'),
+            ),
+          );
+        }
+        final cards = snapshot.data ?? const [];
+        return DropdownButtonFormField<String>(
+          initialValue: additionalCardFilter ?? 'all',
+          isExpanded: true,
+          decoration: const InputDecoration(
+            labelText: 'Tarjeta del movimiento',
+          ),
+          items: [
+            const DropdownMenuItem(
+              value: 'all',
+              child: Text('Titular y adicionales'),
+            ),
+            const DropdownMenuItem(value: '', child: Text('Solo titular')),
+            for (final card in cards)
+              DropdownMenuItem(
+                value: '${card['id']}',
+                child: Text(
+                  'Adicional · ${additionalCardLabel(card)}'
+                  '${card['is_active'] == true ? '' : ' · Inactiva'}',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+          ],
+          onChanged: busy
+              ? null
+              : (value) => setState(() {
+                  additionalCardFilter = value == 'all' ? null : value;
+                  clear();
+                }),
+        );
       },
-      'name': "${name ?? 'Cuenta'} · ${network.isEmpty ? 'Débito' : network}",
-      'card_reference': card['card_reference'],
-    });
+    );
   }
 
   Future<void> loadPeople() async {
@@ -98,7 +152,7 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
       final debitRows = await supabase
           .from('debit_cards')
           .select(
-            'id,network,card_reference,accounts(name,account_type,financial_institutions(name))',
+            'id,name,network,card_reference,financial_institutions(name),accounts(name,financial_institutions(name))',
           )
           .eq('user_id', uid)
           .order('id');
@@ -206,6 +260,7 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
           : await loadExportReport(
               kind: kind,
               cardId: cardId,
+              additionalCardFilter: additionalCardFilter,
               accountId: accountId,
               currency: currency,
               start: start,
@@ -537,6 +592,8 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                               setState(() {
                                 kind = v;
                                 cardId = null;
+                                additionalCardFilter = null;
+                                additionalCards = null;
                                 accountId = null;
                                 if (v == 'movements') {
                                   final today = DateUtils.dateOnly(
@@ -608,7 +665,10 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                                 (kind == 'credit_cards' ||
                                         kind == 'credit_card_expenses')
                                     ? agendaCardLabel(card)
-                                    : debitCardLabel(card),
+                                    : reportDebitCardLabel(
+                                        card,
+                                        account: card['accounts'] as Map?,
+                                      ),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -618,10 +678,19 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                         ? null
                         : (v) => setState(() {
                             cardId = v == '' ? null : v;
+                            additionalCardFilter = null;
+                            additionalCards =
+                                kind == 'credit_card_expenses' && cardId != null
+                                ? loadReportAdditionals(cardId!)
+                                : null;
                             clear();
                           }),
                   ),
                   const SizedBox(height: 12),
+                  if (kind == 'credit_card_expenses' && cardId != null) ...[
+                    additionalCardSelector(),
+                    const SizedBox(height: 12),
+                  ],
                   if (kind == 'debit_cards')
                     const Text(
                       'Se muestran todos los movimientos de la cuenta vinculada; una cuenta con varias tarjetas se suma una sola vez.',
@@ -837,7 +906,7 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                       case final PersonAccountExportReport personReport) ...[
                     Card(
                       color: personReport.settled
-                          ? const Color(0xFFEAF7F0)
+                          ? const Color(0xFFEDF3F9)
                           : const Color(0xFFEFF6FF),
                       child: Padding(
                         padding: const EdgeInsets.all(18),
@@ -899,6 +968,7 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                           ),
                           const SizedBox(height: 6),
                           Text(report!.period),
+                          if (report!.scopeLabel case final scope?) Text(scope),
                           const Divider(height: 24),
                           ...report!.totals.map(
                             (t) => Padding(
@@ -924,7 +994,7 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                     padding: EdgeInsets.only(top: 10),
                     child: Text(
                       'En la web, el navegador gestiona la descarga. Compartir muestra los destinos disponibles en tu dispositivo.',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF50665B)),
+                      style: TextStyle(fontSize: 12, color: Color(0xFF596B7D)),
                     ),
                   ),
                   if (pdfNotice != null)
@@ -940,7 +1010,7 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                         n,
                         style: const TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF50665B),
+                          color: Color(0xFF596B7D),
                         ),
                       ),
                     ),

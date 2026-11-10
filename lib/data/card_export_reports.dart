@@ -1,6 +1,8 @@
+import '../utils/card_cash_advance.dart';
 import '../utils/money.dart';
 import '../features/credit_cards/credit_card_balances.dart';
 import 'export_report_models.dart';
+import 'payment_agenda_labels.dart';
 
 /// Movimientos del período con totales separados por moneda.
 ExportReport creditCardsExport({
@@ -24,8 +26,11 @@ ExportReport creditCardsExport({
   final details = <List<Object?>>[];
   const labels = {
     'purchase': 'Compra',
+    cardCashAdvance: cardCashAdvanceLabel,
     'payment': 'Pago',
     'refund': 'Reembolso',
+    'insurance': 'Seguro de tarjeta',
+    cardPointsRedemption: cardPointsRedemptionLabel,
     'fee': 'Comisión',
     'interest': 'Intereses',
   };
@@ -64,9 +69,11 @@ ExportReport creditCardsExport({
       totals[net] = totals[net]! + amount;
       details.add([
         reportDate(date),
-        '${card['name']}',
-        row['charge_kind'] == 'insurance' ? 'Seguro de tarjeta' : labels[type],
-        '${row['description'] ?? ''}',
+        reportCreditMovementCardLabel(card, row),
+        labels[cardMovementType(type, row['charge_kind'])],
+        isCardCashAdvance(row)
+            ? '${row['description'] ?? ''} · ${cardCashAdvanceBreakdown(row)}'
+            : '${row['description'] ?? ''}',
         c == 'NIO' ? MoneyCell(amount) : null,
         c == 'USD' ? MoneyCell(amount) : null,
         '${row['reference'] ?? ''}',
@@ -136,20 +143,27 @@ ExportReport debitCardsExport({
   String? accountId,
   bool allAccounts = false,
 }) {
-  final linked = cards
-      .where((c) => cardId == null || '${c['id']}' == cardId)
-      .map((c) => '${c['account_id']}')
-      .toSet();
+  final cardsByAccount = <String, List<Map<String, dynamic>>>{};
+  if (!allAccounts) {
+    for (final card in cards) {
+      if (cardId == null || '${card['id']}' == cardId) {
+        (cardsByAccount['${card['account_id']}'] ??= []).add(card);
+      }
+    }
+  }
   final detail = <List<Object?>>[], summary = <List<Object?>>[];
   final totals = {'NIO': 0, 'USD': 0};
   for (final account in accounts.where(
     (a) =>
         (allAccounts
             ? accountId == null || '${a['id']}' == accountId
-            : linked.contains('${a['id']}')) &&
+            : cardsByAccount.containsKey('${a['id']}')) &&
         (currency == 'all' || a['currency'] == currency),
   )) {
     final id = '${account['id']}', c = '${account['currency']}';
+    final linkedLabels = cardsByAccount[id]
+        ?.map((card) => reportDebitCardLabel(card, account: account))
+        .join('\n');
     var balance = moneyCents(account['opening_balance'] ?? 0);
     final events = <Map<String, dynamic>>[];
     for (final tx in transactions.where((t) => t['is_voided'] != true)) {
@@ -234,6 +248,7 @@ ExportReport debitCardsExport({
     totals[c] = totals[c]! + balance;
     summary.add([
       '${account['name']}',
+      if (!allAccounts) linkedLabels,
       c,
       c == 'NIO' ? MoneyCell(balance) : null,
       c == 'USD' ? MoneyCell(balance) : null,
@@ -248,6 +263,7 @@ ExportReport debitCardsExport({
     tables: [
       ReportTable(allAccounts ? 'Cuentas' : 'Cuentas vinculadas', [
         'Cuenta',
+        if (!allAccounts) 'Tarjetas vinculadas',
         'Moneda',
         'Saldo C\$',
         'Saldo US\$',
@@ -296,8 +312,30 @@ ExportReport creditCardExpensesExport({
   required DateTime generatedAt,
   String currency = 'all',
   String? cardId,
+  String? additionalCardFilter,
+  Map<String, dynamic>? additionalCard,
 }) {
-  final names = {for (final card in cards) '${card['id']}': '${card['name']}'};
+  final cardsById = {for (final card in cards) '${card['id']}': card};
+  final card = cardsById[cardId];
+  if (cardId != null && card == null) {
+    throw StateError('La tarjeta seleccionada ya no está disponible.');
+  }
+  if (additionalCardFilter != null &&
+      (card == null ||
+          (additionalCardFilter.isNotEmpty &&
+              additionalCard?['id']?.toString() != additionalCardFilter))) {
+    throw StateError('La adicional seleccionada ya no está disponible.');
+  }
+  final showCardColumn = additionalCardFilter == null;
+  final scopeLabel = card == null
+      ? null
+      : switch (additionalCardFilter) {
+          null => '${agendaCardLabel(card)} · Titular y adicionales',
+          '' => '${agendaCardLabel(card)} · Solo titular',
+          _ => reportCreditMovementCardLabel(card, {
+            'credit_card_additionals': additionalCard,
+          }),
+        };
   final rows = <List<Object?>>[];
   final charges = {'NIO': 0, 'USD': 0}, refunds = {'NIO': 0, 'USD': 0};
   final selected =
@@ -307,6 +345,9 @@ ExportReport creditCardExpensesExport({
                 tx['is_voided'] != true &&
                 tx['is_receivable_funding'] != true &&
                 (cardId == null || '${tx['credit_card_id']}' == cardId) &&
+                (additionalCardFilter == null ||
+                    (tx['additional_card_id']?.toString() ?? '') ==
+                        additionalCardFilter) &&
                 [
                   'purchase',
                   'interest',
@@ -323,23 +364,35 @@ ExportReport creditCardExpensesExport({
     final c = '${tx['currency']}';
     if (!charges.containsKey(c)) throw StateError('Moneda no admitida.');
     final refund = tx['transaction_type'] == 'refund';
-    final amount = moneyCents(tx['amount']);
+    final advance = isCardCashAdvance(tx);
+    final amount = advance ? cardCashAdvanceFee(tx) : moneyCents(tx['amount']);
+    if (advance && amount == 0) continue;
     if (refund) {
       refunds[c] = refunds[c]! + amount;
     } else {
       charges[c] = charges[c]! + amount;
     }
-    final type = tx['charge_kind'] == 'insurance'
-        ? 'Seguro de tarjeta'
-        : switch (tx['transaction_type']) {
-            'purchase' => 'Compra',
-            'interest' => 'Intereses',
-            'fee' => 'Comisión',
-            _ => 'Reembolso',
-          };
+    final type = switch (cardMovementType(
+      tx['transaction_type'],
+      tx['charge_kind'],
+    )) {
+      cardCashAdvance => cardCashAdvanceFeeLabel,
+      'purchase' => 'Compra',
+      'interest' => 'Intereses',
+      'fee' => 'Comisión',
+      'insurance' => 'Seguro de tarjeta',
+      cardPointsRedemption => cardPointsRedemptionLabel,
+      _ => 'Reembolso',
+    };
     rows.add([
       reportDate(date),
-      names['${tx['credit_card_id']}'] ?? 'Tarjeta no disponible',
+      if (showCardColumn)
+        card == null
+            ? reportCreditMovementCardLabel(
+                cardsById['${tx['credit_card_id']}'] ?? const {},
+                tx,
+              )
+            : _cardholderLabel(tx),
       type,
       '${tx['description'] ?? ''}',
       c == 'NIO' ? MoneyCell(refund ? -amount : amount) : null,
@@ -350,11 +403,12 @@ ExportReport creditCardExpensesExport({
   return ExportReport(
     title: 'Gastos de tarjetas de crédito',
     period: '${reportDate(start)} al ${reportDate(end)}',
+    scopeLabel: scopeLabel,
     generatedAt: generatedAt,
     tables: [
       ReportTable('Gastos y devoluciones', [
         'Fecha',
-        'Tarjeta',
+        if (showCardColumn) 'Tarjeta',
         'Tipo',
         'Descripción',
         'Importe C\$',
@@ -371,7 +425,16 @@ ExportReport creditCardExpensesExport({
         ],
     ],
     notes: const [
-      'Pagos de tarjeta y préstamos desde tarjeta se excluyen del gasto. Cada compra se cuenta una vez. Los reembolsos restan. Las monedas se presentan separadas.',
+      'Pagos de tarjeta y préstamos desde tarjeta se excluyen del gasto. Los retiros incluyen solo su comisión en el gasto. Cada compra se cuenta una vez. Los reembolsos restan. Las monedas se presentan separadas.',
     ],
   );
+}
+
+String _cardholderLabel(Map<String, dynamic> movement) {
+  final additional = movement['credit_card_additionals'];
+  if (additional is Map)
+    return 'Adicional · ${additionalCardLabel(additional)}';
+  return movement['additional_card_id'] == null
+      ? 'Titular'
+      : 'Adicional sin identificar';
 }

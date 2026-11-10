@@ -503,7 +503,7 @@ class _DebtInstallmentsPageState extends State<DebtInstallmentsPage> {
                           'Si liquidaste el préstamo anticipadamente, revisa y archiva las cuotas futuras que ya no correspondan.',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Color(0xFF50665B),
+                            color: Color(0xFF596B7D),
                           ),
                         ),
                       ],

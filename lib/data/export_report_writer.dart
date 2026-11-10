@@ -17,6 +17,20 @@ Uint8List reportExcel(ExportReport report) {
   final person = report is PersonAccountExportReport ? report : null;
   summary.appendRow([x.TextCellValue('Mi Billete · ${report.title}')]);
   summary.appendRow([x.TextCellValue(report.period)]);
+  if (report.scopeLabel case final scope?) {
+    summary.appendRow([x.TextCellValue(scope)]);
+    final row = summary.maxRows - 1;
+    final start = x.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row);
+    summary.merge(
+      start,
+      x.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row),
+    );
+    summary.cell(start).cellStyle = x.CellStyle(
+      bold: true,
+      textWrapping: x.TextWrapping.WrapText,
+    );
+    summary.setRowHeight(row, 48);
+  }
   summary.appendRow([
     x.TextCellValue('Generado: ${report.generatedAt.toIso8601String()}'),
   ]);
@@ -34,8 +48,8 @@ Uint8List reportExcel(ExportReport report) {
         bold: true,
         fontSize: fontSize,
         textWrapping: x.TextWrapping.WrapText,
-        fontColorHex: x.ExcelColor.fromHexString('#17493D'),
-        backgroundColorHex: x.ExcelColor.fromHexString('#EAF7F0'),
+        fontColorHex: x.ExcelColor.fromHexString('#304F70'),
+        backgroundColorHex: x.ExcelColor.fromHexString('#EDF3F9'),
       );
       summary.setRowHeight(row, height);
     }
@@ -145,10 +159,17 @@ Uint8List reportExcel(ExportReport report) {
   for (final table in report.tables) {
     final sheet = excel[table.name];
     sheet.appendRow(table.columns.map((c) => x.TextCellValue(c)).toList());
+    final cardColumns = <int>{
+      for (var col = 0; col < table.columns.length; col++)
+        if (['Tarjeta', 'Tarjetas vinculadas'].contains(table.columns[col]))
+          col,
+    };
     for (var col = 0; col < table.columns.length; col++) {
       sheet.setColumnWidth(
         col,
-        table.columns[col] == 'Descripción'
+        cardColumns.contains(col)
+            ? 54
+            : table.columns[col] == 'Descripción'
             ? 45
             : table.columns[col] == 'Quién debe después'
             ? 48
@@ -162,7 +183,7 @@ Uint8List reportExcel(ExportReport report) {
           .cellStyle = x.CellStyle(
         bold: true,
         fontColorHex: x.ExcelColor.white,
-        backgroundColorHex: x.ExcelColor.fromHexString('#005544'),
+        backgroundColorHex: x.ExcelColor.fromHexString('#3C70AA'),
       );
     }
     for (final row in _exportTableRows(table, person != null)) {
@@ -178,6 +199,36 @@ Uint8List reportExcel(ExportReport report) {
             )
             .toList(),
       );
+      if (cardColumns.isNotEmpty) {
+        var lineCount = 1;
+        for (final col in cardColumns) {
+          final text = reportCellText(row[col]);
+          final lines = text
+              .split('\n')
+              .fold<int>(
+                0,
+                (n, line) =>
+                    n + ((line.length + 47) ~/ 48).clamp(1, 30).toInt(),
+              );
+          if (lines > lineCount) lineCount = lines;
+          sheet
+              .cell(
+                x.CellIndex.indexByColumnRow(
+                  columnIndex: col,
+                  rowIndex: sheet.maxRows - 1,
+                ),
+              )
+              .cellStyle = x.CellStyle(
+            textWrapping: x.TextWrapping.WrapText,
+          );
+        }
+        if (lineCount > 1) {
+          sheet.setRowHeight(
+            sheet.maxRows - 1,
+            (lineCount * 16.0).clamp(32.0, 400.0).toDouble(),
+          );
+        }
+      }
       if (person != null) {
         for (var col = 0; col < row.length; col++) {
           if (row[col] is! MoneyCell) {
@@ -315,6 +366,11 @@ Future<Uint8List> reportPdf(
             style: pw.TextStyle(fontSize: 17, fontWeight: pw.FontWeight.bold),
           ),
           pw.Text(report.period, style: const pw.TextStyle(fontSize: 10)),
+          if (report.scopeLabel case final scope?)
+            pw.Text(
+              scope,
+              style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+            ),
           pw.SizedBox(height: 10),
         ],
       ),
@@ -337,7 +393,7 @@ Future<Uint8List> reportPdf(
             width: double.infinity,
             padding: const pw.EdgeInsets.all(12),
             decoration: pw.BoxDecoration(
-              color: PdfColor.fromInt(0xFFEAF7F0),
+              color: PdfColor.fromInt(0xFFEDF3F9),
               borderRadius: pw.BorderRadius.circular(8),
             ),
             child: pw.Column(
@@ -348,7 +404,7 @@ Future<Uint8List> reportPdf(
                   style: pw.TextStyle(
                     fontSize: 10,
                     fontWeight: pw.FontWeight.bold,
-                    color: PdfColor.fromInt(0xFF17493D),
+                    color: PdfColor.fromInt(0xFF304F70),
                   ),
                 ),
                 pw.SizedBox(height: 6),
@@ -365,7 +421,7 @@ Future<Uint8List> reportPdf(
                   style: pw.TextStyle(
                     fontSize: 17,
                     fontWeight: pw.FontWeight.bold,
-                    color: PdfColor.fromInt(0xFF17493D),
+                    color: PdfColor.fromInt(0xFF304F70),
                   ),
                 ),
                 pw.SizedBox(height: 5),
@@ -374,7 +430,7 @@ Future<Uint8List> reportPdf(
                   style: pw.TextStyle(
                     fontSize: 17,
                     fontWeight: pw.FontWeight.bold,
-                    color: PdfColor.fromInt(0xFF17493D),
+                    color: PdfColor.fromInt(0xFF304F70),
                   ),
                 ),
                 pw.SizedBox(height: 5),
@@ -446,7 +502,11 @@ Future<Uint8List> reportPdf(
                             'Quién debe después' => 3.0,
                             _ => 1.6,
                           }
-                        : table.columns[n] == 'Descripción'
+                        : [
+                            'Tarjeta',
+                            'Tarjetas vinculadas',
+                            'Descripción',
+                          ].contains(table.columns[n])
                         ? 3.2
                         : table.columns[n] == 'Moneda'
                         ? 1.05
@@ -471,7 +531,7 @@ Future<Uint8List> reportPdf(
                 color: PdfColors.white,
               ),
               headerDecoration: const pw.BoxDecoration(
-                color: PdfColor.fromInt(0xFF005544),
+                color: PdfColor.fromInt(0xFF3C70AA),
               ),
               cellStyle: pw.TextStyle(
                 fontSize: table.columns.length >= 11

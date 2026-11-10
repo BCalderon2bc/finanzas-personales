@@ -155,7 +155,7 @@ class _CreditCardAppearanceDialogState
             const SizedBox(height: 12),
             const Text(
               'Selecciona los datos de tu tarjeta. La imagen es una referencia visual.',
-              style: TextStyle(color: Color(0xFF50665B), fontSize: 12),
+              style: TextStyle(color: Color(0xFF596B7D), fontSize: 12),
             ),
           ],
         ),

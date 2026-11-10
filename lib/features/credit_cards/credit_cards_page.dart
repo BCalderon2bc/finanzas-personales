@@ -1,3 +1,5 @@
+import '../../data/credit_card_additional_repository.dart';
+import 'credit_card_additionals_page.dart';
 import '../../widgets/page_intro.dart';
 import '../person_accounts/receipt_draft_field.dart';
 import '../../widgets/adaptive_layout.dart';
@@ -259,6 +261,15 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
             ..sort(
               (a, b) => a['name'].toString().compareTo(b['name'].toString()),
             );
+      final additionalCards = await loadAdditionalCards(
+        card['id'].toString(),
+        user.id,
+      );
+      final cashAccounts = (await readRows(
+        'accounts',
+        'id,name,currency,is_active,account_type',
+        user.id,
+      )).where((a) => a['account_type'] == 'cash').toList();
       if (!mounted) {
         return;
       }
@@ -267,6 +278,8 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
         builder: (_) => CreditCardMovementDialog(
           currency: card['currency'].toString(),
           categories: available,
+          cashAccounts: cashAccounts,
+          additionalCards: additionalCards,
         ),
       );
       if (data == null || !mounted) {
@@ -746,6 +759,17 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
                                   onEdit: saving
                                       ? null
                                       : () => addCard(selected),
+                                  onAdditionals: saving
+                                      ? null
+                                      : () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute<void>(
+                                            builder: (_) =>
+                                                CreditCardAdditionalsPage(
+                                                  card: selected,
+                                                ),
+                                          ),
+                                        ),
                                   onPlans: saving
                                       ? null
                                       : () async {

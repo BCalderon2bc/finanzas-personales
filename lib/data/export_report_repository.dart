@@ -1,5 +1,6 @@
 import '../core/supabase_client.dart';
 import 'card_export_reports.dart';
+import 'credit_card_additional_repository.dart';
 import 'transaction_repository.dart';
 import 'card_statement_repository.dart' show statementRows;
 import 'debt_installment_repository.dart';
@@ -8,6 +9,7 @@ import 'export_report_models.dart';
 Future<ExportReport> loadExportReport({
   required String kind,
   String? cardId,
+  String? additionalCardFilter,
   String? accountId,
   required String currency,
   required DateTime start,
@@ -30,32 +32,61 @@ Future<ExportReport> loadExportReport({
       ].contains(kind)) {
     throw ArgumentError('Tipo de reporte o moneda inválidos.');
   }
-  if ([
-    'credit_cards',
-    'credit_card_expenses',
-    'debit_cards',
-    'accounts',
-  ].contains(kind)) {
-    final credit = kind == 'credit_cards' || kind == 'credit_card_expenses';
+  if (kind == 'credit_card_expenses') {
     final values = await Future.wait([
-      statementRows(credit ? 'credit_cards' : 'debit_cards', '*', uid),
-      statementRows('accounts', 'id,name,currency,opening_balance', uid),
+      statementRows('credit_cards', '*,financial_institutions(name)', uid),
+      statementRows(
+        'credit_card_transactions',
+        '*,credit_card_additionals(holder_name,last_four)',
+        uid,
+      ),
+      if (cardId != null && additionalCardFilter?.isNotEmpty == true)
+        loadAdditionalCards(cardId, uid),
+    ]);
+    if (supabase.auth.currentUser?.id != uid) {
+      throw StateError('La sesión cambió.');
+    }
+    return creditCardExpensesExport(
+      cards: values[0],
+      movements: values[1],
+      start: start,
+      end: end,
+      generatedAt: DateTime.now(),
+      currency: currency,
+      cardId: cardId,
+      additionalCardFilter: additionalCardFilter,
+      additionalCard: values.length == 3
+          ? values[2]
+                .where((card) => card['id']?.toString() == additionalCardFilter)
+                .firstOrNull
+          : null,
+    );
+  }
+  if (['credit_cards', 'debit_cards', 'accounts'].contains(kind)) {
+    final credit = kind == 'credit_cards';
+    final values = await Future.wait([
+      statementRows(
+        credit ? 'credit_cards' : 'debit_cards',
+        kind == 'accounts' ? '*' : '*,financial_institutions(name)',
+        uid,
+      ),
+      statementRows(
+        'accounts',
+        kind == 'debit_cards'
+            ? 'id,name,currency,opening_balance,financial_institutions(name)'
+            : 'id,name,currency,opening_balance',
+        uid,
+      ),
       loadUserTransactions(uid),
-      statementRows('credit_card_transactions', '*', uid),
+      statementRows(
+        'credit_card_transactions',
+        credit ? '*,credit_card_additionals(holder_name,last_four)' : '*',
+        uid,
+      ),
       statementRows('debt_payments', '*', uid),
     ]);
     if (supabase.auth.currentUser?.id != uid)
       throw StateError('La sesión cambió.');
-    if (kind == 'credit_card_expenses')
-      return creditCardExpensesExport(
-        cards: values[0],
-        movements: values[3],
-        start: start,
-        end: end,
-        generatedAt: DateTime.now(),
-        currency: currency,
-        cardId: cardId,
-      );
     return credit
         ? creditCardsExport(
             cards: values[0],
@@ -111,7 +142,7 @@ Future<ExportReport> loadExportReport({
     statementRows('credit_cards', 'id,name,currency', uid),
     statementRows(
       'credit_card_transactions',
-      'id,credit_card_id,account_id,category_id,transaction_type,charge_kind,amount,currency,transaction_date,description,reference,is_voided,is_receivable_funding,account_debit_amount,account_debit_currency,payment_exchange_rate',
+      'id,credit_card_id,account_id,category_id,transaction_type,charge_kind,cash_advance_fee,amount,currency,transaction_date,description,reference,is_voided,is_receivable_funding,account_debit_amount,account_debit_currency,payment_exchange_rate',
       uid,
     ),
     statementRows('debts', 'id,description,currency', uid),

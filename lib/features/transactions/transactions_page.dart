@@ -1,4 +1,5 @@
-import 'movement_totals_panel.dart';
+import '../../utils/card_cash_advance.dart';
+import '../../widgets/mobile_navigation.dart';
 import '../person_accounts/receipt_history.dart';
 import '../person_accounts/receipt_draft_field.dart';
 import '../../widgets/adaptive_layout.dart';
@@ -403,6 +404,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
           'credit_card_payment',
           'debt_payment',
           'receivable_loan',
+          cashAdvanceDepositSource,
         ].contains(tx['source'])) {
       return;
     }
@@ -494,15 +496,15 @@ class _TransactionsPageState extends State<TransactionsPage> {
     return TransactionBalances(nioCents: nioCents, usdCents: usdCents);
   }
 
-  Widget _transactionCard(Map<String, dynamic> tx, {required bool table}) {
+  Widget _transactionCard(Map<String, dynamic> tx) {
     final external = [
       'credit_card_payment',
       'debt_payment',
       'receivable_loan',
+      cashAdvanceDepositSource,
     ].contains(tx['source']);
     final reconciled = tx['is_reconciled'] == true;
     return TransactionTile(
-      table: table,
       transaction: tx,
       receiptCount: receiptCounts?[financialReceiptFolder(tx)] ?? 0,
       label: tx['expense_kind'] == 'card_insurance'
@@ -552,8 +554,6 @@ class _TransactionsPageState extends State<TransactionsPage> {
   // Sin agrupar por fecha efectiva: un registro retroactivo recién ingresado
   // debe conservarse antes de los registros anteriores.
   List<Widget> _historyRows(List<Map<String, dynamic>> rows) {
-    final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
-    final table = MediaQuery.sizeOf(context).width >= 880 * scale.clamp(1, 1.8);
     return [
       const Padding(
         padding: EdgeInsets.only(bottom: 8),
@@ -562,8 +562,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
           style: TextStyle(fontSize: 12),
         ),
       ),
-      if (table) const TransactionHistoryHeader(),
-      for (final row in rows) _transactionCard(row, table: table),
+      for (final row in rows) _transactionCard(row),
     ];
   }
 
@@ -619,9 +618,15 @@ class _TransactionsPageState extends State<TransactionsPage> {
           ],
         ),
         bottomNavigationBar: compact
-            ? GuideAnchor(
-                id: 'add',
-                child: CompactActionBar(label: label, onPressed: add),
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GuideAnchor(
+                    id: 'add',
+                    child: CompactActionBar(label: label, onPressed: add),
+                  ),
+                  const MobileNavigation(index: 1),
+                ],
               )
             : null,
         floatingActionButton: compact
@@ -701,14 +706,10 @@ class _TransactionsPageState extends State<TransactionsPage> {
                           child: Text(
                             '${visibleTransactions.length} de ${movements.length} movimientos',
                             style: const TextStyle(
-                              color: Color(0xFF50665B),
+                              color: Color(0xFF596B7D),
                               fontSize: 12,
                             ),
                           ),
-                        ),
-                        MovementTotalsPanel(
-                          rows: visibleTransactions,
-                          selectedType: filter.type,
                         ),
                         const SizedBox(height: 12),
                         if (visibleTransactions.isEmpty)

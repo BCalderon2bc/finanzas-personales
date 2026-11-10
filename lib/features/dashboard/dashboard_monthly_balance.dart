@@ -22,7 +22,7 @@ class DashboardMonthlyBalance extends StatelessWidget {
       expense.abs(),
     ].reduce((a, b) => a > b ? a : b);
     final positive = net >= 0;
-    final color = positive ? const Color(0xFF059669) : const Color(0xFFDC2626);
+    final color = positive ? const Color(0xFF35745C) : const Color(0xFFA3453D);
 
     Widget bar(String label, int amount, Color color) => Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -34,7 +34,7 @@ class DashboardMonthlyBalance extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  style: const TextStyle(color: Color(0xFF50665B)),
+                  style: const TextStyle(color: Color(0xFF596B7D)),
                 ),
               ),
               Text(
@@ -49,7 +49,7 @@ class DashboardMonthlyBalance extends StatelessWidget {
             child: LinearProgressIndicator(
               value: maximum == 0 ? 0 : amount.abs() / maximum,
               minHeight: 10,
-              backgroundColor: const Color(0xFFF0F4EF),
+              backgroundColor: const Color(0xFFF0F3F7),
               color: color,
             ),
           ),
@@ -66,7 +66,7 @@ class DashboardMonthlyBalance extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.bar_chart_rounded, color: Color(0xFF17604E)),
+                const Icon(Icons.bar_chart_rounded, color: Color(0xFF3C70AA)),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -79,16 +79,16 @@ class DashboardMonthlyBalance extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               data.period.label,
-              style: const TextStyle(color: Color(0xFF50665B)),
+              style: const TextStyle(color: Color(0xFF596B7D)),
             ),
             const SizedBox(height: 20),
-            bar('Ingresos', income, const Color(0xFF059669)),
+            bar('Ingresos', income, const Color(0xFF35745C)),
             bar(
               expense < 0
                   ? 'Gastos netos · devoluciones superiores'
                   : 'Gastos netos',
               expense,
-              const Color(0xFFF97316),
+              const Color(0xFFA45F48),
             ),
             Container(
               padding: const EdgeInsets.all(16),
@@ -121,7 +121,7 @@ class DashboardMonthlyBalance extends StatelessWidget {
                         : '${difference > 0 ? 'Mejoró' : 'Disminuyó'} '
                               '${dashboardMoney(difference.abs(), currency)} '
                               'frente al período anterior.',
-                    style: const TextStyle(color: Color(0xFF50665B)),
+                    style: const TextStyle(color: Color(0xFF596B7D)),
                   ),
                 ],
               ),
@@ -129,7 +129,7 @@ class DashboardMonthlyBalance extends StatelessWidget {
             const SizedBox(height: 12),
             const Text(
               'Las barras comparan magnitudes. El resultado excluye transferencias y pagos de capital.',
-              style: TextStyle(color: Color(0xFF50665B), fontSize: 12),
+              style: TextStyle(color: Color(0xFF596B7D), fontSize: 12),
             ),
           ],
         ),

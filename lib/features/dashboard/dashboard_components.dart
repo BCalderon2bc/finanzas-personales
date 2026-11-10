@@ -3,11 +3,11 @@ import '../../widgets/category_style.dart';
 import '../../widgets/adaptive_layout.dart';
 import 'dashboard_overview.dart';
 
-const _blue = Color(0xFF17604E);
-const _green = Color(0xFF14684D);
-const _red = Color(0xFFA2322C);
-const _muted = Color(0xFF50665B);
-const _border = Color(0xFFD9E3DA);
+const _blue = Color(0xFF3C70AA);
+const _green = Color(0xFF35745C);
+const _red = Color(0xFFA3453D);
+const _muted = Color(0xFF596B7D);
+const _border = Color(0xFFDCE3EB);
 
 class DashboardMetrics extends StatelessWidget {
   const DashboardMetrics({
@@ -21,6 +21,7 @@ class DashboardMetrics extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = data.currencies[currency]!;
+    final compact = compactLayout(context);
     String delta(int amount) =>
         '${amount > 0 ? '+' : ''}${dashboardMoney(amount, currency)} vs período anterior';
     final cards = [
@@ -30,20 +31,25 @@ class DashboardMetrics extends StatelessWidget {
         footer: '${c.activeAccounts} cuentas activas',
         icon: Icons.account_balance_wallet_outlined,
         hero: true,
+        compact: compact,
       ),
       _Metric(
-        title: 'Ingresos del período',
+        title: compact ? 'Ingresos' : 'Ingresos del período',
         amount: dashboardMoney(c.income, currency),
         footer: delta(c.income - c.previousIncome),
         icon: Icons.south_west,
+        iconColor: _green,
         footerColor: c.income >= c.previousIncome ? _green : _red,
+        compact: compact,
       ),
       _Metric(
-        title: 'Gastos del período',
+        title: compact ? 'Gastos' : 'Gastos del período',
         amount: dashboardMoney(c.expense, currency),
         footer: delta(c.expense - c.previousExpense),
         icon: Icons.north_east,
+        iconColor: const Color(0xFFA45F48),
         footerColor: c.expense <= c.previousExpense ? _green : _red,
+        compact: compact,
       ),
       _Metric(
         title: 'Ingresos − gastos',
@@ -51,8 +57,25 @@ class DashboardMetrics extends StatelessWidget {
         footer: delta(c.net - c.previousNet),
         icon: Icons.insights_outlined,
         footerColor: c.net >= c.previousNet ? _green : _red,
+        compact: compact,
       ),
     ];
+    if (compact) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          cards[0],
+          const SizedBox(height: 8),
+          AdaptiveColumns(
+            minColumnWidth: 136,
+            spacing: 8,
+            children: [cards[1], cards[2]],
+          ),
+          const SizedBox(height: 8),
+          cards[3],
+        ],
+      );
+    }
     return AdaptiveColumns(
       minColumnWidth: 230,
       maxColumns: 4,
@@ -70,28 +93,31 @@ class _Metric extends StatelessWidget {
     required this.icon,
     this.hero = false,
     this.footerColor,
+    this.iconColor,
+    required this.compact,
   });
   final String title, amount, footer;
   final IconData icon;
-  final bool hero;
-  final Color? footerColor;
+  final bool hero, compact;
+  final Color? footerColor, iconColor;
 
   @override
   Widget build(BuildContext context) {
-    final accent = footerColor ?? _blue;
+    final accent = iconColor ?? _blue;
+    final comparisonColor = footerColor ?? _blue;
     return Container(
-      constraints: const BoxConstraints(minHeight: 166),
-      padding: const EdgeInsets.all(16),
+      constraints: BoxConstraints(minHeight: compact ? 0 : 166),
+      padding: EdgeInsets.all(compact ? 12 : 16),
       decoration: BoxDecoration(
         color: hero ? null : Colors.white,
         gradient: hero
             ? const LinearGradient(
-                colors: [Color(0xFF124737), Color(0xFF17604E)],
+                colors: [Color(0xFF315E91), Color(0xFF3C70AA)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               )
             : null,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(compact ? 16 : 22),
         border: hero ? null : Border.all(color: _border),
         boxShadow: [
           BoxShadow(
@@ -118,7 +144,7 @@ class _Metric extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.all(9),
+                padding: EdgeInsets.all(compact ? 5 : 9),
                 decoration: BoxDecoration(
                   color: hero
                       ? Colors.white.withAlpha(25)
@@ -127,42 +153,47 @@ class _Metric extends StatelessWidget {
                 ),
                 child: Icon(
                   icon,
-                  size: 20,
+                  size: compact ? 16 : 20,
                   color: hero ? Colors.white : accent,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 18),
+          SizedBox(height: compact ? 6 : 18),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
             child: Text(
               amount,
               style: TextStyle(
-                fontSize: 30,
+                fontSize: compact && !hero ? 23 : 30,
                 fontWeight: FontWeight.w800,
                 letterSpacing: -0.8,
-                color: hero ? Colors.white : const Color(0xFF182B24),
+                color: hero ? Colors.white : const Color(0xFF243447),
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: compact ? 6 : 16),
           Align(
             alignment: Alignment.centerLeft,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              padding: EdgeInsets.symmetric(
+                horizontal: compact ? 6 : 10,
+                vertical: compact ? 3 : 7,
+              ),
               decoration: BoxDecoration(
-                color: hero ? Colors.white.withAlpha(22) : accent.withAlpha(12),
+                color: hero
+                    ? Colors.white.withAlpha(22)
+                    : comparisonColor.withAlpha(12),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
                 footer,
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: compact ? 11 : 12,
                   height: 1.4,
                   fontWeight: FontWeight.w600,
-                  color: hero ? Colors.white : accent,
+                  color: hero ? Colors.white : comparisonColor,
                 ),
               ),
             ),
@@ -343,7 +374,7 @@ class DashboardPanels extends StatelessWidget {
                                 fontWeight: FontWeight.w700,
                                 color: entry.value < 0
                                     ? _green
-                                    : const Color(0xFF182B24),
+                                    : const Color(0xFF243447),
                               ),
                             ),
                             Text(
@@ -364,7 +395,7 @@ class DashboardPanels extends StatelessWidget {
                             value: ratio.clamp(0.0, 1.0).toDouble(),
                             minHeight: 7,
                             color: color,
-                            backgroundColor: const Color(0xFFF0F4EF),
+                            backgroundColor: const Color(0xFFF0F3F7),
                           ),
                         ),
                       ],
@@ -459,7 +490,7 @@ class DashboardPanels extends StatelessWidget {
             final color = exceeded
                 ? _red
                 : nearLimit
-                ? const Color(0xFFB45309)
+                ? const Color(0xFF886128)
                 : _green;
             final style = data.categoryStyles[b['category_id'].toString()];
             final categoryAccent = categoryColor(style?['color']);
@@ -486,7 +517,7 @@ class DashboardPanels extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAF7),
+                  color: const Color(0xFFF8FAFC),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: exceeded ? color.withAlpha(65) : _border,

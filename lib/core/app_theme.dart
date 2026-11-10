@@ -1,39 +1,39 @@
 import 'package:flutter/material.dart';
 
-const primaryColor = Color(0xFF17604E);
-const appBackground = Color(0xFFF5F7F3);
-const appText = Color(0xFF182B24);
-const appMuted = Color(0xFF50665B);
-const appBorder = Color(0xFFD9E3DA);
-const appPositive = Color(0xFF14684D);
-const appWarning = Color(0xFF895510);
-const appNegative = Color(0xFFA2322C);
+const primaryColor = Color(0xFF3C70AA);
+const appBackground = Color(0xFFF5F7FA);
+const appText = Color(0xFF243447);
+const appMuted = Color(0xFF596B7D);
+const appBorder = Color(0xFFDCE3EB);
+const appPositive = Color(0xFF35745C);
+const appWarning = Color(0xFF886128);
+const appNegative = Color(0xFFA3453D);
 
 ThemeData createAppTheme() {
   final scheme = ColorScheme.fromSeed(seedColor: primaryColor).copyWith(
     primary: primaryColor,
     onPrimary: Colors.white,
-    primaryContainer: const Color(0xFFDDEFE4),
-    onPrimaryContainer: const Color(0xFF174938),
-    secondary: const Color(0xFF386455),
-    secondaryContainer: const Color(0xFFE7EEE8),
+    primaryContainer: const Color(0xFFE5EDF6),
+    onPrimaryContainer: const Color(0xFF304F70),
+    secondary: const Color(0xFF627A91),
+    secondaryContainer: const Color(0xFFEBEFF4),
     onSecondaryContainer: appText,
     tertiary: appWarning,
-    tertiaryContainer: const Color(0xFFF8ECD5),
-    onTertiaryContainer: const Color(0xFF5B3A10),
+    tertiaryContainer: const Color(0xFFF7EEDC),
+    onTertiaryContainer: const Color(0xFF684A21),
     surface: Colors.white,
     surfaceContainerLowest: Colors.white,
-    surfaceContainerLow: const Color(0xFFF8FAF7),
-    surfaceContainer: const Color(0xFFF0F4EF),
-    surfaceContainerHigh: const Color(0xFFEAF0EA),
-    surfaceContainerHighest: const Color(0xFFE4EBE4),
+    surfaceContainerLow: const Color(0xFFF8FAFC),
+    surfaceContainer: const Color(0xFFF0F3F7),
+    surfaceContainerHigh: const Color(0xFFEAF0F5),
+    surfaceContainerHighest: const Color(0xFFE3EAF1),
     onSurface: appText,
     onSurfaceVariant: appMuted,
-    outline: const Color(0xFF788E81),
+    outline: const Color(0xFF77899B),
     outlineVariant: appBorder,
     error: appNegative,
-    errorContainer: const Color(0xFFFBEAE6),
-    onErrorContainer: const Color(0xFF732522),
+    errorContainer: const Color(0xFFF9EBE8),
+    onErrorContainer: const Color(0xFF79342E),
   );
   final base = ThemeData(useMaterial3: true, colorScheme: scheme);
   final controlShape = RoundedRectangleBorder(

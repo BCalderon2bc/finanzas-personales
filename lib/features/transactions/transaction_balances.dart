@@ -12,8 +12,8 @@ class TransactionBalances extends StatelessWidget {
   Widget balance(String currency, int cents) {
     final usd = currency == 'USD';
     final colors = usd
-        ? const [Color(0xFF064E3B), Color(0xFF166B56)]
-        : const [Color(0xFF1C4140), Color(0xFF17604E)];
+        ? const [Color(0xFF3E6D66), Color(0xFF4B7B72)]
+        : const [Color(0xFF315E91), Color(0xFF3C70AA)];
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -103,7 +103,7 @@ class TransactionBalances extends StatelessWidget {
       const SizedBox(height: 10),
       const Text(
         'Los saldos incluyen todos los registros y no cambian con los filtros.',
-        style: TextStyle(color: Color(0xFF50665B), fontSize: 12),
+        style: TextStyle(color: Color(0xFF596B7D), fontSize: 12),
       ),
     ],
   );

@@ -7,6 +7,8 @@ import '../../core/supabase_client.dart';
 import 'category_form_dialog.dart';
 import 'category_tile.dart';
 
+enum _CategoryStatus { all, active, inactive }
+
 class CategoriesPage extends StatefulWidget {
   const CategoriesPage({super.key});
   @override
@@ -18,6 +20,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
   bool loading = true, saving = false;
   String? error;
   String filter = 'all';
+  _CategoryStatus statusFilter = _CategoryStatus.all;
   @override
   void initState() {
     super.initState();
@@ -144,9 +147,17 @@ class _CategoriesPageState extends State<CategoriesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final visible = categories
-        .where((c) => filter == 'all' || c['category_type'] == filter)
-        .toList();
+    final visible = categories.where((category) {
+      final matchesType =
+          filter == 'all' || category['category_type'] == filter;
+      final active = category['is_active'] == true;
+      final matchesStatus = switch (statusFilter) {
+        _CategoryStatus.all => true,
+        _CategoryStatus.active => active,
+        _CategoryStatus.inactive => !active,
+      };
+      return matchesType && matchesStatus;
+    }).toList();
     return Scaffold(
       appBar: AppBar(
         title: const Text('Categorías'),
@@ -198,32 +209,66 @@ class _CategoriesPageState extends State<CategoriesPage> {
                       description:
                           'Usa categorías para separar ingresos y gastos en tus reportes.',
                     ),
-                    DropdownButtonFormField<String>(
-                      initialValue: filter,
-                      decoration: const InputDecoration(
-                        labelText: 'Mostrar categorías',
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'all', child: Text('Todas')),
-                        DropdownMenuItem(
-                          value: 'income',
-                          child: Text('Ingresos'),
+                    AdaptiveColumns(
+                      minColumnWidth: 220,
+                      children: [
+                        DropdownButtonFormField<String>(
+                          initialValue: filter,
+                          isExpanded: true,
+                          decoration: const InputDecoration(labelText: 'Tipo'),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'all',
+                              child: Text('Todos'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'income',
+                              child: Text('Ingresos'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'expense',
+                              child: Text('Gastos'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) setState(() => filter = value);
+                          },
                         ),
-                        DropdownMenuItem(
-                          value: 'expense',
-                          child: Text('Gastos'),
+                        DropdownButtonFormField<_CategoryStatus>(
+                          initialValue: statusFilter,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Estado',
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: _CategoryStatus.all,
+                              child: Text('Todas'),
+                            ),
+                            DropdownMenuItem(
+                              value: _CategoryStatus.active,
+                              child: Text('Activas'),
+                            ),
+                            DropdownMenuItem(
+                              value: _CategoryStatus.inactive,
+                              child: Text('Inactivas'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null)
+                              setState(() => statusFilter = value);
+                          },
                         ),
                       ],
-                      onChanged: (value) {
-                        if (value != null) setState(() => filter = value);
-                      },
                     ),
                     const SizedBox(height: 12),
                     if (visible.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.all(24),
+                      Padding(
+                        padding: const EdgeInsets.all(24),
                         child: Text(
-                          'No hay categorías. Crea una como Salario, Alimentación o Transporte.',
+                          categories.isEmpty
+                              ? 'No hay categorías. Crea una como Salario, Alimentación o Transporte.'
+                              : 'No hay categorías que coincidan con los filtros.',
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -241,7 +286,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
                                 size: 18,
                                 color: type == 'income'
                                     ? const Color(0xFF047857)
-                                    : const Color(0xFF17604E),
+                                    : const Color(0xFF3C70AA),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
@@ -256,7 +301,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
                               Text(
                                 '${visible.where((c) => c['category_type'] == type).length}',
                                 style: const TextStyle(
-                                  color: Color(0xFF50665B),
+                                  color: Color(0xFF596B7D),
                                   fontSize: 12,
                                 ),
                               ),

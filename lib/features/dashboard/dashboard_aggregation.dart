@@ -1,3 +1,4 @@
+import '../../utils/card_cash_advance.dart';
 import '../../data/period_logic.dart';
 import '../../utils/money.dart';
 import '../credit_cards/credit_card_balances.dart';
@@ -232,11 +233,18 @@ DashboardOverview buildDashboardOverview(
     if (effect != null &&
         type != 'payment' &&
         tx['is_receivable_funding'] != true) {
-      expense(effect * amount, date, currency, tx['category_id']);
+      expense(
+        isCardCashAdvance(tx) ? cardCashAdvanceFee(tx) : effect * amount,
+        date,
+        currency,
+        tx['category_id'],
+      );
     }
 
     final description = tx['description']?.toString().trim() ?? '';
-    final label = cardLabels[type] ?? type;
+    final label = isCardCashAdvance(tx)
+        ? cardCashAdvanceLabel
+        : cardLabels[type] ?? type;
 
     event(
       DashboardEvent(

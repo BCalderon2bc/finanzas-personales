@@ -105,7 +105,7 @@ class _LoginPageState extends State<LoginPage> {
               Text(
                 isRegister
                     ? 'Crea tu cuenta personal'
-                    : 'Ingresa para controlar tu dinero',
+                    : 'Ingresa con el correo de tu cuenta',
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 28),
@@ -116,6 +116,7 @@ class _LoginPageState extends State<LoginPage> {
                 textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(
                   labelText: 'Correo electrónico',
+                  hintText: 'nombre@ejemplo.com',
                   prefixIcon: Icon(Icons.email_outlined),
                 ),
                 validator: (value) {
@@ -126,7 +127,7 @@ class _LoginPageState extends State<LoginPage> {
                   }
 
                   if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
-                    return 'Escribe un correo válido';
+                    return 'Usa el correo de tu cuenta, como nombre@ejemplo.com';
                   }
 
                   return null;

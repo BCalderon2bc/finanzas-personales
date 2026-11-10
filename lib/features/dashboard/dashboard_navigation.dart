@@ -8,16 +8,18 @@ class DashboardNavigation extends StatelessWidget {
   const DashboardNavigation({
     super.key,
     required this.onOpen,
+    required this.activeEmail,
+    this.activeName,
     this.onOpenReceivables,
-    this.onChangePassword,
     this.onSettings,
     this.onExport,
     this.onPersonAccounts,
   });
 
   final ValueChanged<DashboardTarget> onOpen;
+  final String activeEmail;
+  final String? activeName;
   final VoidCallback? onOpenReceivables;
-  final VoidCallback? onChangePassword;
   final VoidCallback? onSettings;
   final VoidCallback? onExport;
   final VoidCallback? onPersonAccounts;
@@ -84,6 +86,37 @@ class DashboardNavigation extends StatelessWidget {
                         ),
                       ),
                     ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.account_circle_outlined),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  activeName ?? 'Usuario activo',
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.titleMedium,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            activeEmail,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(),
                     ListTile(
                       selected: true,
                       leading: const Icon(Icons.dashboard_outlined),
@@ -169,13 +202,8 @@ class DashboardNavigation extends StatelessWidget {
                       ),
                       action(
                         'Configuraciones',
-                        Icons.currency_exchange_outlined,
+                        Icons.settings_outlined,
                         onSettings,
-                      ),
-                      action(
-                        'Cambiar contraseña',
-                        Icons.lock_reset_rounded,
-                        onChangePassword,
                       ),
                       ListTile(
                         leading: const Icon(Icons.menu_book_outlined),

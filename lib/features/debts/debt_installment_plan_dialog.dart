@@ -170,7 +170,7 @@ class _DebtInstallmentPlanDialogState extends State<DebtInstallmentPlanDialog> {
                 const Text(
                   'El nuevo calendario reemplaza al vigente y conserva el anterior con sus pagos en el historial. '
                   'La primera fecha se respeta exactamente; el día habitual se usa desde la segunda cuota.',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF50665B)),
+                  style: TextStyle(fontSize: 12, color: Color(0xFF596B7D)),
                 ),
               ] else ...[
                 const SizedBox(height: 12),

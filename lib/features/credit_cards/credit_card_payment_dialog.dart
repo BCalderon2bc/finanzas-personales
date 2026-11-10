@@ -139,7 +139,7 @@ class _CreditCardPaymentDialogState extends State<CreditCardPaymentDialog> {
                 const SizedBox(height: 8),
                 const Text(
                   'Asigna solo pagos que no estén descontados del saldo al corte registrado.',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF50665B)),
+                  style: TextStyle(fontSize: 12, color: Color(0xFF596B7D)),
                 ),
                 const SizedBox(height: 12),
               ],

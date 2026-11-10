@@ -1,3 +1,6 @@
+import '../utils/card_cash_advance.dart';
+import '../features/credit_cards/credit_card_balances.dart'
+    show cardMovementType, cardPointsRedemption, cardPointsRedemptionLabel;
 import 'period_logic.dart';
 import '../utils/money.dart';
 import 'card_statement_logic.dart';
@@ -35,8 +38,10 @@ class ExportReport {
     required this.totals,
     required this.notes,
     this.showTotalsSummary = true,
+    this.scopeLabel,
   });
   final String title, period;
+  final String? scopeLabel;
   final DateTime generatedAt;
   final List<ReportTable> tables;
   final List<ReportTotal> totals;
@@ -172,8 +177,11 @@ List<ExportMovement> normalizeExportMovements({
     );
   }
   const cardTypes = {
+    cardCashAdvance: cardCashAdvanceLabel,
     'purchase': 'Compra con tarjeta',
     'refund': 'Devolución de tarjeta',
+    'insurance': 'Seguro de tarjeta',
+    cardPointsRedemption: cardPointsRedemptionLabel,
     'interest': 'Intereses de tarjeta',
     'fee': 'Comisión de tarjeta',
     'payment': 'Pago de tarjeta',
@@ -188,6 +196,8 @@ List<ExportMovement> normalizeExportMovements({
         ? 0
         : type == 'refund'
         ? -amount
+        : isCardCashAdvance(tx)
+        ? cardCashAdvanceFee(tx)
         : ['purchase', 'interest', 'fee'].contains(type)
         ? amount
         : 0;
@@ -195,15 +205,16 @@ List<ExportMovement> normalizeExportMovements({
       tx,
       funding
           ? 'Préstamo desde tarjeta'
-          : tx['charge_kind'] == 'insurance'
-          ? 'Seguro de tarjeta'
-          : cardTypes[type] ?? 'Ajuste de tarjeta por revisar',
+          : cardTypes[cardMovementType(type, tx['charge_kind'])] ??
+                'Ajuste de tarjeta por revisar',
       _lookup(cards, tx['credit_card_id'], 'name', 'Tarjeta no disponible'),
       type == 'refund' ? -amount : amount,
       0,
       expense,
       unknown: !cardTypes.containsKey(type),
-      description: type == 'payment' && tx['account_debit_amount'] != null
+      description: isCardCashAdvance(tx)
+          ? '${tx['description'] ?? ''} · ${cardCashAdvanceBreakdown(tx)}'
+          : type == 'payment' && tx['account_debit_amount'] != null
           ? '${tx['description'] ?? ''} · Débito de cuenta: ${formatMoneyCents(moneyCents(tx['account_debit_amount']), '${tx['account_debit_currency']}')}'
                 '${tx['payment_exchange_rate'] == null ? '' : ' · Tasa C\$ ${tx['payment_exchange_rate']} por US\$1'}'
           : null,

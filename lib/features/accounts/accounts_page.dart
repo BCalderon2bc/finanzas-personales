@@ -1,3 +1,4 @@
+import '../../widgets/mobile_navigation.dart';
 import '../../widgets/page_intro.dart';
 import '../../widgets/adaptive_layout.dart';
 import '../help/app_help.dart';
@@ -239,29 +240,37 @@ class _AccountsPageState extends State<AccountsPage> {
           ),
         ],
       ),
-      bottomNavigationBar: !compactLayout(context)
-          ? null
-          : SafeArea(
-              top: false,
-              minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: GuideAnchor(
-                id: 'add',
-                child: FilledButton.icon(
-                  style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
-                  onPressed: saving || loading || error != null
-                      ? null
-                      : () => addAccount(),
-                  icon: saving
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.add),
-                  label: Text(saving ? 'Guardando...' : 'Nueva cuenta'),
+      bottomNavigationBar: compactLayout(context)
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SafeArea(
+                  top: false,
+                  minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                  child: GuideAnchor(
+                    id: 'add',
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(0, 48),
+                      ),
+                      onPressed: saving || loading || error != null
+                          ? null
+                          : () => addAccount(),
+                      icon: saving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.add),
+                      label: Text(saving ? 'Guardando...' : 'Nueva cuenta'),
+                    ),
+                  ),
                 ),
-              ),
-            ),
+                const MobileNavigation(index: 2),
+              ],
+            )
+          : null,
       floatingActionButton: compactLayout(context)
           ? null
           : GuideAnchor(
@@ -324,7 +333,7 @@ class _AccountsPageState extends State<AccountsPage> {
               const Icon(
                 Icons.account_balance_wallet_outlined,
                 size: 64,
-                color: Color(0xFF17604E),
+                color: Color(0xFF3C70AA),
               ),
               const SizedBox(height: 16),
               const Text(
@@ -366,12 +375,13 @@ class _AccountsPageState extends State<AccountsPage> {
               compactLayout(context) ? 24 : 110,
             ),
             children: [
-              const PageIntro(
-                icon: Icons.account_balance_wallet_outlined,
-                title: 'Cuentas y efectivo',
-                description:
-                    'Consulta cuánto tienes y revisa los datos de cada cuenta.',
-              ),
+              if (!compactLayout(context))
+                const PageIntro(
+                  icon: Icons.account_balance_wallet_outlined,
+                  title: 'Cuentas y efectivo',
+                  description:
+                      'Consulta cuánto tienes y revisa los datos de cada cuenta.',
+                ),
               GuideAnchor(
                 id: 'wallet',
                 child: AccountWallet(
