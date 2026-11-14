@@ -13,6 +13,7 @@ class ResponsiveWallet extends StatefulWidget {
     required this.itemBuilder,
     this.onSelected,
     this.desktopItemWidth = 320,
+    this.revealSelectionOnDesktop = false,
   });
   final List<Map<String, dynamic>> items;
   final String? selectedId;
@@ -22,23 +23,32 @@ class ResponsiveWallet extends StatefulWidget {
   final Widget Function(Map<String, dynamic>, bool) itemBuilder;
   final ValueChanged<String>? onSelected;
   final double desktopItemWidth;
+  final bool revealSelectionOnDesktop;
 
   @override
   State<ResponsiveWallet> createState() => _ResponsiveWalletState();
 }
 
 class _ResponsiveWalletState extends State<ResponsiveWallet> {
-  final controller = ScrollController();
+  late final controller = ScrollController(
+    keepScrollOffset: !widget.revealSelectionOnDesktop,
+  );
   final measurements = <String, double>{};
   int visibleIndex = 0;
   double? mobilePageWidth;
   int? lastSelectedIndex;
   bool aligning = false;
+  bool canScrollLeft = false;
+  bool canScrollRight = false;
+  bool checkingScrollEdges = false;
+  (String?, int, double, int)? desktopSelection;
+  VoidCallback? pendingDesktopReveal;
 
   @override
   void initState() {
     super.initState();
     controller.addListener(trackVisible);
+    controller.addListener(updateScrollEdges);
   }
 
   void trackVisible() {
@@ -78,6 +88,49 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
     });
   }
 
+  void revealDesktopSelection(double extent, double width, int index) {
+    final selection = (widget.selectedId, index, extent, widget.items.length);
+    if (desktopSelection == selection) return;
+    desktopSelection = selection;
+    pendingDesktopReveal = null;
+    if (index < 0) return;
+    pendingDesktopReveal = () {
+      if (!mounted ||
+          desktopSelection != selection ||
+          widget.selectedId != selection.$1 ||
+          !controller.hasClients) {
+        return;
+      }
+      final position = controller.position;
+      if (!position.hasContentDimensions || !position.hasViewportDimension) {
+        return;
+      }
+      pendingDesktopReveal = null;
+      final left = index * extent;
+      final right = left + width;
+      final viewportLeft = position.pixels;
+      final viewportRight = viewportLeft + position.viewportDimension;
+      final target =
+          (left < viewportLeft - 0.5
+                  ? left
+                  : right > viewportRight + 0.5
+                  ? right - position.viewportDimension
+                  : viewportLeft)
+              .clamp(position.minScrollExtent, position.maxScrollExtent)
+              .toDouble();
+      if ((target - viewportLeft).abs() > 0.5) controller.jumpTo(target);
+    };
+    scheduleDesktopReveal();
+  }
+
+  void scheduleDesktopReveal() {
+    if (pendingDesktopReveal == null) return;
+    WidgetsBinding.instance.ensureVisualUpdate();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) pendingDesktopReveal?.call();
+    });
+  }
+
   bool selectSettledPage(ScrollEndNotification notification) {
     if (notification.depth != 0 ||
         aligning ||
@@ -85,12 +138,18 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
         widget.onSelected == null ||
         widget.items.isEmpty)
       return false;
-    final index = visibleIndex.clamp(0, widget.items.length - 1).toInt();
+    final previousSelection = widget.selectedId;
+    final index = (notification.metrics.pixels / mobilePageWidth!)
+        .round()
+        .clamp(0, widget.items.length - 1)
+        .toInt();
     final id = '${widget.items[index]['id']}';
     if (id != widget.selectedId) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted ||
             mobilePageWidth == null ||
+            widget.selectedId != previousSelection ||
+            ModalRoute.of(context)?.isCurrent == false ||
             visibleIndex >= widget.items.length ||
             '${widget.items[visibleIndex]['id']}' != id)
           return;
@@ -103,8 +162,50 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
   @override
   void dispose() {
     controller.removeListener(trackVisible);
+    controller.removeListener(updateScrollEdges);
     controller.dispose();
     super.dispose();
+  }
+
+  void updateScrollEdges() {
+    if (checkingScrollEdges || mobilePageWidth != null) return;
+    checkingScrollEdges = true;
+    WidgetsBinding.instance.ensureVisualUpdate();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      checkingScrollEdges = false;
+      if (!mounted || !controller.hasClients || mobilePageWidth != null) {
+        return;
+      }
+      final position = controller.position;
+      if (!position.hasContentDimensions) return;
+      final left = position.extentBefore > 0.5;
+      final right = position.extentAfter > 0.5;
+      if (left == canScrollLeft && right == canScrollRight) return;
+      setState(() {
+        canScrollLeft = left;
+        canScrollRight = right;
+      });
+    });
+  }
+
+  Widget edgeArrow(BuildContext context, int direction, double itemExtent) {
+    final colors = Theme.of(context).colorScheme;
+    return Material(
+      color: colors.surface.withAlpha(218),
+      elevation: 2,
+      shadowColor: colors.shadow.withAlpha(40),
+      shape: CircleBorder(side: BorderSide(color: colors.outlineVariant)),
+      child: IconButton(
+        tooltip: direction < 0 ? 'Anteriores' : 'Siguientes',
+        onPressed: () => move(direction, itemExtent),
+        color: colors.primary,
+        icon: Icon(
+          direction < 0
+              ? Icons.chevron_left_rounded
+              : Icons.chevron_right_rounded,
+        ),
+      ),
+    );
   }
 
   void move(int direction, double itemExtent) {
@@ -126,7 +227,16 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
 
   @override
   Widget build(BuildContext context) {
+    final routeIsCurrent =
+        !widget.revealSelectionOnDesktop ||
+        (ModalRoute.isCurrentOf(context) ?? true);
+    if (widget.items.isEmpty || !routeIsCurrent) {
+      desktopSelection = null;
+      pendingDesktopReveal = null;
+    }
     if (widget.items.isEmpty) {
+      mobilePageWidth = null;
+      lastSelectedIndex = null;
       return const SizedBox.shrink();
     }
     return LayoutBuilder(
@@ -146,6 +256,8 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
           (item) => '${item['id']}' == widget.selectedId,
         );
         if (mobile && itemWidth > 0) {
+          desktopSelection = null;
+          pendingDesktopReveal = null;
           final targetIndex = selectedIndex < 0 ? 0 : selectedIndex;
           if (mobilePageWidth != itemWidth ||
               lastSelectedIndex != targetIndex) {
@@ -157,7 +269,13 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
         } else {
           mobilePageWidth = null;
           lastSelectedIndex = null;
+          if (widget.revealSelectionOnDesktop && routeIsCurrent) {
+            revealDesktopSelection(itemExtent, itemWidth, selectedIndex);
+          }
         }
+        final showDesktopArrows =
+            !mobile && widget.items.length > desktopColumns;
+        if (showDesktopArrows) updateScrollEdges();
         final index = visibleIndex.clamp(0, widget.items.length - 1).toInt();
         final activeId = '${widget.items[index]['id']}';
         final cards = Row(
@@ -216,17 +334,15 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
                     ),
                   ),
                 ),
-                if (widget.items.length > (mobile ? 1 : desktopColumns)) ...[
+                if (mobile && widget.items.length > 1) ...[
                   IconButton(
                     tooltip: 'Anteriores',
-                    onPressed: mobile && index == 0
-                        ? null
-                        : () => move(-1, itemExtent),
+                    onPressed: index == 0 ? null : () => move(-1, itemExtent),
                     icon: const Icon(Icons.chevron_left_rounded),
                   ),
                   IconButton(
                     tooltip: 'Siguientes',
-                    onPressed: mobile && index == widget.items.length - 1
+                    onPressed: index == widget.items.length - 1
                         ? null
                         : () => move(1, itemExtent),
                     icon: const Icon(Icons.chevron_right_rounded),
@@ -242,16 +358,43 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
               style: const TextStyle(color: Color(0xFF596B7D), fontSize: 13),
             ),
             const SizedBox(height: 14),
-            ClipRect(
-              child: _WalletViewport(
-                activeId: mobile ? activeId : null,
-                measurements: measurements,
-                bottomPadding: 12,
-                child: NotificationListener<ScrollEndNotification>(
-                  onNotification: selectSettledPage,
-                  child: strip,
+            Stack(
+              children: [
+                ClipRect(
+                  child: _WalletViewport(
+                    activeId: mobile ? activeId : null,
+                    measurements: measurements,
+                    bottomPadding: 12,
+                    child: NotificationListener<ScrollMetricsNotification>(
+                      onNotification: (notification) {
+                        if (notification.depth == 0) {
+                          updateScrollEdges();
+                          scheduleDesktopReveal();
+                        }
+                        return false;
+                      },
+                      child: NotificationListener<ScrollEndNotification>(
+                        onNotification: selectSettledPage,
+                        child: strip,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+                if (showDesktopArrows && canScrollLeft)
+                  Positioned(
+                    top: 0,
+                    bottom: 12,
+                    left: 4,
+                    child: Center(child: edgeArrow(context, -1, itemExtent)),
+                  ),
+                if (showDesktopArrows && canScrollRight)
+                  Positioned(
+                    top: 0,
+                    bottom: 12,
+                    right: 4,
+                    child: Center(child: edgeArrow(context, 1, itemExtent)),
+                  ),
+              ],
             ),
           ],
         );

@@ -252,18 +252,23 @@ List<ExportMovement> normalizeExportMovements({
   return result;
 }
 
+enum IncomeExpenseSelection { both, income, expenses }
+
 ExportReport movementsReport(
   List<ExportMovement> all,
   DateTime start,
   DateTime end,
   String currency,
-  DateTime generatedAt,
-) {
+  DateTime generatedAt, {
+  IncomeExpenseSelection selection = IncomeExpenseSelection.both,
+}) {
   final rows = all
       .where(
         (m) =>
             (currency == 'all' || m.currency == currency) &&
-            inReportRange(m.date, start, end),
+            inReportRange(m.date, start, end) &&
+            ((selection != IncomeExpenseSelection.expenses && m.income != 0) ||
+                (selection != IncomeExpenseSelection.income && m.expense != 0)),
       )
       .toList();
   final totals = <ReportTotal>[];
@@ -278,34 +283,54 @@ ExportReport movementsReport(
       expense += row.expense;
     }
     totals.addAll([
-      ReportTotal(c, 'Ingresos', income),
-      ReportTotal(c, 'Gasto neto', expense),
-      ReportTotal(c, 'Ingresos menos gastos', income - expense),
+      if (selection != IncomeExpenseSelection.expenses)
+        ReportTotal(c, 'Ingresos', income),
+      if (selection != IncomeExpenseSelection.income)
+        ReportTotal(c, 'Gasto neto', expense),
+      if (selection == IncomeExpenseSelection.both)
+        ReportTotal(c, 'Ingresos menos gastos', income - expense),
     ]);
   }
   rows.sort((a, b) => a.date.compareTo(b.date));
   return ExportReport(
-    title: 'Movimientos',
+    title: switch (selection) {
+      IncomeExpenseSelection.both => 'Ingresos y gastos',
+      IncomeExpenseSelection.income => 'Ingresos',
+      IncomeExpenseSelection.expenses => 'Gastos',
+    },
     period: '${reportDate(start)} al ${reportDate(end)}',
     generatedAt: generatedAt,
     tables: [
-      ReportTable('Movimientos', const [
-        'Fecha',
-        'Tipo',
-        'Cuenta / tarjeta',
-        'Categoría',
-        'Descripción',
-        'Moneda',
-        'Monto',
-        'Referencia',
-      ], rows.map((m) => m.values).toList()),
+      ReportTable(
+        'Detalle',
+        const [
+          'Fecha',
+          'Tipo',
+          'Cuenta / tarjeta',
+          'Categoría',
+          'Descripción',
+          'Moneda',
+          'Monto',
+          'Referencia',
+        ],
+        [
+          for (final row in rows)
+            [
+              ...row.values.take(6),
+              MoneyCell(switch (selection) {
+                IncomeExpenseSelection.both => row.income + row.expense,
+                IncomeExpenseSelection.income => row.income,
+                IncomeExpenseSelection.expenses => row.expense,
+              }),
+              row.values[7],
+            ],
+        ],
+      ),
     ],
     totals: totals,
     notes: [
       'Los totales separan NIO y USD; no se convierten ni se suman monedas diferentes.',
       'Pagos de tarjeta y capital de préstamos no se vuelven a contar como gasto. Los intereses y comisiones pagados sí se incluyen. Las transferencias y préstamos por cobrar no se consideran ingresos o gastos personales.',
-      if (rows.any((m) => m.unknown))
-        'Hay ajustes con efecto sin definir: se muestran en el detalle y se excluyen del resumen de ingresos/gastos.',
     ],
   );
 }
@@ -342,7 +367,7 @@ ExportReport debtsReport({
       }
     }
     final original = moneyCents(debt['original_amount']),
-        pending = original - paid;
+        pending = debt['status'] == 'paid' ? 0 : original - paid;
     if (pending < 0) {
       throw StateError('Los abonos superan el capital de un préstamo.');
     }

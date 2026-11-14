@@ -130,17 +130,12 @@ class _TransactionFiltersBarState extends State<TransactionFiltersBar> {
     final missingAccount =
         accountId != null &&
         !widget.accounts.any((a) => a['id'].toString() == accountId);
-    final reconciliation = filter.reconciled == null
-        ? 'all'
-        : filter.reconciled == true
-        ? 'reconciled'
-        : 'pending';
-
     final receipt = widget.receiptFilter;
     final activeReceipt = receipt != null && receipt != ReceiptFilter.all;
     final accountName = widget.accounts
         .where((a) => '${a['id']}' == accountId)
         .firstOrNull?['name'];
+    final extraCount = (accountId != null ? 1 : 0) + (activeReceipt ? 1 : 0);
     final chips = [
       if (filter.query.trim().isNotEmpty)
         removable(
@@ -161,11 +156,6 @@ class _TransactionFiltersBarState extends State<TransactionFiltersBar> {
         removable(
           dateLabel,
           () => widget.onChanged(filter.copyWith(clearDates: true)),
-        ),
-      if (filter.reconciled != null)
-        removable(
-          filter.reconciled == true ? 'Conciliados' : 'Por conciliar',
-          () => widget.onChanged(filter.copyWith(clearReconciled: true)),
         ),
       if (activeReceipt)
         removable(
@@ -196,7 +186,6 @@ class _TransactionFiltersBarState extends State<TransactionFiltersBar> {
         const SizedBox(height: 12),
         AdaptiveColumns(
           minColumnWidth: 235,
-          maxColumns: 3,
           children: [
             DropdownButtonFormField<String>(
               key: ValueKey('type-${filter.type}'),
@@ -215,92 +204,70 @@ class _TransactionFiltersBarState extends State<TransactionFiltersBar> {
                 }
               },
             ),
-            DropdownButtonFormField<String>(
-              key: ValueKey('account-$accountId'),
-              initialValue: accountId ?? 'all',
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Cuenta'),
-              items: [
-                const DropdownMenuItem(
-                  value: 'all',
-                  child: Text('Todas las cuentas'),
-                ),
-                ...widget.accounts.map(
-                  (account) => DropdownMenuItem(
-                    value: account['id'].toString(),
-                    child: Text(
-                      '${account['name']} (${account['currency']})'
-                      '${account['is_active'] == true ? '' : ' · Inactiva'}',
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-                if (missingAccount)
-                  DropdownMenuItem(
-                    value: accountId,
-                    child: const Text('Cuenta no disponible'),
-                  ),
-              ],
-              onChanged: (value) {
-                if (value == null) {
-                  return;
-                }
-                widget.onChanged(
-                  filter.copyWith(
-                    accountId: value,
-                    clearAccount: value == 'all',
-                  ),
-                );
-              },
-            ),
-            DropdownButtonFormField<String>(
-              key: ValueKey('reconciliation-$reconciliation'),
-              initialValue: reconciliation,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Conciliación'),
-              items: const [
-                DropdownMenuItem(
-                  value: 'all',
-                  child: Text('Todos los estados'),
-                ),
-                DropdownMenuItem(
-                  value: 'pending',
-                  child: Text('Pendientes de conciliar'),
-                ),
-                DropdownMenuItem(
-                  value: 'reconciled',
-                  child: Text('Conciliados'),
-                ),
-              ],
-              onChanged: (value) {
-                if (value == null) {
-                  return;
-                }
-                widget.onChanged(
-                  filter.copyWith(
-                    reconciled: value == 'reconciled',
-                    clearReconciled: value == 'all',
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        AdaptiveColumns(
-          minColumnWidth: 235,
-          children: [
             OutlinedButton.icon(
               onPressed: chooseDates,
               icon: const Icon(Icons.date_range),
               label: Text(dateLabel),
             ),
-            if (receipt != null && widget.onReceiptChanged != null)
-              ReceiptFilterField(
-                key: ValueKey(receipt),
-                value: receipt,
-                onChanged: widget.onReceiptChanged!,
-              ),
+          ],
+        ),
+        ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          title: Text(
+            extraCount == 0
+                ? 'Más filtros'
+                : 'Más filtros · $extraCount activos',
+          ),
+          children: [
+            AdaptiveColumns(
+              minColumnWidth: 235,
+              children: [
+                DropdownButtonFormField<String>(
+                  key: ValueKey('account-$accountId'),
+                  initialValue: accountId ?? 'all',
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Cuenta'),
+                  items: [
+                    const DropdownMenuItem(
+                      value: 'all',
+                      child: Text('Todas las cuentas'),
+                    ),
+                    ...widget.accounts.map(
+                      (account) => DropdownMenuItem(
+                        value: account['id'].toString(),
+                        child: Text(
+                          '${account['name']} (${account['currency']})'
+                          '${account['is_active'] == true ? '' : ' · Inactiva'}',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                    if (missingAccount)
+                      DropdownMenuItem(
+                        value: accountId,
+                        child: const Text('Cuenta no disponible'),
+                      ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) {
+                      return;
+                    }
+                    widget.onChanged(
+                      filter.copyWith(
+                        accountId: value,
+                        clearAccount: value == 'all',
+                      ),
+                    );
+                  },
+                ),
+                if (receipt != null && widget.onReceiptChanged != null)
+                  ReceiptFilterField(
+                    key: ValueKey(receipt),
+                    value: receipt,
+                    onChanged: widget.onReceiptChanged!,
+                  ),
+              ],
+            ),
           ],
         ),
         if (chips.isNotEmpty) ...[

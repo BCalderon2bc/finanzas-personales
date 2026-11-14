@@ -1,3 +1,4 @@
+import '../statistics/statistics_page.dart';
 import '../recurring_expenses/recurring_expenses_page.dart';
 import '../help/app_help.dart';
 import '../../widgets/app_version_footer.dart';
@@ -183,6 +184,13 @@ class DashboardNavigation extends StatelessWidget {
                       ),
                     ]),
                     group('Reportes', Icons.assessment_outlined, [
+                      action('Estadísticas', Icons.analytics_outlined, () {
+                        Navigator.of(context).push<void>(
+                          MaterialPageRoute(
+                            builder: (_) => const StatisticsPage(),
+                          ),
+                        );
+                      }),
                       destination(
                         'Gastos por categoría',
                         Icons.pie_chart_outline_rounded,

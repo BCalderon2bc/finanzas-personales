@@ -1,6 +1,6 @@
-import '../utils/card_cash_advance.dart';
 import '../core/supabase_client.dart';
 import '../utils/money.dart';
+import 'payment_agenda_labels.dart' show agendaCardLabel;
 
 Future<List<Map<String, dynamic>>> loadUserCardExpenses(String userId) async {
   final expenses = <Map<String, dynamic>>[];
@@ -8,7 +8,8 @@ Future<List<Map<String, dynamic>>> loadUserCardExpenses(String userId) async {
     final result = await supabase
         .from('credit_card_transactions')
         .select(
-          'id, transaction_type, charge_kind, cash_advance_fee, amount, currency, transaction_date, created_at, category_id, description, reference, credit_cards(name)',
+          'id, transaction_type, charge_kind, amount, currency, transaction_date, created_at, category_id, description, reference, '
+          'credit_cards(card_reference, financial_institutions(name))',
         )
         .eq('user_id', userId)
         .eq('is_voided', false)
@@ -18,11 +19,8 @@ Future<List<Map<String, dynamic>>> loadUserCardExpenses(String userId) async {
         .range(offset, offset + 499);
     final page = List<Map<String, dynamic>>.from(result);
     for (final tx in page) {
-      final advance = isCardCashAdvance(tx);
-      final amount = advance
-          ? cardCashAdvanceFee(tx)
-          : moneyCents(tx['amount']);
-      if (advance && amount == 0) continue;
+      final amount = moneyCents(tx['amount']);
+      final card = tx['credit_cards'];
       expenses.add({
         'id': tx['id'],
         'transaction_type': 'expense',
@@ -31,13 +29,13 @@ Future<List<Map<String, dynamic>>> loadUserCardExpenses(String userId) async {
         'transaction_date': tx['transaction_date'],
         'created_at': tx['created_at'],
         'category_id': tx['category_id'],
-        'description': advance ? cardCashAdvanceFeeLabel : tx['description'],
+        'description': tx['description'],
         'reference': tx['reference'],
         'source': 'credit_card',
-        'card_transaction_type': advance ? 'fee' : tx['transaction_type'],
+        'card_transaction_type': tx['transaction_type'],
         'charge_kind': tx['charge_kind'],
-        'card_name': tx['credit_cards'] is Map
-            ? tx['credit_cards']['name']?.toString()
+        'card_label': card is Map<String, dynamic>
+            ? agendaCardLabel(card, includeName: false)
             : null,
       });
     }
@@ -52,7 +50,8 @@ Future<List<Map<String, dynamic>>> loadUserCardPayments(String userId) async {
     final result = await supabase
         .from('credit_card_transactions')
         .select(
-          'id, credit_card_id, account_id, amount, currency, account_debit_amount, account_debit_currency, payment_exchange_rate, transaction_date, created_at, reference, credit_cards(name)',
+          'id, credit_card_id, account_id, amount, currency, account_debit_amount, account_debit_currency, payment_exchange_rate, transaction_date, created_at, reference, '
+          'credit_cards(name, card_reference, financial_institutions(name))',
         )
         .eq('user_id', userId)
         .eq('is_voided', false)

@@ -71,14 +71,14 @@ Future<DashboardOverview> loadDashboardOverview(
       'credit_cards',
       'id, name, currency, credit_limit, opening_balance, '
           'opening_balance_nio, opening_balance_usd, '
-          'limit_exchange_rate, is_active',
+          'limit_exchange_rate, is_active, card_reference, financial_institutions(name)',
       user.id,
     ),
     _dashboardRows(
       'credit_card_transactions',
       'id, credit_card_id, account_id, category_id, '
           'transaction_type, amount, currency, transaction_date, '
-          'description, charge_kind, cash_advance_fee, is_voided, is_receivable_funding, account_debit_amount, account_debit_currency, payment_exchange_rate',
+          'description, is_voided, is_receivable_funding, account_debit_amount, account_debit_currency, payment_exchange_rate',
       user.id,
     ),
   ]);

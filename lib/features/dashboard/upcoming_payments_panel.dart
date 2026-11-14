@@ -100,9 +100,9 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
     }
   }
 
-  Widget agendaRow(AgendaItem item) {
+  Widget agendaRow(AgendaItem item, DateTime today) {
     final compact = compactLayout(context);
-    final days = daysUntil(item.date, DateTime.now());
+    final days = daysUntil(item.date, today);
     final isCut = item.kind == AgendaKind.cardCut;
     final loan =
         item.kind == AgendaKind.loanMaturity ||
@@ -171,7 +171,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
                             ? (item.title.trim().isEmpty
                                   ? 'Préstamo sin descripción'
                                   : item.title)
-                            : agendaCardLabel(item.entity),
+                            : agendaCardLabel(item.entity, includeName: false),
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
@@ -252,6 +252,24 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
     );
   }
 
+  List<Widget> agendaGroups(DateTime today) {
+    const titles = ['Vencidos', 'Hoy', 'Próximos', 'Cortes de tarjeta'];
+    final visible = items.take(expanded ? items.length : 5);
+    return [
+      for (final (group, title) in titles.indexed)
+        if (visible.any((item) => agendaUrgency(item, today) == group)) ...[
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text(title, style: Theme.of(context).textTheme.titleSmall),
+          ),
+          for (final item in visible.where(
+            (item) => agendaUrgency(item, today) == group,
+          ))
+            agendaRow(item, today),
+        ],
+    ];
+  }
+
   @override
   Widget build(BuildContext context) => Card(
     margin: EdgeInsets.zero,
@@ -302,7 +320,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
               ),
             )
           else ...[
-            ...items.take(expanded ? items.length : 5).map(agendaRow),
+            ...agendaGroups(DateTime.now()),
             if (items.length > 5)
               TextButton(
                 onPressed: () => setState(() => expanded = !expanded),

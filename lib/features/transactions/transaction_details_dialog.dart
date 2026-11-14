@@ -12,14 +12,12 @@ class TransactionDetailsDialog extends StatelessWidget {
     required this.category,
     this.onDelete,
     this.onEdit,
-    this.onReconcile,
   });
 
   final Map<String, dynamic> transaction;
   final String account, destination, category;
   final VoidCallback? onDelete;
   final VoidCallback? onEdit;
-  final VoidCallback? onReconcile;
 
   @override
   Widget build(BuildContext context) {
@@ -59,11 +57,6 @@ class TransactionDetailsDialog extends StatelessWidget {
               ),
               const Divider(height: 24),
               _detail('Fecha', dateText),
-              if (onReconcile != null)
-                _detail(
-                  'Conciliación',
-                  tx['is_reconciled'] == true ? 'Conciliado' : 'Pendiente',
-                ),
               _detail(
                 type == 'transfer' ? 'Cuenta de origen' : 'Cuenta',
                 account,
@@ -94,14 +87,6 @@ class TransactionDetailsDialog extends StatelessWidget {
         ),
       ),
       actions: [
-        if (onReconcile != null)
-          TextButton.icon(
-            onPressed: onReconcile,
-            icon: const Icon(Icons.fact_check_outlined),
-            label: Text(
-              tx['is_reconciled'] == true ? 'Quitar conciliación' : 'Conciliar',
-            ),
-          ),
         if (onDelete != null)
           TextButton.icon(
             onPressed: onDelete,

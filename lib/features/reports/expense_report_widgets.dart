@@ -280,7 +280,7 @@ class ExpenseDetailTile extends StatelessWidget {
     final color = refund ? const Color(0xFF35745C) : const Color(0xFF3C70AA);
     final description = tx['description']?.toString().trim() ?? '';
     final reference = tx['reference']?.toString().trim() ?? '';
-    final cardName = tx['card_name']?.toString().trim() ?? '';
+    final cardLabel = tx['card_label']?.toString().trim() ?? '';
     final date = DateTime.tryParse('${tx['transaction_date']}')?.toLocal();
     final dateText = date == null
         ? 'Fecha no disponible'
@@ -342,9 +342,9 @@ class ExpenseDetailTile extends StatelessWidget {
                     fontSize: 12,
                   ),
                 ),
-                if (card && cardName.isNotEmpty)
+                if (card && cardLabel.isNotEmpty)
                   Text(
-                    cardName,
+                    cardLabel,
                     style: const TextStyle(
                       color: Color(0xFF596B7D),
                       fontSize: 12,

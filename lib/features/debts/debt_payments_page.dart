@@ -76,7 +76,7 @@ class _DebtPaymentsPageState extends State<DebtPaymentsPage> {
         final result = await supabase
             .from('debt_payments')
             .select(
-              'id, principal_amount, interest_amount, fee_amount, insurance_amount, currency, payment_date, reference, is_voided, void_reason, voided_at',
+              'id, principal_amount, interest_amount, fee_amount, insurance_amount, currency, payment_date, reference, linked_transaction_id, is_voided, void_reason, voided_at',
             )
             .eq('debt_id', widget.debtId)
             .eq('user_id', user.id)
@@ -238,6 +238,13 @@ class _DebtPaymentsPageState extends State<DebtPaymentsPage> {
               count: countFor(payment),
               onClosed: refreshReceiptCounts,
             ),
+            if (payment['linked_transaction_id'] != null) ...[
+              const Text('Movimiento existente asociado'),
+              MovementReceiptsButton(
+                table: 'transactions',
+                record: {'id': payment['linked_transaction_id']},
+              ),
+            ],
             if (!voided)
               Align(
                 alignment: Alignment.centerRight,

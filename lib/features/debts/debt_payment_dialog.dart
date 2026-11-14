@@ -9,13 +9,14 @@ class DebtPaymentDialog extends StatefulWidget {
     required this.currency,
     required this.remainingCents,
     required this.accounts,
+    this.expenses = const [],
     this.installments = const [],
     this.initialInstallmentId,
     this.expectedTotalCents,
   });
   final String currency;
   final int remainingCents;
-  final List<Map<String, dynamic>> accounts;
+  final List<Map<String, dynamic>> accounts, expenses;
   final List<Map<String, dynamic>> installments;
   final String? initialInstallmentId;
   final int? expectedTotalCents;
@@ -35,6 +36,7 @@ class _DebtPaymentDialogState extends State<DebtPaymentDialog> {
   DateTime date = DateTime.now();
   String? error;
   String? accountId, installmentId;
+  Map<String, dynamic>? expense;
   @override
   void initState() {
     super.initState();
@@ -94,6 +96,14 @@ class _DebtPaymentDialogState extends State<DebtPaymentDialog> {
       setState(() => error = 'El abono total debe ser mayor que cero.');
       return;
     }
+    if (expense != null &&
+        capital + interests + fees + insured !=
+            moneyCents(expense!['amount'])) {
+      setState(
+        () => error = 'El total debe coincidir con el movimiento asociado.',
+      );
+      return;
+    }
     Navigator.pop(context, <String, dynamic>{
       ..._receipt.fields,
       'principal_amount': capital / 100,
@@ -108,6 +118,7 @@ class _DebtPaymentDialogState extends State<DebtPaymentDialog> {
       ).toUtc().toIso8601String(),
       'reference': reference.text.trim().isEmpty ? null : reference.text.trim(),
       'account_id': accountId,
+      'transaction_id': expense?['id'],
       'installment_id': installmentId,
     });
   }
@@ -126,27 +137,59 @@ class _DebtPaymentDialogState extends State<DebtPaymentDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                DropdownButtonFormField<String>(
-                  initialValue: accountId,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Cuenta de origen',
-                  ),
-                  items: widget.accounts
-                      .map(
-                        (a) => DropdownMenuItem(
-                          value: a['id'].toString(),
+                if (widget.expenses.isNotEmpty)
+                  DropdownButtonFormField<String>(
+                    initialValue: '',
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Movimiento asociado',
+                    ),
+                    items: [
+                      const DropdownMenuItem(
+                        value: '',
+                        child: Text('Registrar nuevo débito'),
+                      ),
+                      for (final row in widget.expenses)
+                        DropdownMenuItem(
+                          value: '${row['id']}',
                           child: Text(
-                            a['name'].toString(),
+                            "${shortStatementDate(row['transaction_date'])} · "
+                            "${formatMoneyCents(moneyCents(row['amount']), widget.currency)} · "
+                            "${row['description'] ?? 'Gasto'}",
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                      )
-                      .toList(),
-                  onChanged: (value) => setState(() => accountId = value),
-                  validator: (value) =>
-                      value == null ? 'Selecciona una cuenta' : null,
-                ),
+                    ],
+                    onChanged: (id) => setState(() {
+                      expense = widget.expenses
+                          .where((row) => '${row['id']}' == id)
+                          .firstOrNull;
+                      error = null;
+                    }),
+                  ),
+                if (widget.expenses.isNotEmpty) const SizedBox(height: 12),
+                if (expense == null)
+                  DropdownButtonFormField<String>(
+                    initialValue: accountId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Cuenta de origen',
+                    ),
+                    items: widget.accounts
+                        .map(
+                          (a) => DropdownMenuItem(
+                            value: a['id'].toString(),
+                            child: Text(
+                              a['name'].toString(),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) => setState(() => accountId = value),
+                    validator: (value) =>
+                        value == null ? 'Selecciona una cuenta' : null,
+                  ),
                 const SizedBox(height: 12),
                 Text(
                   'Capital pendiente: ${formatMoneyCents(widget.remainingCents, widget.currency)}',
@@ -175,22 +218,23 @@ class _DebtPaymentDialogState extends State<DebtPaymentDialog> {
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.calendar_month),
-                  label: Text(
-                    '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}',
+                if (expense == null)
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.calendar_month),
+                    label: Text(
+                      '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}',
+                    ),
+                    onPressed: () async {
+                      final selected = await showDatePicker(
+                        context: context,
+                        initialDate: date,
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime.now(),
+                      );
+                      if (selected != null && mounted)
+                        setState(() => date = selected);
+                    },
                   ),
-                  onPressed: () async {
-                    final selected = await showDatePicker(
-                      context: context,
-                      initialDate: date,
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime.now(),
-                    );
-                    if (selected != null && mounted)
-                      setState(() => date = selected);
-                  },
-                ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: reference,
@@ -226,9 +270,13 @@ class _DebtPaymentDialogState extends State<DebtPaymentDialog> {
                   ),
                   const SizedBox(height: 10),
                 ],
-                const Text(
-                  'Se descontará de la cuenta el total de capital, intereses, seguro y otros cargos.',
-                ),
+                if (expense == null)
+                  const Text('El total se descontará de la cuenta.')
+                else
+                  const Text(
+                    'El movimiento existente se mostrará como abono. Se conservarán su cuenta y fecha.',
+                  ),
+
                 if (error != null)
                   Text(
                     error!,

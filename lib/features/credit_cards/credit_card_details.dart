@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import '../../core/supabase_client.dart';
+import '../../data/credit_card_additional_repository.dart';
+import '../../data/payment_agenda_labels.dart';
 import '../../utils/money.dart';
 import '../../widgets/bank_brand.dart';
 import 'credit_card_face.dart';
 import 'credit_card_balances.dart';
 
-class CreditCardDetails extends StatelessWidget {
+class CreditCardDetails extends StatefulWidget {
   const CreditCardDetails({
     super.key,
     required this.card,
@@ -24,10 +27,47 @@ class CreditCardDetails extends StatelessWidget {
       onHistory,
       onMovement,
       onPayment,
-      onPlans,
-      onAdditionals;
+      onPlans;
+  final Future<void> Function()? onAdditionals;
+
+  @override
+  State<CreditCardDetails> createState() => _CreditCardDetailsState();
+}
+
+class _CreditCardDetailsState extends State<CreditCardDetails> {
+  late Future<List<Map<String, dynamic>>> additionals;
+
+  @override
+  void initState() {
+    super.initState();
+    additionals = fetchAdditionals();
+  }
+
+  @override
+  void didUpdateWidget(covariant CreditCardDetails oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.card['id'] != widget.card['id']) {
+      additionals = fetchAdditionals();
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchAdditionals() async {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) throw StateError('Debes iniciar sesión.');
+    return loadAdditionalCards('${widget.card['id']}', userId);
+  }
+
+  void refreshAdditionals() {
+    final result = fetchAdditionals();
+    setState(() {
+      additionals = result;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final card = widget.card;
+    final balances = widget.balances;
     const blue = Color(0xFF3C70AA),
         green = Color(0xFF35745C),
         muted = Color(0xFF596B7D);
@@ -97,7 +137,7 @@ class CreditCardDetails extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'TARJETA SELECCIONADA',
+                        'TARJETA TITULAR',
                         style: TextStyle(
                           color: muted,
                           fontSize: 10,
@@ -106,7 +146,7 @@ class CreditCardDetails extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        card['name'].toString(),
+                        agendaCardLabel(card),
                         style: const TextStyle(
                           fontSize: 21,
                           fontWeight: FontWeight.w700,
@@ -116,23 +156,23 @@ class CreditCardDetails extends StatelessWidget {
                   ),
                 ),
                 PopupMenuButton<String>(
-                  enabled: onEdit != null || onToggle != null,
+                  enabled: widget.onEdit != null || widget.onToggle != null,
                   onSelected: (v) {
                     if (v == 'edit') {
-                      onEdit?.call();
+                      widget.onEdit?.call();
                     } else {
-                      onToggle?.call();
+                      widget.onToggle?.call();
                     }
                   },
                   itemBuilder: (_) => [
                     PopupMenuItem(
                       value: 'edit',
-                      enabled: onEdit != null,
+                      enabled: widget.onEdit != null,
                       child: const Text('Editar tarjeta'),
                     ),
                     PopupMenuItem(
                       value: 'toggle',
-                      enabled: onToggle != null,
+                      enabled: widget.onToggle != null,
                       child: Text(active ? 'Desactivar' : 'Activar'),
                     ),
                   ],
@@ -147,7 +187,6 @@ class CreditCardDetails extends StatelessWidget {
               children: [
                 BankLogo(name: cardBankName(card), width: 110, height: 30),
                 Chip(label: Text(active ? 'Activa' : 'Inactiva')),
-                const Chip(label: Text('Límite compartido')),
               ],
             ),
             const SizedBox(height: 12),
@@ -172,6 +211,11 @@ class CreditCardDetails extends StatelessWidget {
                     ),
             ),
             const SizedBox(height: 14),
+            Text(
+              'Uso del límite compartido',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
             Text(
               'Límite total: ${cardMoney(limit, base)}',
               style: const TextStyle(fontWeight: FontWeight.w700),
@@ -263,15 +307,66 @@ class CreditCardDetails extends StatelessWidget {
             const Divider(height: 20),
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
-              onPressed: onPlans,
+              onPressed: widget.onPlans,
               icon: const Icon(Icons.calendar_month_outlined),
               label: const Text('Planes tasa cero · cuotas y pagos'),
             ),
             const SizedBox(height: 8),
+            Text(
+              'Tarjetas adicionales',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            FutureBuilder<List<Map<String, dynamic>>>(
+              future: additionals,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: LinearProgressIndicator(),
+                  );
+                }
+                if (snapshot.hasError) {
+                  return TextButton(
+                    onPressed: refreshAdditionals,
+                    child: const Text('Reintentar carga de adicionales'),
+                  );
+                }
+                final cards = snapshot.data!;
+                if (cards.isEmpty) {
+                  return const Text('Todavía no hay tarjetas adicionales.');
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final additional in cards)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.credit_card_outlined),
+                        title: Text(additionalCardLabel(additional)),
+                        subtitle: Text(
+                          [
+                            additional['is_active'] == true
+                                ? 'Activa'
+                                : 'Archivada',
+                            if (additional['credit_limit'] != null)
+                              'Tope por corte: ${cardMoney(moneyCents(additional['credit_limit']), base)}',
+                          ].join(' · '),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 8),
             OutlinedButton.icon(
-              onPressed: onAdditionals,
+              onPressed: widget.onAdditionals == null
+                  ? null
+                  : () async {
+                      await widget.onAdditionals!();
+                      if (mounted) refreshAdditionals();
+                    },
               icon: const Icon(Icons.group_outlined),
-              label: const Text('Tarjetas compartidas'),
+              label: const Text('Administrar adicionales'),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -281,7 +376,7 @@ class CreditCardDetails extends StatelessWidget {
               children: [
                 TextButton.icon(
                   style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
-                  onPressed: onHistory,
+                  onPressed: widget.onHistory,
                   icon: const Icon(Icons.history),
                   label: const Text('Historial'),
                 ),
@@ -290,13 +385,13 @@ class CreditCardDetails extends StatelessWidget {
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size(0, 48),
                     ),
-                    onPressed: onMovement,
+                    onPressed: widget.onMovement,
                     icon: const Icon(Icons.add_card_outlined),
                     label: const Text('Movimiento'),
                   ),
                 FilledButton.icon(
                   style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
-                  onPressed: onPayment,
+                  onPressed: widget.onPayment,
                   icon: const Icon(Icons.payments_outlined),
                   label: const Text('Pagar tarjeta'),
                 ),

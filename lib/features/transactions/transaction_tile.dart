@@ -1,4 +1,3 @@
-import '../../utils/card_cash_advance.dart';
 import 'package:flutter/material.dart';
 
 import '../../utils/money.dart';
@@ -39,7 +38,6 @@ class TransactionTile extends StatelessWidget {
       'credit_card_payment',
       'debt_payment',
       'receivable_loan',
-      cashAdvanceDepositSource,
     ].contains(transaction['source']);
     final color = income
         ? const Color(0xFF35745C)
@@ -80,87 +78,99 @@ class TransactionTile extends StatelessWidget {
         : expense
         ? '−'
         : '';
-    final status = transaction['source'] == cashAdvanceDepositSource
-        ? 'Retiro vinculado'
-        : external
-        ? 'Pago vinculado'
-        : transaction['is_reconciled'] == true
-        ? 'Conciliado'
-        : 'Por conciliar';
-    final title = description.isEmpty ? label : description;
-    final subtitle = [
-      if (description.isNotEmpty) label,
-      if (category.isNotEmpty) category,
-      status,
-    ].join(' · ');
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    const paymentPrefix = 'Pago de tarjeta: ';
+    final paymentCard =
+        type == 'card_payment' && description.startsWith(paymentPrefix)
+        ? description.substring(paymentPrefix.length)
+        : null;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compactPayment =
+            paymentCard != null &&
+            constraints.maxWidth < MediaQuery.textScalerOf(context).scale(520);
+        final title = compactPayment || description.isEmpty
+            ? label
+            : description;
+        final subtitle = [
+          if (description.isNotEmpty && !compactPayment) label,
+          if (category.isNotEmpty) category,
+          if (external) 'Pago vinculado',
+        ].join(' · ');
+        return Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Icon(visualIcon, color: visualColor, size: 19),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(title, style: theme.textTheme.titleMedium),
-                  ),
-                  const SizedBox(width: 12),
-                  Flexible(
-                    child: Text(
-                      '$sign${formatMoneyCents(cents, currency)}',
-                      textAlign: TextAlign.end,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: color,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  if (onTap != null)
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      color: colors.onSurfaceVariant,
-                      size: 20,
-                    ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(dateLabel, style: theme.textTheme.bodySmall),
-              Text(accountLabel),
-              Text(subtitle, style: theme.textTheme.bodySmall),
-              if (receiptCount > 0) ...[
-                const SizedBox(height: 6),
-                Text.rich(
-                  TextSpan(
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      WidgetSpan(
-                        alignment: PlaceholderAlignment.middle,
-                        child: Icon(
-                          Icons.attach_file,
-                          color: colors.onSurfaceVariant,
-                          size: 16,
+                      Icon(visualIcon, color: visualColor, size: 19),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(title, style: theme.textTheme.titleMedium),
+                      ),
+                      const SizedBox(width: 12),
+                      Flexible(
+                        child: Text(
+                          '$sign${formatMoneyCents(cents, currency)}',
+                          textAlign: TextAlign.end,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: color,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
-                      TextSpan(
-                        text: receiptCount == 1
-                            ? '  1 comprobante'
-                            : '  $receiptCount comprobantes',
-                      ),
+                      if (onTap != null)
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: colors.onSurfaceVariant,
+                          size: 20,
+                        ),
                     ],
                   ),
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
-            ],
+                  const SizedBox(height: 6),
+                  if (compactPayment) ...[
+                    Text(paymentCard, style: theme.textTheme.bodyMedium),
+                    const SizedBox(height: 6),
+                  ],
+                  Text(dateLabel, style: theme.textTheme.bodySmall),
+                  Text(accountLabel),
+                  if (subtitle.isNotEmpty)
+                    Text(subtitle, style: theme.textTheme.bodySmall),
+                  if (receiptCount > 0) ...[
+                    const SizedBox(height: 6),
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          WidgetSpan(
+                            alignment: PlaceholderAlignment.middle,
+                            child: Icon(
+                              Icons.attach_file,
+                              color: colors.onSurfaceVariant,
+                              size: 16,
+                            ),
+                          ),
+                          TextSpan(
+                            text: receiptCount == 1
+                                ? '  1 comprobante'
+                                : '  $receiptCount comprobantes',
+                          ),
+                        ],
+                      ),
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

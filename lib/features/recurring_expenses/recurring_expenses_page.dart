@@ -1,4 +1,3 @@
-import '../../widgets/page_intro.dart';
 import '../help/app_help.dart';
 import 'package:flutter/material.dart';
 
@@ -607,12 +606,6 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
                             child: const Text('Reintentar'),
                           ),
                         ] else ...[
-                          const PageIntro(
-                            icon: Icons.event_repeat_outlined,
-                            title: 'Tus gastos de cada mes',
-                            description:
-                                'Consulta tus gastos previstos y los montos que registraste.',
-                          ),
                           Card(
                             margin: EdgeInsets.zero,
                             color: theme.colorScheme.primaryContainer,

@@ -1,4 +1,3 @@
-import '../../utils/card_cash_advance.dart';
 import '../../data/credit_card_additional_repository.dart';
 import '../../data/payment_agenda_labels.dart' show additionalCardLabel;
 import '../../data/period_logic.dart' show includesDay;
@@ -35,8 +34,6 @@ class CreditCardMovementsPage extends StatefulWidget {
 class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
   List<Map<String, dynamic>> movements = [];
   String name = '', currencyFilter = 'all', filter = 'all';
-  Map<String, dynamic> cardData = {};
-  Map<String, String> accountNames = {};
   Map<String, Map<String, dynamic>> additionalCards = {};
   late String? additionalFilter = widget.initialAdditionalId;
   bool loading = true;
@@ -140,7 +137,6 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
 
   static const types = {
     'purchase': 'Compra',
-    cardCashAdvance: cardCashAdvanceLabel,
     'payment': 'Pago',
     'interest': 'Intereses',
     'fee': 'Comisión',
@@ -150,7 +146,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
     'adjustment': 'Ajuste',
   };
 
-  String statusFilter = 'all';
+  String statusFilter = 'valid';
   late DateTimeRange dateFilter;
 
   @override
@@ -165,23 +161,31 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
   }
 
   Future<void> deleteMovement(Map<String, dynamic> tx) async {
+    final isPayment = tx['transaction_type'] == 'payment';
+    final canDelete = isPayment
+        ? tx['is_voided'] == true
+        : [
+            'purchase',
+            'interest',
+            'fee',
+            'refund',
+          ].contains(tx['transaction_type']);
     if (loading ||
         saving ||
         tx['is_receivable_funding'] == true ||
-        ![
-          'purchase',
-          'interest',
-          'fee',
-          'refund',
-        ].contains(tx['transaction_type'])) {
+        !canDelete) {
       return;
     }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Eliminar movimiento'),
-        content: const Text(
-          'Se actualizarán la deuda de la tarjeta y los reportes relacionados. Esta acción no se puede deshacer.',
+        title: Text(
+          isPayment ? 'Eliminar pago definitivamente' : 'Eliminar movimiento',
+        ),
+        content: Text(
+          isPayment
+              ? 'Se borrará el pago anulado del historial. Esta acción es irreversible.'
+              : 'Se actualizarán la deuda de la tarjeta y los reportes relacionados. Esta acción no se puede deshacer.',
         ),
         actions: [
           TextButton(
@@ -200,19 +204,14 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
     if (user == null) return;
     setState(() => saving = true);
     try {
-      final deleted = await supabase
+      final query = supabase
           .from('credit_card_transactions')
           .delete()
           .eq('id', tx['id'])
           .eq('user_id', user.id)
           .eq('credit_card_id', widget.cardId)
-          .eq('transaction_type', tx['transaction_type'])
-          .inFilter('transaction_type', [
-            'purchase',
-            'interest',
-            'fee',
-            'refund',
-          ])
+          .eq('transaction_type', tx['transaction_type']);
+      final deleted = await (isPayment ? query.eq('is_voided', true) : query)
           .select('id');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -220,6 +219,8 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
           content: Text(
             deleted.isEmpty
                 ? 'No se eliminó. Revisa los permisos o si el registro cambió.'
+                : isPayment
+                ? 'Pago eliminado definitivamente.'
                 : 'Movimiento eliminado.',
           ),
         ),
@@ -228,7 +229,13 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
     } on PostgrestException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No se pudo eliminar: ${e.message}')),
+          SnackBar(
+            content: Text(
+              isPayment && e.code == '23503'
+                  ? 'Este pago anulado sigue vinculado a otros registros y no se pudo borrar.'
+                  : 'No se pudo eliminar: ${e.message}',
+            ),
+          ),
         );
       }
     } catch (e) {
@@ -282,23 +289,10 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
             ..sort(
               (a, b) => a['name'].toString().compareTo(b['name'].toString()),
             );
-      final cashAccounts = <Map<String, dynamic>>[];
-      for (var offset = 0; ; offset += 500) {
-        final result = await supabase
-            .from('accounts')
-            .select('id,name,currency,is_active')
-            .eq('user_id', user.id)
-            .eq('account_type', 'cash')
-            .order('id')
-            .range(offset, offset + 499);
-        cashAccounts.addAll(List<Map<String, dynamic>>.from(result));
-        if (result.length < 500) break;
-      }
       if (!mounted) return;
       final data = await showDialog<Map<String, dynamic>>(
         context: context,
         builder: (_) => CreditCardMovementDialog(
-          cashAccounts: cashAccounts,
           currency: tx['currency'].toString(),
           categories: available,
           movement: tx,
@@ -310,8 +304,6 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
         for (final key in [
           'transaction_type',
           'charge_kind',
-          'cash_advance_fee',
-          'cash_advance_account_id',
           'additional_card_id',
           'currency',
           'amount',
@@ -405,9 +397,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
       if (user == null) throw Exception('Debes iniciar sesión nuevamente.');
       final card = await supabase
           .from('credit_cards')
-          .select(
-            'id, name, currency, opening_balance, opening_balance_nio, opening_balance_usd',
-          )
+          .select('name')
           .eq('id', widget.cardId)
           .eq('user_id', user.id)
           .single();
@@ -418,7 +408,9 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
             .from('credit_card_transactions')
             .select(
               'id, additional_card_id, transaction_type, charge_kind, amount, currency, transaction_date, created_at, '
-              'cash_advance_fee, cash_advance_account_id, description, reference, account_id, account_debit_amount, account_debit_currency, payment_exchange_rate, category_id, is_voided, is_receivable_funding, void_reason, voided_at, categories(name)',
+              'description, reference, account_id, account_debit_amount, account_debit_currency, payment_exchange_rate, '
+              'category_id, is_voided, is_receivable_funding, void_reason, voided_at, '
+              'accounts!credit_card_transactions_account_id_user_id_fkey(name), categories(name)',
             )
             .eq('credit_card_id', widget.cardId)
             .eq('user_id', user.id)
@@ -429,35 +421,9 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
         rows.addAll(page);
         if (page.length < 500) break;
       }
-      final accountIds = rows
-          .expand(
-            (row) => [
-              row['account_id']?.toString(),
-              row['cash_advance_account_id']?.toString(),
-            ],
-          )
-          .nonNulls
-          .toSet()
-          .toList();
-      final names = <String, String>{};
-      for (var offset = 0; offset < accountIds.length; offset += 100) {
-        final accounts = await supabase
-            .from('accounts')
-            .select('id,name')
-            .eq('user_id', user.id)
-            .inFilter('id', accountIds.skip(offset).take(100).toList());
-        for (final account in accounts) {
-          names['${account['id']}'] = '${account['name']}';
-        }
-      }
-      if (!mounted ||
-          request != requestId ||
-          supabase.auth.currentUser?.id != user.id)
-        return;
+      if (!mounted || request != requestId) return;
       setState(() {
-        accountNames = names;
         name = card['name'].toString();
-        cardData = card;
         additionalCards = {for (final a in additions) a['id'].toString(): a};
         if (additionalFilter != '' &&
             !additionalCards.containsKey(additionalFilter)) {
@@ -485,7 +451,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
       return;
     final reason = await showDialog<String>(
       context: context,
-      builder: (_) => const VoidPaymentDialog(),
+      builder: (_) => const VoidPaymentDialog(deleteFromMovements: true),
     );
     if (reason == null || !mounted || loading || saving) return;
     setState(() => saving = true);
@@ -499,21 +465,23 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
         },
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Pago anulado.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pago eliminado de los movimientos vigentes.'),
+        ),
+      );
       await loadData();
     } on PostgrestException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No se pudo anular: ${e.message}')),
+          SnackBar(content: Text('No se pudo eliminar el pago: ${e.message}')),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('No se pudo anular: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No se pudo eliminar el pago: $e')),
+        );
       }
     } finally {
       if (mounted) setState(() => saving = false);
@@ -536,7 +504,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
     final amount = cardMoney(moneyCents(tx['amount']), txCurrency);
     final description = tx['description']?.toString().trim() ?? '';
     final reference = tx['reference']?.toString().trim() ?? '';
-    final account = accountNames[tx['account_id']?.toString()] ?? '';
+    final account = relatedName(tx['accounts']);
     final category = relatedName(tx['categories']);
     final additional = additionalCards[tx['additional_card_id']?.toString()];
 
@@ -594,13 +562,6 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
             if (description.isNotEmpty) ...[
               const SizedBox(height: 6),
               Text(description),
-            ],
-            if (displayType == cardCashAdvance) ...[
-              Text(cardCashAdvanceBreakdown(tx)),
-              if (tx['cash_advance_account_id'] != null)
-                Text(
-                  'Recibido en: ${accountNames[tx['cash_advance_account_id']?.toString()] ?? 'No disponible'}',
-                ),
             ],
             if (type == 'payment')
               Text('Cuenta: ${account.isEmpty ? 'No disponible' : account}'),
@@ -661,6 +622,18 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
                   ),
                 ],
               ),
+            if (type == 'payment' && voided)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: saving ? null : () => deleteMovement(tx),
+                  icon: const Icon(Icons.delete_forever_outlined),
+                  label: const Text('Eliminar definitivamente'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: theme.colorScheme.error,
+                  ),
+                ),
+              ),
             if (type == 'payment' && !voided)
               Wrap(
                 alignment: WrapAlignment.end,
@@ -673,8 +646,8 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
                   ),
                   TextButton.icon(
                     onPressed: saving ? null : () => voidPayment(tx),
-                    icon: const Icon(Icons.cancel_outlined),
-                    label: const Text('Anular pago'),
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('Eliminar pago'),
                     style: TextButton.styleFrom(
                       foregroundColor: theme.colorScheme.error,
                     ),
@@ -708,153 +681,148 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
               if (mounted) setState(() => dateFilter = range);
             },
           ),
-          const SizedBox(height: 4),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: AdaptiveColumns(
-              minColumnWidth: 216,
-              maxColumns: additionalCards.isEmpty ? 4 : 3,
-              children: [
-                if (additionalCards.isNotEmpty)
-                  DropdownButtonFormField<String>(
-                    key: ValueKey(additionalFilter),
-                    initialValue: additionalFilter ?? 'all',
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Tarjeta del movimiento',
-                    ),
-                    items: [
-                      const DropdownMenuItem(
-                        value: 'all',
-                        child: Text('Todas'),
-                      ),
-                      const DropdownMenuItem(
-                        value: '',
-                        child: Text('Titular / cuenta compartida'),
-                      ),
-                      for (final card in additionalCards.values)
-                        DropdownMenuItem(
-                          value: card['id'].toString(),
-                          child: Text(
-                            additionalCardLabel(card),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                    ],
-                    onChanged: (value) => setState(
-                      () => additionalFilter = value == 'all' ? null : value,
-                    ),
-                  ),
-                GuideAnchor(
-                  id: 'currency',
-                  child: DropdownButtonFormField<String>(
-                    initialValue: currencyFilter,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Moneda'),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'all',
-                        child: Text('Ambas monedas'),
-                      ),
-                      DropdownMenuItem(value: 'NIO', child: Text('Córdobas')),
-                      DropdownMenuItem(value: 'USD', child: Text('Dólares')),
-                    ],
-                    onChanged: (v) {
-                      if (v != null) {
-                        setState(() => currencyFilter = v);
-                      }
-                    },
-                  ),
+            child: GuideAnchor(
+              id: 'type',
+              child: DropdownButtonFormField<String>(
+                initialValue: filter,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Tipo de movimiento',
                 ),
-                GuideAnchor(
-                  id: 'state',
-                  child: DropdownButtonFormField<String>(
-                    initialValue: statusFilter,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Estado del registro',
+                items: [
+                  const DropdownMenuItem(value: 'all', child: Text('Todos')),
+                  ...types.entries.map(
+                    (e) => DropdownMenuItem(
+                      value: e.key,
+                      child: Text(e.value, overflow: TextOverflow.ellipsis),
                     ),
-                    items: const [
-                      DropdownMenuItem(value: 'valid', child: Text('Vigentes')),
-                      DropdownMenuItem(
-                        value: 'voided',
-                        child: Text('Anulados'),
-                      ),
-                      DropdownMenuItem(value: 'all', child: Text('Todos')),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) setState(() => statusFilter = value);
-                    },
                   ),
-                ),
-                GuideAnchor(
-                  id: 'type',
-                  child: DropdownButtonFormField<String>(
-                    initialValue: filter,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Tipo de movimiento',
-                    ),
-                    items: [
-                      const DropdownMenuItem(
-                        value: 'all',
-                        child: Text('Todos'),
-                      ),
-                      ...types.entries.map(
-                        (e) => DropdownMenuItem(
-                          value: e.key,
-                          child: Text(e.value, overflow: TextOverflow.ellipsis),
-                        ),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) setState(() => filter = value);
-                    },
-                  ),
-                ),
-                if (receiptCounts != null)
-                  ReceiptFilterField(
-                    value: receiptFilter,
-                    onChanged: (value) => setState(() => receiptFilter = value),
-                  ),
-              ],
+                ],
+                onChanged: (value) {
+                  if (value != null) setState(() => filter = value);
+                },
+              ),
             ),
+          ),
+          ExpansionTile(
+            title: Text(
+              'Más filtros · ${(currencyFilter == 'all' ? 0 : 1) + (statusFilter == 'valid' ? 0 : 1) + (additionalFilter == null ? 0 : 1) + (receiptFilter == ReceiptFilter.all ? 0 : 1)} activos',
+            ),
+            subtitle: Text(
+              statusFilter == 'valid'
+                  ? 'Vigentes'
+                  : statusFilter == 'voided'
+                  ? 'Anulados'
+                  : 'Todos los estados',
+            ),
+            children: [
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: AdaptiveColumns(
+                  minColumnWidth: 216,
+                  maxColumns: additionalCards.isEmpty ? 4 : 3,
+                  children: [
+                    if (additionalCards.isNotEmpty)
+                      DropdownButtonFormField<String>(
+                        key: ValueKey(additionalFilter),
+                        initialValue: additionalFilter ?? 'all',
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Tarjeta del movimiento',
+                        ),
+                        items: [
+                          const DropdownMenuItem(
+                            value: 'all',
+                            child: Text('Todas'),
+                          ),
+                          const DropdownMenuItem(
+                            value: '',
+                            child: Text('Titular / cuenta compartida'),
+                          ),
+                          for (final card in additionalCards.values)
+                            DropdownMenuItem(
+                              value: card['id'].toString(),
+                              child: Text(
+                                additionalCardLabel(card),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                        ],
+                        onChanged: (value) => setState(
+                          () =>
+                              additionalFilter = value == 'all' ? null : value,
+                        ),
+                      ),
+                    GuideAnchor(
+                      id: 'currency',
+                      child: DropdownButtonFormField<String>(
+                        initialValue: currencyFilter,
+                        isExpanded: true,
+                        decoration: const InputDecoration(labelText: 'Moneda'),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'all',
+                            child: Text('Ambas monedas'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'NIO',
+                            child: Text('Córdobas'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'USD',
+                            child: Text('Dólares'),
+                          ),
+                        ],
+                        onChanged: (v) {
+                          if (v != null) {
+                            setState(() => currencyFilter = v);
+                          }
+                        },
+                      ),
+                    ),
+                    GuideAnchor(
+                      id: 'state',
+                      child: DropdownButtonFormField<String>(
+                        initialValue: statusFilter,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Estado del registro',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'valid',
+                            child: Text('Vigentes'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'voided',
+                            child: Text('Anulados'),
+                          ),
+                          DropdownMenuItem(value: 'all', child: Text('Todos')),
+                        ],
+                        onChanged: (value) {
+                          if (value != null)
+                            setState(() => statusFilter = value);
+                        },
+                      ),
+                    ),
+                    if (receiptCounts != null)
+                      ReceiptFilterField(
+                        value: receiptFilter,
+                        onChanged: (value) =>
+                            setState(() => receiptFilter = value),
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
     ),
   );
-
-  Widget balanceCard(BuildContext context, String currency) {
-    final balance = cardBalance(
-      cardData,
-      movements.map((tx) => {...tx, 'credit_card_id': widget.cardId}),
-      currency,
-    );
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              currency == 'USD' ? 'Dólares' : 'Córdobas',
-              style: Theme.of(context).textTheme.labelLarge,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${balance != null && balance < 0 ? 'A favor' : 'Deuda'}: ${cardMoney(balance?.abs(), currency)}',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            Text(
-              'Inicial: ${cardMoney(cardOpening(cardData, currency), currency)}',
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -938,21 +906,6 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
                       Text(
                         name,
                         style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        additionalCards.isEmpty
-                            ? 'Saldo total de la tarjeta'
-                            : 'Saldo compartido de la tarjeta titular',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      const SizedBox(height: 12),
-                      AdaptiveColumns(
-                        minColumnWidth: 216,
-                        children: [
-                          for (final currency in cardCurrencies)
-                            balanceCard(context, currency),
-                        ],
                       ),
                       const SizedBox(height: 16),
                       filtersPanel(context),

@@ -1,4 +1,3 @@
-import '../utils/card_cash_advance.dart';
 import '../core/supabase_client.dart';
 import '../utils/entry_order.dart';
 import 'receivable_loan_repository.dart';
@@ -11,9 +10,12 @@ Future<List<Map<String, dynamic>>> loadUserTransactions(String userId) async {
         .from('transactions')
         .select(
           'id, account_id, destination_account_id, category_id, transaction_type, amount, '
-          'currency, expense_kind, transaction_date, description, reference, is_reconciled, created_at',
+          'currency, expense_kind, transaction_date, description, reference, created_at, '
+          'linked_payments:debt_payments!debt_payments_linked_transaction_id_fkey(id)',
         )
         .eq('user_id', userId)
+        .eq('linked_payments.is_voided', false)
+        .isFilter('linked_payments', null)
         .order('created_at', ascending: false)
         .order('id', ascending: false)
         .range(offset, offset + pageSize - 1);
@@ -42,33 +44,6 @@ Future<List<Map<String, dynamic>>> loadUserTransactions(String userId) async {
       ),
     );
     if (page.length < pageSize) break;
-  }
-  // The card record is the source of truth for the associated cash deposit.
-  for (var offset = 0; ; offset += pageSize) {
-    final result = await supabase
-        .from('credit_card_transactions')
-        .select(
-          'id,cash_advance_account_id,cash_advance_fee,amount,currency,transaction_date,created_at,reference,description',
-        )
-        .eq('user_id', userId)
-        .eq('charge_kind', cardCashAdvance)
-        .eq('is_voided', false)
-        .not('cash_advance_account_id', 'is', null)
-        .order('id')
-        .range(offset, offset + pageSize - 1);
-    for (final row in result) {
-      rows.add({
-        ...row,
-        'account_id': row['cash_advance_account_id'],
-        'amount': cardCashAdvancePrincipal(row) / 100,
-        'transaction_type': 'deposit',
-        'description': row['description'] == null
-            ? 'Efectivo recibido de tarjeta'
-            : 'Efectivo recibido de tarjeta · ${row['description']}',
-        'source': cashAdvanceDepositSource,
-      });
-    }
-    if (result.length < pageSize) break;
   }
   rows.addAll(await loadReceivableAccountMovements(userId));
   if (supabase.auth.currentUser?.id != userId) {

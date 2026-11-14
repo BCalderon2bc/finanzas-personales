@@ -1,5 +1,3 @@
-import '../../utils/card_cash_advance.dart';
-
 class TransactionFilter {
   const TransactionFilter({
     this.type = 'all',
@@ -7,20 +5,17 @@ class TransactionFilter {
     this.query = '',
     this.start,
     this.end,
-    this.reconciled,
   });
   final String type, query;
   final String? accountId;
   final DateTime? start, end;
-  final bool? reconciled;
 
   bool get isActive =>
       type != 'all' ||
       accountId != null ||
       query.trim().isNotEmpty ||
       start != null ||
-      end != null ||
-      reconciled != null;
+      end != null;
 
   TransactionFilter copyWith({
     String? type,
@@ -28,29 +23,17 @@ class TransactionFilter {
     String? query,
     DateTime? start,
     DateTime? end,
-    bool? reconciled,
     bool clearAccount = false,
     bool clearDates = false,
-    bool clearReconciled = false,
   }) => TransactionFilter(
     type: type ?? this.type,
     accountId: clearAccount ? null : accountId ?? this.accountId,
     query: query ?? this.query,
     start: clearDates ? null : start ?? this.start,
     end: clearDates ? null : end ?? this.end,
-    reconciled: clearReconciled ? null : reconciled ?? this.reconciled,
   );
 
   bool matches(Map<String, dynamic> tx) {
-    final external = [
-      'credit_card_payment',
-      'debt_payment',
-      'receivable_loan',
-      cashAdvanceDepositSource,
-    ].contains(tx['source']);
-    if (reconciled != null && (external || tx['is_reconciled'] != reconciled)) {
-      return false;
-    }
     if (type == 'insurance'
         ? tx['expense_kind'] != 'card_insurance'
         : type != 'all' && tx['transaction_type'] != type) {

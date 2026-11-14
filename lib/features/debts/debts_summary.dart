@@ -16,7 +16,8 @@ class DebtsSummary extends StatelessWidget {
   Widget currencyCard(BuildContext context, String currency, DateTime now) {
     int pending = 0, overdue = 0, today = 0, count = 0;
     for (final debt in debts) {
-      if (debt['currency'] != currency || debt['status'] == 'cancelled')
+      if (debt['currency'] != currency ||
+          ['cancelled', 'paid'].contains(debt['status']))
         continue;
       final paid = principalPaid[debt['id'].toString()] ?? 0;
       final remaining = moneyCents(debt['original_amount']) - paid;

@@ -1,4 +1,3 @@
-import '../../utils/card_cash_advance.dart';
 import '../../widgets/mobile_navigation.dart';
 import '../person_accounts/receipt_history.dart';
 import '../person_accounts/receipt_draft_field.dart';
@@ -10,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/supabase_client.dart';
 import '../../data/transaction_repository.dart';
 import '../../data/credit_card_repository.dart';
+import '../../data/payment_agenda_labels.dart' show agendaCardLabel;
 import '../../data/debt_payment_repository.dart';
 import '../../utils/money.dart';
 import '../categories/categories_page.dart';
@@ -265,11 +265,10 @@ class _TransactionsPageState extends State<TransactionsPage> {
             .update(changes)
             .eq('id', transaction['id'])
             .eq('user_id', user.id)
-            .eq('is_reconciled', false)
             .select('id');
         if (updated.isEmpty) {
           throw StateError(
-            'No se actualizó: puede estar conciliado, ya no existir o faltar permisos.',
+            'No se actualizó: puede que ya no exista o falten permisos.',
           );
         }
       }
@@ -337,14 +336,13 @@ class _TransactionsPageState extends State<TransactionsPage> {
           .delete()
           .eq('id', tx['id'])
           .eq('user_id', user.id)
-          .eq('is_reconciled', false)
           .select('id');
       if (!mounted) {
         return;
       }
       message(
         deleted.isEmpty
-            ? 'No se eliminó: puede estar conciliado, ya no existir o faltar permisos.'
+            ? 'No se eliminó: puede que ya no exista o falten permisos.'
             : 'Movimiento eliminado.',
       );
       await loadData();
@@ -368,13 +366,12 @@ class _TransactionsPageState extends State<TransactionsPage> {
       ...transactions,
       ...cardPayments.map((payment) {
         final card = payment['credit_cards'];
-        final name = card is Map ? card['name']?.toString() ?? '' : '';
         return <String, dynamic>{
           ...payment,
           'transaction_type': 'card_payment',
-          'description': name.isEmpty
-              ? 'Pago de tarjeta'
-              : 'Pago de tarjeta: $name',
+          'description': card is Map<String, dynamic>
+              ? 'Pago de tarjeta: ${agendaCardLabel(card, includeName: false)}'
+              : 'Pago de tarjeta',
           'source': 'credit_card_payment',
         };
       }),
@@ -395,86 +392,6 @@ class _TransactionsPageState extends State<TransactionsPage> {
     ];
     rows.sort(compareNewestEntry);
     return rows;
-  }
-
-  Future<void> toggleReconciliation(Map<String, dynamic> tx) async {
-    if (saving ||
-        loading ||
-        [
-          'credit_card_payment',
-          'debt_payment',
-          'receivable_loan',
-          cashAdvanceDepositSource,
-        ].contains(tx['source'])) {
-      return;
-    }
-    final reconciled = tx['is_reconciled'] == true;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          reconciled ? 'Quitar conciliación' : 'Conciliar movimiento',
-        ),
-        content: Text(
-          reconciled
-              ? 'El movimiento volverá a permitir edición y eliminación.'
-              : 'Confirma que verificaste este movimiento contra tu estado de cuenta. '
-                    'Quedará protegido contra edición y eliminación.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Confirmar'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted || saving || loading) {
-      return;
-    }
-    final user = supabase.auth.currentUser;
-    if (user == null) {
-      return;
-    }
-    setState(() => saving = true);
-    try {
-      final updated = await supabase
-          .from(
-            tx['source'] == 'fx_transfer' ? 'app_fx_transfers' : 'transactions',
-          )
-          .update({'is_reconciled': !reconciled})
-          .eq('id', tx['id'])
-          .eq('user_id', user.id)
-          .eq('is_reconciled', reconciled)
-          .select('id');
-      if (!mounted) {
-        return;
-      }
-      message(
-        updated.isEmpty
-            ? 'No se actualizó. Revisa los permisos o si el registro cambió.'
-            : reconciled
-            ? 'Conciliación retirada.'
-            : 'Movimiento conciliado.',
-      );
-      await loadData();
-    } on PostgrestException catch (e) {
-      if (mounted) {
-        message('No se pudo actualizar: ${e.message}');
-      }
-    } catch (e) {
-      if (mounted) {
-        message('No se pudo actualizar: $e');
-      }
-    } finally {
-      if (mounted) {
-        setState(() => saving = false);
-      }
-    }
   }
 
   Widget _buildBalanceCards() {
@@ -501,9 +418,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
       'credit_card_payment',
       'debt_payment',
       'receivable_loan',
-      cashAdvanceDepositSource,
     ].contains(tx['source']);
-    final reconciled = tx['is_reconciled'] == true;
     return TransactionTile(
       transaction: tx,
       receiptCount: receiptCounts?[financialReceiptFolder(tx)] ?? 0,
@@ -526,23 +441,17 @@ class _TransactionsPageState extends State<TransactionsPage> {
                     tx['destination_account_id']?.toString(),
                   ),
                   category: categoryName(tx['category_id']?.toString()),
-                  onEdit: external || reconciled
+                  onEdit: external
                       ? null
                       : () {
                           Navigator.pop(dialogContext);
                           addTransaction(tx);
                         },
-                  onDelete: external || reconciled
+                  onDelete: external
                       ? null
                       : () {
                           Navigator.pop(dialogContext);
                           deleteTransaction(tx);
-                        },
-                  onReconcile: external
-                      ? null
-                      : () {
-                          Navigator.pop(dialogContext);
-                          toggleReconciliation(tx);
                         },
                 ),
               );

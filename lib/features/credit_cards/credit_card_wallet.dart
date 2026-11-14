@@ -24,6 +24,7 @@ class CreditCardWallet extends StatelessWidget {
     title: 'Mi tarjetero',
     icon: Icons.wallet_outlined,
     desktopItemWidth: 320,
+    revealSelectionOnDesktop: true,
     labelFor: (card) {
       final ref = card['card_reference']?.toString().trim() ?? '';
       return '${card['name']}${ref.isEmpty ? '' : ' · $ref'}';

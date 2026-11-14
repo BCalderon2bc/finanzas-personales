@@ -1,6 +1,6 @@
 String _agendaText(dynamic value) => value?.toString().trim() ?? '';
 
-String agendaCardLabel(Map<String, dynamic>? card) {
+String agendaCardLabel(Map<String, dynamic>? card, {bool includeName = true}) {
   final institution = card?['financial_institutions'];
   final bank = institution is Map ? _agendaText(institution['name']) : '';
   final name = _agendaText(card?['name']);
@@ -9,7 +9,7 @@ String agendaCardLabel(Map<String, dynamic>? card) {
   ).replaceAll(RegExp(r'\D'), '');
   return [
     bank.isEmpty ? 'Banco sin asignar' : bank,
-    name.isEmpty ? 'Tarjeta' : name,
+    if (includeName) name.isEmpty ? 'Tarjeta' : name,
     if (digits.length >= 4) '••${digits.substring(digits.length - 4)}',
   ].join(' · ');
 }

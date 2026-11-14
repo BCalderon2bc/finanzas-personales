@@ -31,6 +31,15 @@ class CreditCardsPage extends StatefulWidget {
 class _CreditCardsPageState extends State<CreditCardsPage> {
   List<Map<String, dynamic>> cards = [], transactions = [];
   bool loading = true, saving = false;
+  bool hasLoaded = false;
+  final scrollController = ScrollController(keepScrollOffset: false);
+
+  @override
+  void dispose() {
+    scrollController.dispose();
+    super.dispose();
+  }
+
   CardStatementData? statementData;
   String? error, selectedCardId;
   int requestId = 0;
@@ -115,6 +124,7 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
         return;
       }
       setState(() {
+        hasLoaded = true;
         cards = cardRows;
         transactions = txRows;
         statementData = periods;
@@ -129,9 +139,10 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
     } catch (e) {
       if (mounted && request == requestId) {
         setState(() {
-          error = e.toString();
+          if (!hasLoaded) error = e.toString();
           loading = false;
         });
+        if (hasLoaded) message('No se pudieron actualizar las tarjetas: $e');
       }
     }
   }
@@ -265,11 +276,6 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
         card['id'].toString(),
         user.id,
       );
-      final cashAccounts = (await readRows(
-        'accounts',
-        'id,name,currency,is_active,account_type',
-        user.id,
-      )).where((a) => a['account_type'] == 'cash').toList();
       if (!mounted) {
         return;
       }
@@ -278,7 +284,6 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
         builder: (_) => CreditCardMovementDialog(
           currency: card['currency'].toString(),
           categories: available,
-          cashAccounts: cashAccounts,
           additionalCards: additionalCards,
         ),
       );
@@ -571,6 +576,18 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
             id: 'title',
             child: const Text('Tarjetas de crédito'),
           ),
+          bottom: loading && hasLoaded
+              ? const PreferredSize(
+                  preferredSize: Size.zero,
+                  child: SizedBox(
+                    height: 0,
+                    child: OverflowBox(
+                      maxHeight: 2,
+                      child: LinearProgressIndicator(minHeight: 2),
+                    ),
+                  ),
+                )
+              : null,
           actions: [
             const AppHelpButton(topic: 'cards'),
             IconButton(
@@ -613,7 +630,7 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
               ),
         body: SafeArea(
           top: false,
-          child: loading
+          child: loading && !hasLoaded
               ? const Center(child: CircularProgressIndicator())
               : error != null
               ? Center(
@@ -640,6 +657,8 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
                     child: RefreshIndicator(
                       onRefresh: loadData,
                       child: ListView(
+                        controller: scrollController,
+                        primary: false,
                         physics: const ClampingScrollPhysics(
                           parent: AlwaysScrollableScrollPhysics(),
                         ),
@@ -740,7 +759,7 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
                                 cards: orderedCards,
                                 selectedId: selectedCardId,
                                 balanceFor: balanceFor,
-                                onSelected: saving
+                                onSelected: loading || saving
                                     ? null
                                     : (id) =>
                                           setState(() => selectedCardId = id),
@@ -756,10 +775,10 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
                                     for (final c in cardCurrencies)
                                       c: balanceFor(selected, c),
                                   },
-                                  onEdit: saving
+                                  onEdit: loading || saving
                                       ? null
                                       : () => addCard(selected),
-                                  onAdditionals: saving
+                                  onAdditionals: loading || saving
                                       ? null
                                       : () => Navigator.push(
                                           context,
@@ -770,7 +789,7 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
                                                 ),
                                           ),
                                         ),
-                                  onPlans: saving
+                                  onPlans: loading || saving
                                       ? null
                                       : () async {
                                           await Navigator.push(
@@ -782,16 +801,16 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
                                           );
                                           if (mounted) await loadData();
                                         },
-                                  onToggle: saving
+                                  onToggle: loading || saving
                                       ? null
                                       : () => toggleCard(selected),
-                                  onHistory: saving
+                                  onHistory: loading || saving
                                       ? null
                                       : () => history(selected),
-                                  onMovement: saving
+                                  onMovement: loading || saving
                                       ? null
                                       : () => addMovement(selected),
-                                  onPayment: saving
+                                  onPayment: loading || saving
                                       ? null
                                       : () => payCard(selected),
                                 ),
@@ -814,7 +833,7 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
                                         child: CreditCardPeriodSummary(
                                           cardId: '${selected['id']}',
                                           data: statementData!,
-                                          onManage: saving
+                                          onManage: loading || saving
                                               ? null
                                               : () async {
                                                   await Navigator.push(

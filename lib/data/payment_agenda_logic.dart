@@ -153,9 +153,23 @@ List<AgendaItem> buildPaymentAgenda({
       ),
     );
   }
-  result.sort((a, b) {
-    final byDate = a.date.compareTo(b.date);
-    return byDate != 0 ? byDate : a.id.compareTo(b.id);
+  return sortPaymentAgenda(result, today);
+}
+
+int agendaUrgency(AgendaItem item, DateTime today) {
+  if (item.kind == AgendaKind.cardCut) return 3;
+  return switch (daysUntil(item.date, today)) {
+    < 0 => 0,
+    0 => 1,
+    _ => 2,
+  };
+}
+
+List<AgendaItem> sortPaymentAgenda(Iterable<AgendaItem> items, DateTime today) {
+  return [...items]..sort((a, b) {
+    final group = agendaUrgency(a, today).compareTo(agendaUrgency(b, today));
+    if (group != 0) return group;
+    final date = a.date.compareTo(b.date);
+    return date != 0 ? date : a.id.compareTo(b.id);
   });
-  return result;
 }

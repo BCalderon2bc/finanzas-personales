@@ -1,3 +1,4 @@
+import '../../data/transaction_repository.dart';
 import '../person_accounts/receipt_draft_field.dart';
 import 'package:flutter/material.dart';
 import '../person_accounts/person_receipts_dialog.dart';
@@ -109,9 +110,24 @@ class _DebtInstallmentsPageState extends State<DebtInstallmentsPage> {
   Future<void> configure([Map<String, dynamic>? i]) => run((uid) async {
     final v = await showDialog<Map<String, dynamic>>(
       context: context,
+      barrierDismissible: i == null,
       builder: (_) => DebtInstallmentPlanDialog(
         currency: '${debt['currency']}',
         installment: i,
+        onSaveEdit: i == null
+            ? null
+            : (values) async {
+                same(uid);
+                await supabase.rpc(
+                  'update_debt_installment',
+                  params: {
+                    'p_installment_id': i['id'],
+                    'p_amount': values['amount'],
+                    'p_due_date': values['first_due'],
+                    'p_notes': values['notes'],
+                  },
+                );
+              },
       ),
     );
     if (v == null || !mounted) {
@@ -130,20 +146,11 @@ class _DebtInstallmentsPageState extends State<DebtInstallmentsPage> {
           'p_last_amount': v['last'],
         },
       );
-    } else {
-      await supabase.rpc(
-        'update_debt_installment',
-        params: {
-          'p_installment_id': i['id'],
-          'p_amount': v['amount'],
-          'p_due_date': v['first_due'],
-          'p_notes': v['notes'],
-        },
-      );
     }
-    message('Calendario guardado.');
+    message(i == null ? 'Calendario guardado.' : 'Cuota actualizada.');
   });
   int get principalRemaining {
+    if (debt['status'] == 'paid') return 0;
     var paid = 0;
     for (final p in data!.payments) {
       if ('${p['debt_id']}' == debtId && p['is_voided'] != true) {
@@ -166,6 +173,14 @@ class _DebtInstallmentsPageState extends State<DebtInstallmentsPage> {
       'id,name,currency,is_active',
       uid,
     );
+    final expenses = (await loadUserTransactions(uid))
+        .where(
+          (row) =>
+              row['transaction_type'] == 'expense' &&
+              row['source'] == null &&
+              row['currency'] == debt['currency'],
+        )
+        .toList();
     final accounts = rows
         .where(
           (a) => a['is_active'] == true && a['currency'] == debt['currency'],
@@ -174,7 +189,7 @@ class _DebtInstallmentsPageState extends State<DebtInstallmentsPage> {
     if (!mounted) {
       return;
     }
-    if (accounts.isEmpty) {
+    if (accounts.isEmpty && expenses.isEmpty) {
       message('Necesitas una cuenta activa en ${debt['currency']}.');
       return;
     }
@@ -184,6 +199,7 @@ class _DebtInstallmentsPageState extends State<DebtInstallmentsPage> {
         currency: '${debt['currency']}',
         remainingCents: remaining,
         accounts: accounts,
+        expenses: expenses,
         installments: [i],
         initialInstallmentId: '${i['id']}',
         expectedTotalCents: data!.progress(i).remaining,
@@ -196,15 +212,19 @@ class _DebtInstallmentsPageState extends State<DebtInstallmentsPage> {
     final linked = v['installment_id'];
     final receipt = v.remove(receiptDraftKey) as PendingReceipt?;
     final saved = await supabase.rpc(
-      'register_debt_payment_breakdown',
+      v['transaction_id'] == null
+          ? 'register_debt_payment_breakdown'
+          : 'register_debt_payment_from_expense',
       params: {
         'p_debt_id': debtId,
-        'p_account_id': v['account_id'],
+        if (v['transaction_id'] == null) 'p_account_id': v['account_id'],
+        if (v['transaction_id'] != null)
+          'p_transaction_id': v['transaction_id'],
         'p_principal_amount': v['principal_amount'],
         'p_interest_amount': v['interest_amount'],
         'p_fee_amount': v['fee_amount'],
         'p_insurance_amount': v['insurance_amount'],
-        'p_payment_date': v['payment_date'],
+        if (v['transaction_id'] == null) 'p_payment_date': v['payment_date'],
         'p_reference': v['reference'],
         if (linked != null) 'p_installment_id': linked,
       },

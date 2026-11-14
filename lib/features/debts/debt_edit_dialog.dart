@@ -87,7 +87,7 @@ class _DebtEditDialogState extends State<DebtEditDialog> {
                   DropdownMenuItem(value: 'active', child: Text('Activa')),
                   DropdownMenuItem(value: 'overdue', child: Text('Vencida')),
                   DropdownMenuItem(value: 'paused', child: Text('Pausada')),
-                  DropdownMenuItem(value: 'paid', child: Text('Pagada')),
+                  DropdownMenuItem(value: 'paid', child: Text('Saldada')),
                   DropdownMenuItem(
                     value: 'cancelled',
                     child: Text('Cancelada'),
@@ -99,7 +99,7 @@ class _DebtEditDialogState extends State<DebtEditDialog> {
               ),
               if (status == 'paid')
                 const Text(
-                  'Confirma que también liquidaste intereses y comisiones. El capital pendiente debe ser cero.',
+                  'La deuda quedará saldada. Sus abonos anteriores se conservan y el cambio de estado no genera un débito.',
                 ),
               if (status == 'cancelled')
                 const Text(

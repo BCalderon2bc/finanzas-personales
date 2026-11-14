@@ -79,7 +79,7 @@ class DebtCard extends StatelessWidget {
     const muted = Color(0xFF596B7D);
     const border = Color(0xFFDCE3EB);
     final original = moneyCents(debt['original_amount']);
-    final pending = original - paidCents;
+    final pending = debt['status'] == 'paid' ? 0 : original - paidCents;
     final status = debt['status']?.toString() ?? '';
     final creditor = debt['creditor_name']?.toString().trim() ?? '';
     final due = debtDueStatus(debt, paidCents, DateTime.now());
@@ -91,7 +91,7 @@ class DebtCard extends StatelessWidget {
       'active': 'Activa',
       'overdue': 'Vencida',
       'paused': 'Pausada',
-      'paid': 'Pagada',
+      'paid': 'Saldada',
       'cancelled': 'Cancelada',
     };
     final color = pending < 0

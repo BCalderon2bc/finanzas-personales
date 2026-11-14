@@ -137,7 +137,7 @@ class _ZeroPlansAgendaState extends State<ZeroPlansAgenda> {
                 '${p['description']} · cuota ${i['number']}/${p['total_installments']}',
               ),
               subtitle: Text(
-                '${agendaCardLabel(card)} · ${zeroDateLabel(i['due_date'])}\nPendiente: ${formatMoneyCents(data!.remaining(i), '${p['currency']}')}',
+                '${agendaCardLabel(card, includeName: false)} · ${zeroDateLabel(i['due_date'])}\nPendiente: ${formatMoneyCents(data!.remaining(i), '${p['currency']}')}',
               ),
               trailing: const Icon(Icons.chevron_right),
               onTap: card == null

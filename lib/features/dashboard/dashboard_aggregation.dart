@@ -1,4 +1,4 @@
-import '../../utils/card_cash_advance.dart';
+import '../../data/payment_agenda_labels.dart' show agendaCardLabel;
 import '../../data/period_logic.dart';
 import '../../utils/money.dart';
 import '../credit_cards/credit_card_balances.dart';
@@ -233,25 +233,19 @@ DashboardOverview buildDashboardOverview(
     if (effect != null &&
         type != 'payment' &&
         tx['is_receivable_funding'] != true) {
-      expense(
-        isCardCashAdvance(tx) ? cardCashAdvanceFee(tx) : effect * amount,
-        date,
-        currency,
-        tx['category_id'],
-      );
+      expense(effect * amount, date, currency, tx['category_id']);
     }
 
     final description = tx['description']?.toString().trim() ?? '';
-    final label = isCardCashAdvance(tx)
-        ? cardCashAdvanceLabel
-        : cardLabels[type] ?? type;
+    final label = cardLabels[type] ?? type;
+    final cardLabel = agendaCardLabel(card, includeName: false);
 
     event(
       DashboardEvent(
         'card:${tx['id']}',
         date,
-        description.isEmpty ? label : description,
-        '$label · ${card['name']}',
+        type == 'payment' || description.isEmpty ? label : description,
+        '$label · $cardLabel',
         currency,
         amount,
         type == 'refund'
@@ -339,7 +333,7 @@ DashboardOverview buildDashboardOverview(
   }
 
   for (final debt in debts) {
-    if (debt['status'] == 'cancelled') {
+    if (['cancelled', 'paid'].contains(debt['status'])) {
       continue;
     }
 

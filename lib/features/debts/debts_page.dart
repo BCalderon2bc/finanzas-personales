@@ -1,3 +1,4 @@
+import '../../data/transaction_repository.dart';
 import '../../widgets/page_intro.dart';
 import '../person_accounts/receipt_draft_field.dart';
 import '../../widgets/adaptive_layout.dart';
@@ -29,6 +30,7 @@ class _DebtsPageState extends State<DebtsPage> {
   List<Map<String, dynamic>> debts = [];
   Map<String, int> principalPaid = {};
   bool loading = true, saving = false;
+  bool hasLoaded = false;
   DebtInstallmentData? installmentData;
   String? error;
   int requestId = 0;
@@ -41,10 +43,12 @@ class _DebtsPageState extends State<DebtsPage> {
   }
 
   final searchController = TextEditingController();
+  final scrollController = ScrollController(keepScrollOffset: false);
 
   @override
   void dispose() {
     searchController.dispose();
+    scrollController.dispose();
     super.dispose();
   }
 
@@ -52,7 +56,7 @@ class _DebtsPageState extends State<DebtsPage> {
   void message(String text) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 
-  String filter = 'all';
+  String filter = 'active';
 
   List<Map<String, dynamic>> get visibleDebts {
     final now = DateTime.now();
@@ -137,13 +141,21 @@ class _DebtsPageState extends State<DebtsPage> {
         'id, name, currency, is_active',
         user.id,
       );
+      final expenses = (await loadUserTransactions(user.id))
+          .where(
+            (row) =>
+                row['transaction_type'] == 'expense' &&
+                row['source'] == null &&
+                row['currency'] == debt['currency'],
+          )
+          .toList();
       final accounts = rows
           .where(
             (a) => a['is_active'] == true && a['currency'] == debt['currency'],
           )
           .toList();
       if (!mounted) return;
-      if (accounts.isEmpty) {
+      if (accounts.isEmpty && expenses.isEmpty) {
         message('Necesitas una cuenta activa en la misma moneda.');
         return;
       }
@@ -153,6 +165,7 @@ class _DebtsPageState extends State<DebtsPage> {
           currency: debt['currency'].toString(),
           remainingCents: pending,
           accounts: accounts,
+          expenses: expenses,
           installments: installmentData?.payableFor('${debt['id']}') ?? [],
         ),
       );
@@ -160,15 +173,21 @@ class _DebtsPageState extends State<DebtsPage> {
       final installmentId = data['installment_id'];
       final receipt = data.remove(receiptDraftKey) as PendingReceipt?;
       final saved = await supabase.rpc(
-        'register_debt_payment_breakdown',
+        data['transaction_id'] == null
+            ? 'register_debt_payment_breakdown'
+            : 'register_debt_payment_from_expense',
         params: {
           'p_debt_id': debt['id'],
-          'p_account_id': data['account_id'],
+          if (data['transaction_id'] == null)
+            'p_account_id': data['account_id'],
+          if (data['transaction_id'] != null)
+            'p_transaction_id': data['transaction_id'],
           'p_principal_amount': data['principal_amount'],
           'p_interest_amount': data['interest_amount'],
           'p_fee_amount': data['fee_amount'],
           'p_insurance_amount': data['insurance_amount'],
-          'p_payment_date': data['payment_date'],
+          if (data['transaction_id'] == null)
+            'p_payment_date': data['payment_date'],
           'p_reference': data['reference'],
           if (installmentId != null) 'p_installment_id': installmentId,
         },
@@ -242,8 +261,10 @@ class _DebtsPageState extends State<DebtsPage> {
         paid[id] = (paid[id] ?? 0) + moneyCents(payment['principal_amount']);
       }
       final schedules = await loadDebtInstallments(user.id);
+      if (supabase.auth.currentUser?.id != user.id) return;
       if (!mounted || request != requestId) return;
       setState(() {
+        hasLoaded = true;
         debts = debtRows;
         principalPaid = paid;
         installmentData = schedules;
@@ -252,9 +273,10 @@ class _DebtsPageState extends State<DebtsPage> {
     } catch (e) {
       if (mounted && request == requestId) {
         setState(() {
-          error = e.toString();
+          if (!hasLoaded) error = e.toString();
           loading = false;
         });
+        if (hasLoaded) message('No se pudieron actualizar las deudas: $e');
       }
     }
   }
@@ -289,11 +311,12 @@ class _DebtsPageState extends State<DebtsPage> {
     final schedule = installmentData?.payableFor('${debt['id']}') ?? [];
     final next = schedule.isEmpty ? null : schedule.first;
     return DebtCard(
+      key: ValueKey(debt['id']),
       nextInstallmentLabel:
           next == null || !['active', 'overdue'].contains(debt['status'])
           ? null
           : 'Cuota ${next['number']}: ${formatMoneyCents(installmentData!.progress(next).remaining, '${debt['currency']}')} · ${shortStatementDate(next['due_date'])}',
-      onInstallments: saving
+      onInstallments: loading || saving
           ? null
           : () async {
               await Navigator.push(
@@ -310,7 +333,7 @@ class _DebtsPageState extends State<DebtsPage> {
       paidCents: paid,
       onEdit: saving ? null : () => editDebt(debt),
       onPayment: saving ? null : () => addPayment(debt),
-      onHistory: saving
+      onHistory: loading || saving
           ? null
           : () async {
               await Navigator.push(
@@ -376,7 +399,7 @@ class _DebtsPageState extends State<DebtsPage> {
             ),
       body: PageFrame(
         maxWidth: 1180,
-        child: loading
+        child: loading && !hasLoaded
             ? const Center(child: CircularProgressIndicator())
             : error != null
             ? Center(
@@ -398,6 +421,8 @@ class _DebtsPageState extends State<DebtsPage> {
             : RefreshIndicator(
                 onRefresh: loadData,
                 child: ListView(
+                  controller: scrollController,
+                  primary: false,
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: EdgeInsets.fromLTRB(
                     16,
@@ -464,7 +489,10 @@ class _DebtsPageState extends State<DebtsPage> {
                           value: 'paused',
                           child: Text('Pausadas'),
                         ),
-                        DropdownMenuItem(value: 'paid', child: Text('Pagadas')),
+                        DropdownMenuItem(
+                          value: 'paid',
+                          child: Text('Saldadas'),
+                        ),
                         DropdownMenuItem(
                           value: 'cancelled',
                           child: Text('Canceladas'),

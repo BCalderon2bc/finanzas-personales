@@ -8,6 +8,7 @@ import 'export_report_models.dart';
 
 Future<ExportReport> loadExportReport({
   required String kind,
+  IncomeExpenseSelection selection = IncomeExpenseSelection.both,
   String? cardId,
   String? additionalCardFilter,
   String? accountId,
@@ -135,6 +136,41 @@ Future<ExportReport> loadExportReport({
       generatedAt: DateTime.now(),
     );
   }
+  final data = await loadIncomeExpenseData(
+    includeBudgets: kind == 'budgets',
+    userId: uid,
+  );
+  return kind == 'movements'
+      ? movementsReport(
+          data.movements,
+          start,
+          end,
+          currency,
+          DateTime.now(),
+          selection: selection,
+        )
+      : budgetsReport(
+          budgets: data.budgets,
+          categories: data.categories,
+          movements: data.movements,
+          month: month,
+          currency: currency,
+          generatedAt: DateTime.now(),
+        );
+}
+
+Future<
+  ({
+    List<ExportMovement> movements,
+    List<Map<String, dynamic>> categories,
+    List<Map<String, dynamic>> budgets,
+  })
+>
+loadIncomeExpenseData({bool includeBudgets = false, String? userId}) async {
+  final uid = userId ?? supabase.auth.currentUser?.id;
+  if (uid == null || supabase.auth.currentUser?.id != uid) {
+    throw StateError('Debes iniciar sesión.');
+  }
   final values = await Future.wait([
     loadUserTransactions(uid),
     statementRows('accounts', 'id,name,currency', uid),
@@ -151,7 +187,7 @@ Future<ExportReport> loadExportReport({
       'id,debt_id,account_id,principal_amount,interest_amount,fee_amount,insurance_amount,currency,payment_date,reference,is_voided',
       uid,
     ),
-    if (kind == 'budgets')
+    if (includeBudgets)
       statementRows(
         'budgets',
         'id,category_id,currency,budget_amount,month,start_date,end_date',
@@ -170,14 +206,9 @@ Future<ExportReport> loadExportReport({
     debts: values[5],
     debtPayments: values[6],
   );
-  return kind == 'movements'
-      ? movementsReport(normalized, start, end, currency, DateTime.now())
-      : budgetsReport(
-          budgets: values[7],
-          categories: values[2],
-          movements: normalized,
-          month: month,
-          currency: currency,
-          generatedAt: DateTime.now(),
-        );
+  return (
+    movements: normalized,
+    categories: values[2],
+    budgets: includeBudgets ? values[7] : <Map<String, dynamic>>[],
+  );
 }

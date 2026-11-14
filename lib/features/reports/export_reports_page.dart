@@ -31,6 +31,7 @@ class ExportReportsPage extends StatefulWidget {
 
 class _ExportReportsPageState extends State<ExportReportsPage> {
   String kind = 'movements', currency = 'all';
+  IncomeExpenseSelection selection = IncomeExpenseSelection.both;
   bool busy = false, loadingPeople = true, allHistory = true;
   String? personId, peopleError, cardId, accountId, additionalCardFilter;
   Future<List<Map<String, dynamic>>>? additionalCards;
@@ -259,6 +260,7 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
             )
           : await loadExportReport(
               kind: kind,
+              selection: selection,
               cardId: cardId,
               additionalCardFilter: additionalCardFilter,
               accountId: accountId,
@@ -610,6 +612,37 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                   ),
                 ),
                 const SizedBox(height: 14),
+                if (kind == 'movements') ...[
+                  DropdownButtonFormField<IncomeExpenseSelection>(
+                    initialValue: selection,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Incluir'),
+                    items: const [
+                      DropdownMenuItem(
+                        value: IncomeExpenseSelection.both,
+                        child: Text('Ambos'),
+                      ),
+                      DropdownMenuItem(
+                        value: IncomeExpenseSelection.income,
+                        child: Text('Solo ingresos'),
+                      ),
+                      DropdownMenuItem(
+                        value: IncomeExpenseSelection.expenses,
+                        child: Text('Solo gastos'),
+                      ),
+                    ],
+                    onChanged: busy
+                        ? null
+                        : (value) {
+                            if (value == null) return;
+                            setState(() {
+                              selection = value;
+                              clear();
+                            });
+                          },
+                  ),
+                  const SizedBox(height: 14),
+                ],
                 if (kind != 'person')
                   GuideAnchor(
                     id: 'currency',
