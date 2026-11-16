@@ -1,3 +1,4 @@
+import '../../widgets/collapsible_filters.dart';
 import 'zero_plans_page.dart';
 import '../person_accounts/receipt_draft_field.dart';
 import '../help/app_help.dart';
@@ -134,11 +135,8 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
               ];
         final result = await showDialog<Map<String, dynamic>>(
           context: context,
-          builder: (_) => CreditCardStatementForm(
-            statements: editable,
-            bank: bank,
-            cardReference: widget.card['card_reference']?.toString(),
-          ),
+          builder: (_) =>
+              CreditCardStatementForm(statements: editable, bank: bank),
         );
         if (result == null || !mounted) return;
         sameOwner(userId);
@@ -839,14 +837,19 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
                               ),
                             ),
                           ),
-                          GuideAnchor(
-                            id: 'history',
-                            child: SwitchListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: const Text('Mostrar historial'),
-                              value: showHistory,
-                              onChanged: (v) => setState(() => showHistory = v),
-                            ),
+                          CollapsibleFilters(
+                            children: [
+                              GuideAnchor(
+                                id: 'history',
+                                child: SwitchListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: const Text('Mostrar historial'),
+                                  value: showHistory,
+                                  onChanged: (v) =>
+                                      setState(() => showHistory = v),
+                                ),
+                              ),
+                            ],
                           ),
                           if (visibleGroups.isEmpty)
                             Padding(

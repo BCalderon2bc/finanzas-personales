@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import '../../widgets/adaptive_layout.dart';
 import '../../widgets/responsive_wallet.dart';
+import 'credit_card_products.dart';
 import 'credit_card_face.dart';
-import 'credit_card_balances.dart';
 
 class CreditCardWallet extends StatelessWidget {
   const CreditCardWallet({
     super.key,
     required this.cards,
     required this.selectedId,
-    required this.balanceFor,
     this.onSelected,
   });
   final List<Map<String, dynamic>> cards;
   final String? selectedId;
-  final int? Function(Map<String, dynamic>, String) balanceFor;
   final ValueChanged<String>? onSelected;
 
   @override
@@ -24,6 +24,7 @@ class CreditCardWallet extends StatelessWidget {
     title: 'Mi tarjetero',
     icon: Icons.wallet_outlined,
     desktopItemWidth: 320,
+    showNextOnMobile: true,
     revealSelectionOnDesktop: true,
     labelFor: (card) {
       final ref = card['card_reference']?.toString().trim() ?? '';
@@ -31,13 +32,6 @@ class CreditCardWallet extends StatelessWidget {
     },
     itemBuilder: (card, selected) {
       final id = '${card['id']}';
-      String amount(String currency) {
-        final balance = balanceFor(card, currency);
-        return balance == null
-            ? '$currency: por revisar'
-            : '${balance < 0 ? 'A favor' : 'Deuda'}: ${cardMoney(balance.abs(), currency)}';
-      }
-
       return Semantics(
         selected: selected,
         button: true,
@@ -60,41 +54,29 @@ class CreditCardWallet extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    '${card['name']}',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
+                  if (compactLayout(context))
+                    _MobileCardSummary(card: card)
+                  else ...[
+                    Text(
+                      '${card['name']}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  CreditCardFace(card: card, compact: true),
-                  const Divider(height: 18),
-                  Text(
-                    amount('NIO'),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
+                    const SizedBox(height: 8),
+                    CreditCardFace(card: card, compact: true),
+                    const Divider(height: 18),
+                    Text(
+                      card['is_active'] == true ? 'Activa' : 'Inactiva',
+                      style: const TextStyle(
+                        color: Color(0xFF596B7D),
+                        fontSize: 13,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    amount('USD'),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    card['is_active'] == true ? 'Activa' : 'Inactiva',
-                    style: const TextStyle(
-                      color: Color(0xFF596B7D),
-                      fontSize: 13,
-                    ),
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -103,4 +85,75 @@ class CreditCardWallet extends StatelessWidget {
       );
     },
   );
+}
+
+class _MobileCardSummary extends StatelessWidget {
+  const _MobileCardSummary({required this.card});
+
+  final Map<String, dynamic> card;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bank = cardBankName(card);
+    final visual = creditCardVisual(card, cardBankKey(bank));
+    final digits = (card['card_reference']?.toString() ?? '').replaceAll(
+      RegExp(r'\D'),
+      '',
+    );
+    final ending = digits.length >= 4
+        ? '••${digits.substring(digits.length - 4)}'
+        : '';
+    final icon = Icon(
+      Icons.credit_card_outlined,
+      color: theme.colorScheme.primary,
+    );
+    final identity = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          bank.isEmpty ? '${card['name']}' : bank,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        if (visual != null ||
+            ending.isNotEmpty ||
+            card['is_active'] != true) ...[
+          const SizedBox(height: 4),
+          Text(
+            [
+              if (visual != null) visual.label,
+              if (ending.isNotEmpty) ending,
+              if (card['is_active'] != true) 'Inactiva',
+            ].join(' · '),
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium,
+          ),
+        ],
+      ],
+    );
+    final artwork = SizedBox(
+      height: 112,
+      child: visual == null
+          ? Center(child: icon)
+          : visual.asset.toLowerCase().endsWith('.svg')
+          ? SvgPicture.asset(visual.asset, fit: BoxFit.contain)
+          : Image.asset(
+              visual.asset,
+              fit: BoxFit.contain,
+              errorBuilder: (_, _, _) => Center(child: icon),
+            ),
+    );
+    return AdaptiveColumns(
+      minColumnWidth: 110,
+      spacing: 10,
+      children: [
+        artwork,
+        Center(child: identity),
+      ],
+    );
+  }
 }

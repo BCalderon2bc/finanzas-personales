@@ -1,5 +1,5 @@
-import '../../utils/card_cash_advance.dart';
 import '../../utils/money.dart';
+import '../../utils/card_cash_advance.dart';
 
 const cardCurrencies = ['NIO', 'USD'];
 const cardEffects = {
@@ -16,7 +16,6 @@ const cardPointsRedemptionLabel = 'Redención de puntos';
 String cardMovementType(Object? transactionType, Object? chargeKind) =>
     switch (chargeKind) {
       'insurance' => 'insurance',
-      cardCashAdvance => cardCashAdvance,
       cardPointsRedemption => cardPointsRedemption,
       _ => transactionType.toString(),
     };
@@ -37,8 +36,9 @@ int cardOpening(Map<String, dynamic> card, String currency) {
 int? cardBalance(
   Map<String, dynamic> card,
   Iterable<Map<String, dynamic>> transactions,
-  String currency,
-) {
+  String currency, {
+  bool forLimit = false,
+}) {
   var balance = cardOpening(card, currency);
   for (final tx in transactions) {
     if (tx['credit_card_id'].toString() != card['id'].toString() ||
@@ -55,7 +55,16 @@ int? cardBalance(
     if (effect == null) {
       return null;
     }
-    balance += effect * moneyCents(tx['amount']);
+    var amount = moneyCents(tx['amount']);
+    if (forLimit && tx['excludes_from_limit'] == true) {
+      if (isCardCashAdvance(tx)) {
+        amount -= cardCashAdvanceFee(tx);
+      } else if (tx['transaction_type'] == 'interest' ||
+          tx['transaction_type'] == 'fee') {
+        continue;
+      }
+    }
+    balance += effect * amount;
   }
   return balance;
 }
@@ -83,8 +92,16 @@ int? cardLimitUsed(Map<String, dynamic> card, int? nio, int? usd) {
   return (base == 'USD' ? u : n) + converted.round();
 }
 
-int? cardAvailable(Map<String, dynamic> card, int? nio, int? usd) {
-  final used = cardLimitUsed(card, nio, usd);
+int? cardUsed(
+  Map<String, dynamic> card,
+  Iterable<Map<String, dynamic>> transactions,
+) => cardLimitUsed(
+  card,
+  cardBalance(card, transactions, 'NIO', forLimit: true),
+  cardBalance(card, transactions, 'USD', forLimit: true),
+);
+
+int? cardAvailable(Map<String, dynamic> card, int? used) {
   if (used == null) {
     return null;
   }

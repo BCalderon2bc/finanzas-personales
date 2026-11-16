@@ -1,4 +1,4 @@
-import '../../widgets/page_intro.dart';
+import '../../widgets/collapsible_filters.dart';
 import '../../widgets/date_period_field.dart';
 import '../../data/period_logic.dart';
 import '../help/app_help.dart';
@@ -8,11 +8,14 @@ import '../../data/transaction_repository.dart';
 import '../../data/credit_card_repository.dart';
 import '../../data/debt_payment_repository.dart';
 import '../../data/expense_report_categories.dart';
-import '../../utils/money.dart';
+import '../../data/exchange_rate.dart';
+import '../../data/financial_settings_repository.dart';
 import '../../widgets/adaptive_layout.dart';
 import '../../widgets/category_style.dart';
 import 'category_expenses_dialog.dart';
 import 'expense_report_widgets.dart';
+
+typedef _CategoryRow = ({String key, String currency, int cents, Widget card});
 
 class MonthlyExpensesPage extends StatefulWidget {
   const MonthlyExpensesPage({super.key});
@@ -23,11 +26,12 @@ class MonthlyExpensesPage extends StatefulWidget {
 class _MonthlyExpensesPageState extends State<MonthlyExpensesPage> {
   DateTime month = DateTime(DateTime.now().year, DateTime.now().month);
   DateTime end = DateTime.now();
-  String currency = 'NIO';
+  String currency = 'both';
   String selectedCategory = 'all';
   List<Map<String, dynamic>> expenses = [];
   Map<String, String> categoryNames = {};
   Map<String, Map<String, dynamic>> categoryStyles = {};
+  ExchangeRate? exchangeRate;
   bool loading = true;
   String? error;
   int requestId = 0;
@@ -82,6 +86,12 @@ class _MonthlyExpensesPageState extends State<MonthlyExpensesPage> {
         ...await loadUserCardExpenses(user.id),
         ...debtPaymentExpenses(await loadUserDebtPayments(user.id)),
       ];
+      ExchangeRate? rate;
+      try {
+        rate = (await loadFinancialSettings())?.rate;
+      } catch (e) {
+        debugPrint('No se pudo cargar la tasa para gastos por categoría: $e');
+      }
       final selected = <Map<String, dynamic>>[];
       for (final tx in rows) {
         if (tx['transaction_type'] != 'expense') {
@@ -102,6 +112,7 @@ class _MonthlyExpensesPageState extends State<MonthlyExpensesPage> {
         categoryNames = names;
         categoryStyles = styles;
         expenses = selected;
+        exchangeRate = rate;
         loading = false;
       });
     } catch (e) {
@@ -114,22 +125,33 @@ class _MonthlyExpensesPageState extends State<MonthlyExpensesPage> {
     }
   }
 
-  ({Widget summary, Widget? distribution}) currencyReport(
+  ({Widget summary, List<_CategoryRow> categories}) currencyReport(
     String reportCurrency,
   ) {
     final filteredExpenses = expenses
         .where(
           (tx) =>
-              tx['currency'] == reportCurrency &&
+              (currency != 'both' || tx['currency'] == reportCurrency) &&
               (selectedCategory == 'all' ||
                   expenseReportCategoryKey(tx) == selectedCategory),
         )
         .toList();
+    final rate = currency == 'both' ? null : exchangeRate;
+    if (rate == null &&
+        filteredExpenses.any((tx) => tx['currency'] != reportCurrency)) {
+      return (
+        summary: const Text(
+          'Se necesita una tasa de cambio válida en Configuraciones para '
+          'ver todos los gastos en una sola moneda.',
+        ),
+        categories: const [],
+      );
+    }
     final totals = <String, int>{}, counts = <String, int>{};
     int charges = 0, refunds = 0;
     for (final tx in filteredExpenses) {
       final key = expenseReportCategoryKey(tx);
-      final amount = moneyCents(tx['amount']);
+      final amount = expenseReportAmount(tx, reportCurrency, rate);
       if (amount < 0) {
         refunds += -amount;
       } else {
@@ -138,11 +160,7 @@ class _MonthlyExpensesPageState extends State<MonthlyExpensesPage> {
       totals[key] = (totals[key] ?? 0) + amount;
       counts[key] = (counts[key] ?? 0) + 1;
     }
-    final groups = totals.entries.toList()
-      ..sort((a, b) {
-        final byAmount = b.value.compareTo(a.value);
-        return byAmount != 0 ? byAmount : a.key.compareTo(b.key);
-      });
+    final groups = totals.entries;
     final positiveTotal = groups.fold<int>(
       0,
       (sum, group) => sum + (group.value > 0 ? group.value : 0),
@@ -165,75 +183,53 @@ class _MonthlyExpensesPageState extends State<MonthlyExpensesPage> {
           const Padding(
             padding: EdgeInsets.only(top: 8),
             child: Text('Sin movimientos con estos filtros.'),
-          )
-        else if (selectedCategory != 'all')
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: OutlinedButton.icon(
-              onPressed: () => showDialog<void>(
-                context: context,
-                builder: (_) => CategoryExpensesDialog(
-                  name: '${categoryName(selectedCategory)} · $currencyLabel',
-                  currency: reportCurrency,
-                  expenses: filteredExpenses,
-                ),
-              ),
-              icon: const Icon(Icons.receipt_long_outlined),
-              label: Text('Ver movimientos en ${currencyLabel.toLowerCase()}'),
-            ),
           ),
       ],
     );
-    if (selectedCategory != 'all' || groups.isEmpty) {
-      return (summary: summary, distribution: null);
-    }
-
     return (
       summary: summary,
-      distribution: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (currency == 'both') ...[
-            Text(currencyLabel, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-          ],
-          ...groups.map((group) {
-            final name = categoryName(group.key);
-            final style = categoryStyles[group.key];
-            return ExpenseCategoryCard(
+      categories: groups.map((group) {
+        final name = categoryName(group.key);
+        final style = categoryStyles[group.key];
+        final card = ExpenseCategoryCard(
+          name: name,
+          currency: reportCurrency,
+          amountCents: group.value,
+          count: counts[group.key] ?? 0,
+          positiveTotalCents: positiveTotal,
+          color: group.key == 'uncategorized'
+              ? const Color(0xFF596B7D)
+              : categoryColor(style?['color']),
+          icon: switch (group.key) {
+            'debt_costs' => Icons.payments_outlined,
+            'card_refunds' => Icons.undo_rounded,
+            'card_insurance' => Icons.shield_outlined,
+            'card_purchases' ||
+            'card_interest' ||
+            'card_fees' ||
+            'card_other' => Icons.credit_card_outlined,
+            'uncategorized' => Icons.help_outline_rounded,
+            _ => categoryIcon(style?['icon']),
+          },
+          onTap: () => showDialog<void>(
+            context: context,
+            builder: (_) => CategoryExpensesDialog(
               name: name,
               currency: reportCurrency,
-              amountCents: group.value,
-              count: counts[group.key] ?? 0,
-              positiveTotalCents: positiveTotal,
-              color: group.key == 'uncategorized'
-                  ? const Color(0xFF596B7D)
-                  : categoryColor(style?['color']),
-              icon: switch (group.key) {
-                'debt_costs' => Icons.payments_outlined,
-                'card_refunds' => Icons.undo_rounded,
-                'card_insurance' => Icons.shield_outlined,
-                'card_purchases' ||
-                'card_interest' ||
-                'card_fees' ||
-                'card_other' => Icons.credit_card_outlined,
-                'uncategorized' => Icons.help_outline_rounded,
-                _ => categoryIcon(style?['icon']),
-              },
-              onTap: () => showDialog<void>(
-                context: context,
-                builder: (_) => CategoryExpensesDialog(
-                  name: name,
-                  currency: reportCurrency,
-                  expenses: filteredExpenses
-                      .where((tx) => expenseReportCategoryKey(tx) == group.key)
-                      .toList(),
-                ),
-              ),
-            );
-          }),
-        ],
-      ),
+              exchangeRate: rate,
+              expenses: filteredExpenses
+                  .where((tx) => expenseReportCategoryKey(tx) == group.key)
+                  .toList(),
+            ),
+          ),
+        );
+        return (
+          key: group.key,
+          currency: reportCurrency,
+          cents: group.value,
+          card: card,
+        );
+      }).toList(),
     );
   }
 
@@ -258,10 +254,26 @@ class _MonthlyExpensesPageState extends State<MonthlyExpensesPage> {
             in currency == 'both' ? const ['NIO', 'USD'] : [currency])
           currencyReport(reportCurrency),
     ];
-    final distributions = [
-      for (final report in reports)
-        if (report.distribution case final details?) details,
-    ];
+    final categories = [for (final report in reports) ...report.categories];
+    final rate = exchangeRate;
+    final mixedCurrencies =
+        categories.map((entry) => entry.currency).toSet().length > 1;
+    final missingRate = mixedCurrencies && rate == null;
+    // Compare exact USD equivalents with a shared denominator.
+    BigInt dollarOrder(_CategoryRow entry) =>
+        BigInt.from(entry.cents) *
+        BigInt.from(
+          entry.currency == 'USD' ? rate?.micros ?? 1000000 : 1000000,
+        );
+    categories.sort((a, b) {
+      if (missingRate && a.currency != b.currency) {
+        return a.currency.compareTo(b.currency);
+      }
+      final byAmount = dollarOrder(b).compareTo(dollarOrder(a));
+      if (byAmount != 0) return byAmount;
+      final byCategory = a.key.compareTo(b.key);
+      return byCategory != 0 ? byCategory : a.currency.compareTo(b.currency);
+    });
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -287,112 +299,98 @@ class _MonthlyExpensesPageState extends State<MonthlyExpensesPage> {
               },
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                padding: EdgeInsets.fromLTRB(
+                  pageGutter(context),
+                  12,
+                  pageGutter(context),
+                  32,
+                ),
                 children: [
-                  const PageIntro(
-                    icon: Icons.pie_chart_outline_rounded,
-                    title: 'En qué estás gastando',
-                    description:
-                        'Elige el período, la moneda y las categorías que quieres consultar.',
-                  ),
-                  Card(
-                    margin: EdgeInsets.zero,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                  CollapsibleFilters(
+                    summary: currency == 'both'
+                        ? 'Ambas monedas'
+                        : currency == 'NIO'
+                        ? 'Córdobas'
+                        : 'Dólares',
+                    children: [
+                      DatePeriodField(
+                        minColumnWidth: 136,
+                        start: month,
+                        end: end,
+                        enabled: !loading,
+                        onChanged: (range) {
+                          setState(() {
+                            month = range.start;
+                            end = range.end;
+                          });
+                          loadData();
+                        },
+                      ),
+                      AdaptiveColumns(
+                        minColumnWidth: 148,
                         children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: Text(
-                              'Filtros',
-                              style: theme.textTheme.titleMedium,
+                          DropdownButtonFormField<String>(
+                            initialValue: currency,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Moneda',
                             ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'both',
+                                child: Text('Ambas monedas'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'NIO',
+                                child: Text('Córdobas (C\$)'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'USD',
+                                child: Text('Dólares (\$)'),
+                              ),
+                            ],
+                            onChanged: loading
+                                ? null
+                                : (value) {
+                                    if (value != null) {
+                                      setState(() => currency = value);
+                                    }
+                                  },
                           ),
-                          DatePeriodField(
-                            start: month,
-                            end: end,
-                            enabled: !loading,
-                            onChanged: (range) {
-                              setState(() {
-                                month = range.start;
-                                end = range.end;
-                              });
-                              loadData();
-                            },
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: AdaptiveColumns(
-                              minColumnWidth: 240,
-                              children: [
-                                DropdownButtonFormField<String>(
-                                  initialValue: currency,
-                                  isExpanded: true,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Moneda',
-                                  ),
-                                  items: const [
-                                    DropdownMenuItem(
-                                      value: 'both',
-                                      child: Text('Ambas monedas'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'NIO',
-                                      child: Text('Córdobas (C\$)'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'USD',
-                                      child: Text('Dólares (US\$)'),
-                                    ),
-                                  ],
-                                  onChanged: loading
-                                      ? null
-                                      : (value) {
-                                          if (value != null) {
-                                            setState(() => currency = value);
-                                          }
-                                        },
-                                ),
-                                DropdownButtonFormField<String>(
-                                  initialValue: selectedCategory,
-                                  isExpanded: true,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Categoría',
-                                  ),
-                                  items: [
-                                    const DropdownMenuItem(
-                                      value: 'all',
-                                      child: Text('Todas las categorías'),
-                                    ),
-                                    for (final key in categoryOptions)
-                                      DropdownMenuItem(
-                                        value: key,
-                                        child: Text(
-                                          categoryName(key),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    const DropdownMenuItem(
-                                      value: 'uncategorized',
-                                      child: Text('Sin categoría'),
-                                    ),
-                                  ],
-                                  onChanged: loading
-                                      ? null
-                                      : (value) {
-                                          if (value != null)
-                                            setState(
-                                              () => selectedCategory = value,
-                                            );
-                                        },
-                                ),
-                              ],
+                          DropdownButtonFormField<String>(
+                            initialValue: selectedCategory,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Categoría',
                             ),
+                            items: [
+                              const DropdownMenuItem(
+                                value: 'all',
+                                child: Text('Todas las categorías'),
+                              ),
+                              for (final key in categoryOptions)
+                                DropdownMenuItem(
+                                  value: key,
+                                  child: Text(
+                                    categoryName(key),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              const DropdownMenuItem(
+                                value: 'uncategorized',
+                                child: Text('Sin categoría'),
+                              ),
+                            ],
+                            onChanged: loading
+                                ? null
+                                : (value) {
+                                    if (value != null)
+                                      setState(() => selectedCategory = value);
+                                  },
                           ),
                         ],
                       ),
-                    ),
+                    ],
                   ),
                   const SizedBox(height: 20),
                   if (loading)
@@ -406,21 +404,21 @@ class _MonthlyExpensesPageState extends State<MonthlyExpensesPage> {
                     ),
                   ] else ...[
                     Text(
-                      selectedCategory == 'all'
-                          ? 'Resumen de gastos'
-                          : categoryName(selectedCategory),
+                      'Resumen de gastos',
                       style: theme.textTheme.titleLarge,
                     ),
                     const SizedBox(height: 4),
                     const Text(
                       'El gasto neto es el total de cargos menos las devoluciones.',
                     ),
+                    if (exchangeRate case final rate? when currency != 'both')
+                      Text('Tasa configurada · \$ 1 = C\$ ${rate.decimal}'),
                     const SizedBox(height: 12),
                     AdaptiveColumns(
-                      minColumnWidth: 320,
+                      minColumnWidth: 300,
                       children: [for (final report in reports) report.summary],
                     ),
-                    if (distributions.isNotEmpty) ...[
+                    if (categories.isNotEmpty) ...[
                       const SizedBox(height: 24),
                       Text(
                         'Distribución por categoría',
@@ -431,14 +429,19 @@ class _MonthlyExpensesPageState extends State<MonthlyExpensesPage> {
                         'Cada porcentaje representa la parte del gasto neto positivo en su moneda.',
                       ),
                       const SizedBox(height: 12),
-                      AdaptiveColumns(
-                        minColumnWidth: 320,
-                        children: distributions,
-                      ),
+                      if (missingRate)
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 12),
+                          child: Text(
+                            'Configura una tasa de cambio para ordenar juntas '
+                            'las categorías en córdobas y dólares.',
+                          ),
+                        ),
+                      for (final entry in categories) entry.card,
                     ],
                     const SizedBox(height: 20),
                     Text(
-                      'Incluye gastos de cuentas y tarjetas, e intereses, seguros y otros cargos de deudas. Excluye pagos de tarjeta y capital abonado a deudas.',
+                      'Incluye gastos de cuentas y tarjetas y abonos de deuda, con su capital, intereses, seguros y comisiones. Excluye pagos de tarjeta.',
                       style: theme.textTheme.bodySmall,
                     ),
                   ],

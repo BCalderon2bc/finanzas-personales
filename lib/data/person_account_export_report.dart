@@ -34,5 +34,5 @@ class PersonAccountExportReport extends ExportReport {
       : 'Si paga en dólares: ${formatMoneyCents(paymentUsdCents!, 'USD')}';
   String get paymentRateLabel => settlementRate == null
       ? 'Sin tasa de pago indicada'
-      : 'Tasa de pago: C\$ ${settlementRate!.decimal} por US\$ 1';
+      : 'Tasa de pago: C\$ ${settlementRate!.decimal} por \$ 1';
 }

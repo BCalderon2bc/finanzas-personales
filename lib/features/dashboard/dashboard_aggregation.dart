@@ -283,7 +283,7 @@ DashboardOverview buildDashboardOverview(
 
     if (card['is_active'] == true) {
       final total = metric(card['currency'].toString());
-      final available = cardAvailable(card, values['NIO'], values['USD']);
+      final available = cardAvailable(card, cardUsed(card, cardTransactions));
       final previousAvailable = total.cardAvailable;
 
       total.cardAvailable = previousAvailable == null || available == null

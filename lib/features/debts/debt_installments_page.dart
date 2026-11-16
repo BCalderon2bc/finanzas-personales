@@ -1,3 +1,4 @@
+import '../../widgets/collapsible_filters.dart';
 import '../../data/transaction_repository.dart';
 import '../person_accounts/receipt_draft_field.dart';
 import 'package:flutter/material.dart';
@@ -502,11 +503,17 @@ class _DebtInstallmentsPageState extends State<DebtInstallmentsPage> {
                           icon: const Icon(Icons.calendar_month),
                           label: const Text('Configurar cuotas mensuales'),
                         ),
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Mostrar calendarios anteriores'),
-                          value: history,
-                          onChanged: (v) => setState(() => history = v),
+                        CollapsibleFilters(
+                          children: [
+                            SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text(
+                                'Mostrar calendarios anteriores',
+                              ),
+                              value: history,
+                              onChanged: (v) => setState(() => history = v),
+                            ),
+                          ],
                         ),
                         if (rows.isEmpty)
                           const Padding(

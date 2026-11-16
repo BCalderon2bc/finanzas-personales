@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../utils/money.dart';
+import '../../data/exchange_rate.dart';
 import 'expense_report_widgets.dart';
 
 class CategoryExpensesDialog extends StatelessWidget {
@@ -8,8 +8,10 @@ class CategoryExpensesDialog extends StatelessWidget {
     required this.name,
     required this.currency,
     required this.expenses,
+    this.exchangeRate,
   });
   final String name, currency;
+  final ExchangeRate? exchangeRate;
   final List<Map<String, dynamic>> expenses;
 
   @override
@@ -24,7 +26,7 @@ class CategoryExpensesDialog extends StatelessWidget {
       });
     int charges = 0, refunds = 0;
     for (final tx in rows) {
-      final amount = moneyCents(tx['amount']);
+      final amount = expenseReportAmount(tx, currency, exchangeRate);
       if (amount < 0) {
         refunds += -amount;
       } else {
@@ -82,8 +84,11 @@ class CategoryExpensesDialog extends StatelessWidget {
                   if (rows.isEmpty)
                     const Text('No hay movimientos para mostrar.'),
                   ...rows.map(
-                    (tx) =>
-                        ExpenseDetailTile(transaction: tx, currency: currency),
+                    (tx) => ExpenseDetailTile(
+                      transaction: tx,
+                      currency: currency,
+                      exchangeRate: exchangeRate,
+                    ),
                   ),
                 ],
               ),

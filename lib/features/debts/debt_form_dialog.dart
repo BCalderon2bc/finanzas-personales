@@ -70,7 +70,7 @@ class _DebtFormDialogState extends State<DebtFormDialog> {
                 decoration: const InputDecoration(labelText: 'Moneda'),
                 items: const [
                   DropdownMenuItem(value: 'NIO', child: Text('Córdobas (C\$)')),
-                  DropdownMenuItem(value: 'USD', child: Text('Dólares (US\$)')),
+                  DropdownMenuItem(value: 'USD', child: Text('Dólares (\$)')),
                 ],
                 onChanged: (value) {
                   if (value != null) setState(() => currency = value);

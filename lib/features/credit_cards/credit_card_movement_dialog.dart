@@ -30,6 +30,9 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
   final commission = TextEditingController(text: '0');
   String? cashAccountId;
   bool get cashAdvance => type == cardCashAdvance;
+  bool excludesFromLimit = false;
+  bool get canExclude =>
+      cashAdvance || const ['fee', 'insurance', 'interest'].contains(type);
 
   int? cashInputCents(String input) {
     final text = input.trim().replaceAll(',', '.');
@@ -71,7 +74,10 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
     if (tx == null) {
       return;
     }
-    type = cardMovementType(tx['transaction_type'], tx['charge_kind']);
+    type = isCardCashAdvance(tx)
+        ? cardCashAdvance
+        : cardMovementType(tx['transaction_type'], tx['charge_kind']);
+    excludesFromLimit = tx['excludes_from_limit'] == true;
     categoryId = tx['category_id']?.toString();
     additionalId = tx['additional_card_id']?.toString() ?? '';
     amount.text = cashAdvance
@@ -100,6 +106,7 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
     }
     Navigator.pop(context, <String, dynamic>{
       ..._receipt.fields,
+      'excludes_from_limit': canExclude && excludesFromLimit,
       'transaction_type': switch (type) {
         'insurance' => 'fee',
         cardCashAdvance => 'purchase',
@@ -115,10 +122,10 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
           ? (cashInputCents(amount.text)! + cashInputCents(commission.text)!) /
                 100
           : double.parse(amount.text.trim().replaceAll(',', '.')),
-      'cash_advance_fee': cashAdvance
-          ? cashInputCents(commission.text)! / 100
-          : null,
-      'cash_advance_account_id': cashAdvance ? cashAccountId : null,
+      if (cashAdvance) ...{
+        'cash_advance_fee': cashInputCents(commission.text)! / 100,
+        'cash_advance_account_id': cashAccountId,
+      },
       'additional_card_id': additionalId.isEmpty ? null : additionalId,
       'category_id': usesCategory ? categoryId : null,
       'description': description.text.trim().isEmpty
@@ -141,7 +148,8 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
           (account) =>
               account['currency'] == currency &&
               (account['is_active'] == true ||
-                  '${account['id']}' == cashAccountId),
+                  '${account['id']}' ==
+                      widget.movement?['cash_advance_account_id']?.toString()),
         )
         .toList();
     final principalCents = cashInputCents(amount.text);
@@ -205,7 +213,7 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
                     ),
                     DropdownMenuItem(
                       value: 'USD',
-                      child: Text('Dólares (US\$)'),
+                      child: Text('Dólares (\$)'),
                     ),
                   ],
                   onChanged: (value) {
@@ -222,6 +230,12 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
                   initialValue: type,
                   decoration: const InputDecoration(labelText: 'Tipo'),
                   items: types.entries
+                      .where(
+                        (entry) =>
+                            cashAdvance ||
+                            !editing ||
+                            entry.key != cardCashAdvance,
+                      )
                       .map(
                         (e) => DropdownMenuItem(
                           value: e.key,
@@ -229,16 +243,18 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
                         ),
                       )
                       .toList(),
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() {
-                        type = value;
-                        if (!usesCategory) {
-                          categoryId = null;
-                        }
-                      });
-                    }
-                  },
+                  onChanged: editing && cashAdvance
+                      ? null
+                      : (value) {
+                          if (value != null) {
+                            setState(() {
+                              type = value;
+                              if (!usesCategory) {
+                                categoryId = null;
+                              }
+                            });
+                          }
+                        },
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
@@ -249,7 +265,7 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
                   ),
                   decoration: InputDecoration(
                     labelText:
-                        '${cashAdvance ? 'Efectivo recibido' : 'Monto'} (${currency == 'USD' ? 'US\$' : 'C\$'})',
+                        '${cashAdvance ? 'Efectivo recibido' : 'Monto'} (${currency == 'USD' ? '\$' : 'C\$'})',
                     helperText: type == cardPointsRedemption
                         ? 'Ingresa el importe abonado por el banco.'
                         : null,
@@ -278,7 +294,7 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
                     ),
                     decoration: InputDecoration(
                       labelText:
-                          'Comisión del banco (${currency == 'USD' ? 'US\$' : 'C\$'})',
+                          'Comisión del banco (${currency == 'USD' ? '\$' : 'C\$'})',
                       helperText: 'Ingresa el cargo que aplicó el banco.',
                     ),
                     validator: (value) {
@@ -327,6 +343,23 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
                     'La comisión se registra como gasto. El efectivo se suma a la cuenta elegida.',
                   ),
                 ],
+                if (canExclude)
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      cashAdvance
+                          ? 'La comisión no consume límite'
+                          : 'No consume límite',
+                    ),
+                    subtitle: Text(
+                      cashAdvance
+                          ? 'El efectivo retirado sigue consumiendo límite.'
+                          : 'El cargo sigue sumando a la deuda.',
+                    ),
+                    value: excludesFromLimit,
+                    onChanged: (value) =>
+                        setState(() => excludesFromLimit = value),
+                  ),
                 if (usesCategory) ...[
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(

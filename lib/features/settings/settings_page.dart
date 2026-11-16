@@ -238,7 +238,7 @@ class _SettingsPageState extends State<SettingsPage> {
                             if (ExchangeRate.tryParse(controller.text)
                                 case final rate?)
                               Text(
-                                'US\$ 1.00 = C\$ ${rate.decimal}',
+                                '\$ 1.00 = C\$ ${rate.decimal}',
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w600,
                                 ),

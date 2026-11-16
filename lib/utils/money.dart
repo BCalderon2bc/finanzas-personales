@@ -100,6 +100,6 @@ String formatMoneyCents(int? cents, String currency) {
     return 'Por revisar';
   }
 
-  final symbol = currency == 'USD' ? 'US\$' : 'C\$';
-  return '$symbol ${formatAmountCents(cents)}';
+  final symbol = currency == 'USD' ? '\$' : 'C\$';
+  return '$symbol${formatAmountCents(cents)}';
 }

@@ -21,6 +21,8 @@ class AccountWallet extends StatelessWidget {
     selectedId: selectedId,
     onSelected: onSelected,
     title: 'Mi billetera',
+    showNextOnMobile: true,
+    uniformMobileHeight: true,
     icon: Icons.account_balance_wallet_outlined,
     labelFor: (a) => '${a['name']} · ${a['currency']}',
     itemBuilder: (account, selected) {
@@ -44,6 +46,7 @@ class AccountWallet extends StatelessWidget {
               ),
               child: AccountCard(
                 account: {...account, 'notes': null, 'account_reference': null},
+                centerOnMobile: true,
                 balanceCents: balances[id] ?? 0,
                 balanceLabel: selected
                     ? 'Seleccionada · Saldo registrado'

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../data/card_statement_pdf.dart';
 import '../../data/card_statement_logic.dart';
 import '../../data/period_logic.dart';
-import '../../utils/money.dart';
 import '../../widgets/adaptive_layout.dart';
 import '../person_accounts/receipt_draft_field.dart';
 
@@ -12,12 +11,10 @@ class CreditCardStatementForm extends StatefulWidget {
     super.key,
     this.statements = const [],
     this.bank = '',
-    this.cardReference,
   });
 
   final List<Map<String, dynamic>> statements;
   final String bank;
-  final String? cardReference;
 
   @override
   State<CreditCardStatementForm> createState() =>
@@ -36,11 +33,9 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
   DateTime closing = DateTime.now();
   DateTime due = DateTime.now().add(const Duration(days: 20));
   DateTime? bonus;
-  String? error, pdfMessage;
-  bool readingPdf = false;
+  String? error;
 
-  String? get pdfBank => statementPdfBankName(widget.bank);
-  bool get supportsPdf => pdfBank != null;
+  bool get usesPaymentFields => statementPdfBankName(widget.bank) != null;
   bool get showsOverdue => statementShowsOverdue(widget.bank);
 
   bool get editing => existing.isNotEmpty;
@@ -96,8 +91,7 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
   }
 
   void save() {
-    if (receipt.picking || readingPdf || !formKey.currentState!.validate())
-      return;
+    if (receipt.picking || !formKey.currentState!.validate()) return;
     final rows = <Map<String, dynamic>>[
       for (final currency in shownCurrencies)
         if (balances[currency]!.text.trim().isNotEmpty)
@@ -166,9 +160,10 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
   );
 
   String currencyLabel(String currency) =>
-      currency == 'NIO' ? 'Córdobas (C\$)' : 'Dólares (US\$)';
+      currency == 'NIO' ? 'Córdobas (C\$)' : 'Dólares (\$)';
 
-  String get balanceLabel => supportsPdf ? 'Pago de contado' : 'Saldo al corte';
+  String get balanceLabel =>
+      usesPaymentFields ? 'Pago de contado' : 'Saldo al corte';
 
   Widget amountField(
     String currency,
@@ -207,7 +202,7 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
         style: Theme.of(context).textTheme.titleMedium,
       ),
       const SizedBox(height: 8),
-      if (!supportsPdf) ...[
+      if (!usesPaymentFields) ...[
         amountField(currency, balances, balanceLabel),
         const SizedBox(height: 8),
       ],
@@ -216,7 +211,7 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
         const SizedBox(height: 8),
         amountField(currency, overdues, 'Pago atrasado (opcional)'),
       ],
-      if (supportsPdf) ...[
+      if (usesPaymentFields) ...[
         const SizedBox(height: 8),
         amountField(currency, balances, balanceLabel),
       ],
@@ -225,7 +220,7 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
 
   Widget amountsLayout() => LayoutBuilder(
     builder: (context, constraints) {
-      if (!supportsPdf ||
+      if (!usesPaymentFields ||
           shownCurrencies.length != 2 ||
           constraints.maxWidth < 490) {
         return AdaptiveColumns(
@@ -279,137 +274,6 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
     },
   );
 
-  Future<void> readPdf() async {
-    if (receipt.picking || readingPdf) return;
-    final file = receipt.file;
-    if (file == null) {
-      setState(
-        () => pdfMessage = 'Adjunta primero el PDF del estado de cuenta.',
-      );
-      return;
-    }
-    setState(() {
-      readingPdf = true;
-      pdfMessage = null;
-    });
-    try {
-      final source = await file.readFirstPdfPage();
-      if (!mounted) return;
-      final parsed = source == null
-          ? null
-          : parseCardStatementPdf(widget.bank, source);
-      if (parsed == null) {
-        setState(
-          () => pdfMessage =
-              'No se reconoció el formato de $pdfBank. Puedes ingresar los montos y fechas manualmente.',
-        );
-        return;
-      }
-      final cardEnding = RegExp(
-        r'\d{4}$',
-      ).stringMatch(widget.cardReference?.trim() ?? '');
-      if (cardEnding != null &&
-          parsed.cardEnding != null &&
-          cardEnding != parsed.cardEnding) {
-        setState(
-          () => pdfMessage =
-              'La terminación del PDF no coincide con la tarjeta seleccionada.',
-        );
-        return;
-      }
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (dialog) => AlertDialog(
-          title: const Text('Revisa los datos del PDF'),
-          content: SizedBox(
-            width: 400,
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('Corte · ${shortStatementDate(isoDay(parsed.closing))}'),
-                  if (parsed.bonus case final bonusDate?)
-                    Text(
-                      'Para bonificar · ${shortStatementDate(isoDay(bonusDate))}',
-                    ),
-                  Text(
-                    'Fecha máxima de pago · ${shortStatementDate(isoDay(parsed.due))}',
-                  ),
-                  for (final currency in shownCurrencies) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      currencyLabel(currency),
-                      style: Theme.of(dialog).textTheme.titleSmall,
-                    ),
-                    Text(
-                      'Pago mínimo · ${formatMoneyCents(parsed.amounts[currency]!.minimum, currency)}',
-                    ),
-                    if (parsed.amounts[currency]!.overdue case final overdue?)
-                      Text(
-                        'Pago atrasado · ${formatMoneyCents(overdue, currency)}',
-                      ),
-                    Text(
-                      'Pago de contado · ${formatMoneyCents(parsed.amounts[currency]!.balance, currency)}',
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  if (widget.bank == 'bac')
-                    const Text(
-                      'Se usa la fila «Pago de contado» del resumen. El PDF puede mostrar un saldo al corte distinto en el detalle.',
-                    ),
-                  if (widget.bank == 'ficohsa')
-                    const Text(
-                      'Se usa la fecha «Hasta» del período como fecha de corte.',
-                    ),
-                  const Text(
-                    'Al usar estos datos puedes revisarlos o editarlos antes de guardar el corte.',
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialog),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialog, true),
-              child: const Text('Usar datos'),
-            ),
-          ],
-        ),
-      );
-      if (!mounted || confirmed != true) return;
-      setState(() {
-        for (final currency in shownCurrencies) {
-          final values = parsed.amounts[currency]!;
-          balances[currency]!.text = (values.balance / 100).toStringAsFixed(2);
-          minimums[currency]!.text = (values.minimum / 100).toStringAsFixed(2);
-          if (values.overdue case final overdue?) {
-            overdues[currency]!.text = (overdue / 100).toStringAsFixed(2);
-          }
-        }
-        closing = parsed.closing;
-        bonus = parsed.bonus;
-        due = parsed.due;
-        error = null;
-        pdfMessage =
-            'Datos copiados al formulario. Revísalos antes de guardar.';
-      });
-    } catch (_) {
-      if (mounted) {
-        setState(
-          () => pdfMessage =
-              'No se pudo leer el PDF. Puedes ingresar los datos manualmente.',
-        );
-      }
-    } finally {
-      if (mounted) setState(() => readingPdf = false);
-    }
-  }
-
   Widget attachment() => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
@@ -418,22 +282,7 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
         style: Theme.of(context).textTheme.titleSmall,
       ),
       const Text('Adjunta un PDF o una foto para todo el corte. Hasta 10 MB.'),
-      IgnorePointer(
-        ignoring: readingPdf,
-        child: ReceiptDraftField(draft: receipt),
-      ),
-      if (pdfBank case final bank?)
-        Align(
-          alignment: Alignment.centerRight,
-          child: OutlinedButton.icon(
-            onPressed: readingPdf ? null : readPdf,
-            icon: const Icon(Icons.picture_as_pdf_outlined),
-            label: Text(
-              readingPdf ? 'Leyendo PDF…' : 'Leer datos del PDF de $bank',
-            ),
-          ),
-        ),
-      if (pdfMessage case final message?) Text(message),
+      ReceiptDraftField(draft: receipt),
     ],
   );
 
@@ -459,7 +308,7 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
                   'Si el banco solo indica una moneda, deja la otra en blanco. Usa 0 para registrar un saldo de cero.',
                 ),
               const SizedBox(height: 16),
-              if (!editing && supportsPdf) ...[
+              if (!editing && usesPaymentFields) ...[
                 attachment(),
                 const SizedBox(height: 16),
               ],
@@ -505,7 +354,7 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
                   labelText: 'Notas (opcional)',
                 ),
               ),
-              if (!editing && !supportsPdf) ...[
+              if (!editing && !usesPaymentFields) ...[
                 const SizedBox(height: 14),
                 attachment(),
               ],
@@ -530,10 +379,7 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
         onPressed: () => Navigator.pop(context),
         child: const Text('Cancelar'),
       ),
-      FilledButton(
-        onPressed: readingPdf ? null : save,
-        child: const Text('Guardar corte'),
-      ),
+      FilledButton(onPressed: save, child: const Text('Guardar corte')),
     ],
   );
 }

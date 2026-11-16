@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'dashboard_overview.dart';
+import '../../data/expense_report_categories.dart';
 
 const _blue = Color(0xFF3C70AA);
 const _green = Color(0xFF35745C);
@@ -67,9 +68,8 @@ class DashboardFinancialHealth extends StatelessWidget {
       final entry = positiveCategories[i];
       categorySlices.add(
         _Slice(
-          entry.key == 'none'
-              ? 'Sin categoría'
-              : data.categoryNames[entry.key] ?? 'Categoría no disponible',
+          expenseReportCategoryLabels[entry.key] ??
+              data.categoryNames[entry.key] ?? 'Categoría no disponible',
           entry.value,
           palette[i],
         ),
@@ -90,6 +90,18 @@ class DashboardFinancialHealth extends StatelessWidget {
       0,
       (sum, e) => sum + e.value,
     );
+
+    final allCategoryLegend = <_Legend>[
+      for (var i = 0; i < positiveCategories.length; i++)
+        _Legend(
+          expenseReportCategoryLabels[positiveCategories[i].key] ??
+              data.categoryNames[positiveCategories[i].key] ??
+              'Categoría no disponible',
+          '${money(positiveCategories[i].value)} · '
+              '${positiveCategoryTotal == 0 ? '0' : (positiveCategories[i].value / positiveCategoryTotal * 100).toStringAsFixed(0)}%',
+          palette[i < 5 ? i : 5],
+        ),
+    ];
 
     final hasNegativeCategories = c.categories.values.any((value) => value < 0);
 
@@ -252,6 +264,7 @@ class DashboardFinancialHealth extends StatelessWidget {
                     slice.color,
                   );
                 }).toList(),
+                expandedLegend: allCategoryLegend,
                 footer: hasNegativeCategories
                     ? 'Las categorías con devoluciones netas negativas no '
                           'participan en este gráfico. Sí se incluyen en el gasto neto del período.'
@@ -416,6 +429,7 @@ class _ChartPanel extends StatelessWidget {
     required this.slices,
     required this.emptyText,
     required this.legend,
+    this.expandedLegend,
     required this.footer,
   });
 
@@ -424,6 +438,7 @@ class _ChartPanel extends StatelessWidget {
   final Color centerColor;
   final List<_Slice> slices;
   final List<_Legend> legend;
+  final List<_Legend>? expandedLegend;
 
   Widget compactPanel(BuildContext context) {
     final hasValues = slices.any((slice) => slice.value > 0);
@@ -470,49 +485,10 @@ class _ChartPanel extends StatelessWidget {
         ),
       ),
     );
-    final values = Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: legend
-          .map(
-            (item) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    margin: const EdgeInsets.only(top: 5),
-                    decoration: BoxDecoration(
-                      color: item.color,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item.label,
-                          style: const TextStyle(fontSize: 13, color: _muted),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          item.value,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          )
-          .toList(),
+    final values = _CategoryLegendList(
+      legend: legend,
+      expandedLegend: expandedLegend,
+      compact: true,
     );
     return Container(
       padding: const EdgeInsets.all(16),
@@ -685,44 +661,11 @@ class _ChartPanel extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 22),
-          for (final item in legend)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 7),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 9,
-                    height: 9,
-                    margin: const EdgeInsets.only(top: 4),
-                    decoration: BoxDecoration(
-                      color: item.color,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    flex: 5,
-                    child: Text(
-                      item.label,
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Flexible(
-                    flex: 6,
-                    child: Text(
-                      item.value,
-                      textAlign: TextAlign.right,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          _CategoryLegendList(
+            legend: legend,
+            expandedLegend: expandedLegend,
+            compact: false,
+          ),
           const Divider(height: 26),
           Text(
             footer,
@@ -730,6 +673,93 @@ class _ChartPanel extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _CategoryLegendList extends StatefulWidget {
+  const _CategoryLegendList({
+    required this.legend,
+    required this.expandedLegend,
+    required this.compact,
+  });
+
+  final List<_Legend> legend;
+  final List<_Legend>? expandedLegend;
+  final bool compact;
+
+  @override
+  State<_CategoryLegendList> createState() => _CategoryLegendListState();
+}
+
+class _CategoryLegendListState extends State<_CategoryLegendList> {
+  bool expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final canExpand = widget.expandedLegend != null &&
+        widget.expandedLegend!.length > 5;
+    final rows = expanded && canExpand
+        ? widget.expandedLegend!
+        : widget.legend;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final item in rows)
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: widget.compact ? 6 : 7),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: widget.compact ? 8 : 9,
+                  height: widget.compact ? 8 : 9,
+                  margin: const EdgeInsets.only(top: 4),
+                  decoration: BoxDecoration(
+                    color: item.color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 5,
+                  child: Text(
+                    item.label,
+                    style: TextStyle(
+                      fontSize: widget.compact ? 13 : 12,
+                      color: widget.compact ? _muted : null,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  flex: 6,
+                  child: Text(
+                    item.value,
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      fontSize: widget.compact ? 13 : 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (canExpand)
+          Align(
+            alignment: Alignment.center,
+            child: TextButton.icon(
+              onPressed: () => setState(() => expanded = !expanded),
+              icon: Icon(expanded
+                  ? Icons.keyboard_arrow_up_rounded
+                  : Icons.keyboard_arrow_down_rounded),
+              label: Text(expanded
+                  ? 'Mostrar menos'
+                  : 'Ver todas (${widget.expandedLegend!.length})'),
+            ),
+          ),
+      ],
     );
   }
 }

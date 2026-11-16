@@ -1,6 +1,5 @@
 import '../../data/credit_card_additional_repository.dart';
 import 'credit_card_additionals_page.dart';
-import '../../widgets/page_intro.dart';
 import '../person_accounts/receipt_draft_field.dart';
 import '../../widgets/adaptive_layout.dart';
 import '../help/app_help.dart';
@@ -115,7 +114,8 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
       );
       final txRows = await readRows(
         'credit_card_transactions',
-        'id, credit_card_id, transaction_type, amount, currency, is_voided',
+        'id, credit_card_id, transaction_type, amount, currency, is_voided, '
+            'charge_kind, cash_advance_fee, excludes_from_limit',
         user.id,
       );
       final periods = await loadCardStatements(user.id);
@@ -160,7 +160,7 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
             onPressed: () => Navigator.pop(dialogContext, c),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Text(c == 'USD' ? 'Dólares · US\$' : 'Córdobas · C\$'),
+              child: Text(c == 'USD' ? 'Dólares · \$' : 'Córdobas · C\$'),
             ),
           ),
       ],
@@ -279,9 +279,16 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
       if (!mounted) {
         return;
       }
+      final cashAccounts = (await readRows(
+        'accounts',
+        'id,name,currency,is_active,account_type',
+        user.id,
+      )).where((a) => a['account_type'] == 'cash').toList();
+      if (!mounted) return;
       final data = await showDialog<Map<String, dynamic>>(
         context: context,
         builder: (_) => CreditCardMovementDialog(
+          cashAccounts: cashAccounts,
           currency: card['currency'].toString(),
           categories: available,
           additionalCards: additionalCards,
@@ -686,21 +693,16 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
                               ),
                             )
                           else ...[
-                            const PageIntro(
-                              icon: Icons.credit_card_outlined,
-                              title: 'Tu tarjetero',
-                              description:
-                                  'Elige una tarjeta para consultar su deuda, movimientos y fechas de pago.',
-                            ),
                             AdaptiveColumns(
                               minColumnWidth: 235,
                               children: [
                                 DropdownButtonFormField<String>(
                                   initialValue: cardOrder,
                                   isExpanded: true,
-                                  decoration: const InputDecoration(
+                                  decoration: InputDecoration(
+                                    isDense: compactLayout(context),
                                     labelText: 'Ordenar por',
-                                    prefixIcon: Icon(Icons.sort_rounded),
+                                    prefixIcon: const Icon(Icons.sort_rounded),
                                   ),
                                   items: const [
                                     DropdownMenuItem(
@@ -758,7 +760,6 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
                               child: CreditCardWallet(
                                 cards: orderedCards,
                                 selectedId: selectedCardId,
-                                balanceFor: balanceFor,
                                 onSelected: loading || saving
                                     ? null
                                     : (id) =>
@@ -771,6 +772,7 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
                                 id: 'details',
                                 child: CreditCardDetails(
                                   card: selected,
+                                  usedLimit: cardUsed(selected, transactions),
                                   balances: {
                                     for (final c in cardCurrencies)
                                       c: balanceFor(selected, c),

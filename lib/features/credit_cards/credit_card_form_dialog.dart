@@ -353,7 +353,7 @@ class _CreditCardFormDialogState extends State<CreditCardFormDialog> {
                       ),
                       DropdownMenuItem(
                         value: 'USD',
-                        child: Text('Dólares (US\$)'),
+                        child: Text('Dólares (\$)'),
                       ),
                     ],
                     onChanged: selectCurrency,
@@ -373,7 +373,7 @@ class _CreditCardFormDialogState extends State<CreditCardFormDialog> {
                       decimal: true,
                     ),
                     decoration: const InputDecoration(
-                      labelText: 'Córdobas por US\$ 1 (opcional)',
+                      labelText: 'Córdobas por \$ 1 (opcional)',
                       helperText:
                           'Usa la tasa de tu banco. Solo estima el disponible; no convierte tus deudas.',
                       helperMaxLines: 3,
@@ -399,7 +399,7 @@ class _CreditCardFormDialogState extends State<CreditCardFormDialog> {
                   child: amountField('Deuda inicial en córdobas (C\$)', nio),
                 ),
                 const SizedBox(height: 12),
-                amountField('Deuda inicial en dólares (US\$)', usd),
+                amountField('Deuda inicial en dólares (\$)', usd),
                 const SizedBox(height: 8),
                 const Text(
                   'Ingresa lo que debías antes del historial registrado. Los movimientos existentes se suman a estos importes.',

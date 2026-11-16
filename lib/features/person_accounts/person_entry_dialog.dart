@@ -258,7 +258,7 @@ class _PersonEntryDialogState extends State<PersonEntryDialog> {
                             ),
                             DropdownMenuItem(
                               value: 'USD',
-                              child: Text('Dólares (US\$)'),
+                              child: Text('Dólares (\$)'),
                             ),
                           ],
                           onChanged: (v) {
@@ -313,7 +313,7 @@ class _PersonEntryDialogState extends State<PersonEntryDialog> {
                               decimal: true,
                             ),
                             decoration: const InputDecoration(
-                              labelText: 'Córdobas por US\$1',
+                              labelText: 'Córdobas por \$1',
                               helperText:
                                   'Esta tasa queda guardada solo en este movimiento.',
                               helperMaxLines: 2,

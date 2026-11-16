@@ -136,8 +136,8 @@ ExportReport personAccountReport({
         'Descripción',
         'Moneda',
         if (showExchange) ...[
-          'Importe US\$',
-          'Tasa C\$/US\$',
+          'Importe \$',
+          'Tasa C\$/\$',
           'Importe C\$',
         ] else
           'Importe C\$',

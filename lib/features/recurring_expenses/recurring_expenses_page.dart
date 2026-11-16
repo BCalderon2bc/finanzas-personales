@@ -1,3 +1,4 @@
+import '../../widgets/collapsible_filters.dart';
 import '../help/app_help.dart';
 import 'package:flutter/material.dart';
 
@@ -516,6 +517,17 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
         variables = <Map<String, dynamic>>[];
     final plannedAmounts = {'NIO': 0, 'USD': 0};
     final pendingAmounts = {'NIO': 0, 'USD': 0};
+    final variableAmounts = {'NIO': 0, 'USD': 0};
+    final period = isoDay(month);
+    var hasVariableTotals = false;
+    for (final entry in monthlyTotals.entries) {
+      if (entry.key.$2 != period) continue;
+      final total = entry.value;
+      final subtotal = variableAmounts[total.currency];
+      if (subtotal == null) continue;
+      variableAmounts[total.currency] = subtotal + total.cents;
+      hasVariableTotals = true;
+    }
     for (final expense in expenses) {
       if (!recurringInMonth(expense, month)) {
         inactive.add(expense);
@@ -649,7 +661,9 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
                               ),
                             ),
                           ),
-                          if (count > 0) ...[
+                          if (count > 0 ||
+                              variables.isNotEmpty ||
+                              hasVariableTotals) ...[
                             const SizedBox(height: 14),
                             AdaptiveColumns(
                               minColumnWidth: 280,
@@ -674,6 +688,13 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
                                             'Fijos previstos · ${formatMoneyCents(plannedAmounts[currency]!, currency)}',
                                           ),
                                           Text(
+                                            'Variables registrados · ${formatMoneyCents(variableAmounts[currency]!, currency)}',
+                                          ),
+                                          Text(
+                                            'Total del mes · ${formatMoneyCents(plannedAmounts[currency]! + variableAmounts[currency]!, currency)}',
+                                            style: theme.textTheme.titleSmall,
+                                          ),
+                                          Text(
                                             'Pendiente previsto · ${formatMoneyCents(pendingAmounts[currency]!, currency)}',
                                             style: theme.textTheme.titleSmall,
                                           ),
@@ -689,7 +710,9 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
                           ],
                           if (variables.isNotEmpty)
                             section('Gastos variables', variables),
-                          if (count == 0 && variables.isEmpty)
+                          if (count == 0 &&
+                              variables.isEmpty &&
+                              !hasVariableTotals)
                             const Padding(
                               padding: EdgeInsets.symmetric(vertical: 24),
                               child: Text(
@@ -698,14 +721,18 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
                             ),
                           if (inactive.isNotEmpty) ...[
                             const SizedBox(height: 16),
-                            SwitchListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: const Text(
-                                'Mostrar servicios pausados o fuera del mes',
-                              ),
-                              value: showInactive,
-                              onChanged: (value) =>
-                                  setState(() => showInactive = value),
+                            CollapsibleFilters(
+                              children: [
+                                SwitchListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: const Text(
+                                    'Mostrar servicios pausados o fuera del mes',
+                                  ),
+                                  value: showInactive,
+                                  onChanged: (value) =>
+                                      setState(() => showInactive = value),
+                                ),
+                              ],
                             ),
                             if (showInactive)
                               section(

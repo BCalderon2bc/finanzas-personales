@@ -1,3 +1,4 @@
+import '../../widgets/collapsible_filters.dart';
 import '../../widgets/page_intro.dart';
 import '../../widgets/adaptive_layout.dart';
 import '../help/app_help.dart';
@@ -209,55 +210,62 @@ class _CategoriesPageState extends State<CategoriesPage> {
                       description:
                           'Usa categorías para separar ingresos y gastos en tus reportes.',
                     ),
-                    AdaptiveColumns(
-                      minColumnWidth: 220,
+                    CollapsibleFilters(
                       children: [
-                        DropdownButtonFormField<String>(
-                          initialValue: filter,
-                          isExpanded: true,
-                          decoration: const InputDecoration(labelText: 'Tipo'),
-                          items: const [
-                            DropdownMenuItem(
-                              value: 'all',
-                              child: Text('Todos'),
+                        AdaptiveColumns(
+                          minColumnWidth: 220,
+                          children: [
+                            DropdownButtonFormField<String>(
+                              initialValue: filter,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Tipo',
+                              ),
+                              items: const [
+                                DropdownMenuItem(
+                                  value: 'all',
+                                  child: Text('Todos'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'income',
+                                  child: Text('Ingresos'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'expense',
+                                  child: Text('Gastos'),
+                                ),
+                              ],
+                              onChanged: (value) {
+                                if (value != null)
+                                  setState(() => filter = value);
+                              },
                             ),
-                            DropdownMenuItem(
-                              value: 'income',
-                              child: Text('Ingresos'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'expense',
-                              child: Text('Gastos'),
+                            DropdownButtonFormField<_CategoryStatus>(
+                              initialValue: statusFilter,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Estado',
+                              ),
+                              items: const [
+                                DropdownMenuItem(
+                                  value: _CategoryStatus.all,
+                                  child: Text('Todas'),
+                                ),
+                                DropdownMenuItem(
+                                  value: _CategoryStatus.active,
+                                  child: Text('Activas'),
+                                ),
+                                DropdownMenuItem(
+                                  value: _CategoryStatus.inactive,
+                                  child: Text('Inactivas'),
+                                ),
+                              ],
+                              onChanged: (value) {
+                                if (value != null)
+                                  setState(() => statusFilter = value);
+                              },
                             ),
                           ],
-                          onChanged: (value) {
-                            if (value != null) setState(() => filter = value);
-                          },
-                        ),
-                        DropdownButtonFormField<_CategoryStatus>(
-                          initialValue: statusFilter,
-                          isExpanded: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Estado',
-                          ),
-                          items: const [
-                            DropdownMenuItem(
-                              value: _CategoryStatus.all,
-                              child: Text('Todas'),
-                            ),
-                            DropdownMenuItem(
-                              value: _CategoryStatus.active,
-                              child: Text('Activas'),
-                            ),
-                            DropdownMenuItem(
-                              value: _CategoryStatus.inactive,
-                              child: Text('Inactivas'),
-                            ),
-                          ],
-                          onChanged: (value) {
-                            if (value != null)
-                              setState(() => statusFilter = value);
-                          },
                         ),
                       ],
                     ),

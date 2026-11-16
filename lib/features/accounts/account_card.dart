@@ -16,12 +16,14 @@ class AccountCard extends StatelessWidget {
     required this.account,
     required this.balanceCents,
     this.balanceLabel = 'Saldo registrado',
+    this.centerOnMobile = false,
     this.onEdit,
     this.onToggle,
   });
   final Map<String, dynamic> account;
   final int balanceCents;
   final String balanceLabel;
+  final bool centerOnMobile;
   final VoidCallback? onEdit, onToggle;
 
   Widget bankLogo(String bank, bool cash) => BankLogo(
@@ -34,6 +36,8 @@ class AccountCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final compact = compactLayout(context);
+    final centered = compact && centerOnMobile;
+    final textAlign = centered ? TextAlign.center : TextAlign.start;
     final raw = account['card_design'];
     final design = raw is Map
         ? Map<String, dynamic>.from(raw)
@@ -60,6 +64,13 @@ class AccountCard extends StatelessWidget {
       'investment': 'Inversión',
       'other': 'Otra cuenta',
     };
+
+    final typeLabel = types[type] ?? 'Cuenta';
+    final accountSubtitle = bank.isEmpty
+        ? typeLabel
+        : centered
+        ? '$bank\n$typeLabel'
+        : '$bank · $typeLabel';
 
     final bankColors = type == 'cash'
         ? const [Color(0xFF065F46), Color(0xFF0D9470)]
@@ -90,9 +101,18 @@ class AccountCard extends StatelessWidget {
         ],
       ),
       child: Column(
+        mainAxisAlignment: centered
+            ? MainAxisAlignment.center
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
+          Wrap(
+            alignment: centered
+                ? WrapAlignment.center
+                : WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 6,
             children: [
               Container(
                 width: compact ? 88 : 112,
@@ -104,7 +124,6 @@ class AccountCard extends StatelessWidget {
                 ),
                 child: bankLogo(bank, type == 'cash'),
               ),
-              const Spacer(),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
@@ -124,6 +143,7 @@ class AccountCard extends StatelessWidget {
           SizedBox(height: compact ? 8 : 12),
           Text(
             account['name']?.toString() ?? 'Mi cuenta',
+            textAlign: textAlign,
             style: const TextStyle(
               color: Colors.white,
               fontSize: 20,
@@ -132,20 +152,20 @@ class AccountCard extends StatelessWidget {
           ),
           const SizedBox(height: 5),
           Text(
-            bank.isEmpty
-                ? types[type] ?? 'Cuenta'
-                : '$bank · ${types[type] ?? 'Cuenta'}',
+            accountSubtitle,
+            textAlign: textAlign,
             style: TextStyle(color: Colors.white.withAlpha(205), fontSize: 13),
           ),
           SizedBox(height: compact ? 9 : 14),
           Text(
             balanceLabel,
+            textAlign: textAlign,
             style: TextStyle(color: Colors.white.withAlpha(205), fontSize: 13),
           ),
           const SizedBox(height: 5),
           FittedBox(
             fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
+            alignment: centered ? Alignment.center : Alignment.centerLeft,
             child: Text(
               formatMoneyCents(balanceCents, currency),
               style: const TextStyle(
@@ -160,31 +180,37 @@ class AccountCard extends StatelessWidget {
             SizedBox(height: compact ? 9 : 14),
             Divider(color: Colors.white.withAlpha(40), height: 1),
             SizedBox(height: compact ? 7 : 10),
-            Row(
+            Wrap(
+              alignment: centered
+                  ? WrapAlignment.center
+                  : WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 12,
+              runSpacing: 8,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'DÉBITO',
-                        style: TextStyle(
-                          color: Colors.white.withAlpha(190),
-                          fontSize: 10,
-                          letterSpacing: 2,
-                        ),
+                Column(
+                  crossAxisAlignment: centered
+                      ? CrossAxisAlignment.center
+                      : CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'DÉBITO',
+                      style: TextStyle(
+                        color: Colors.white.withAlpha(190),
+                        fontSize: 10,
+                        letterSpacing: 2,
                       ),
-                      const SizedBox(height: 5),
-                      Text(
-                        '••••  $ending',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          letterSpacing: 2,
-                        ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      '••••  $ending',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        letterSpacing: 2,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(

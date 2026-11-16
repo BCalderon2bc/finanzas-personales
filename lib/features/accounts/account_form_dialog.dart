@@ -349,7 +349,7 @@ class _AccountFormDialogState extends State<AccountFormDialog> {
                       ),
                       DropdownMenuItem(
                         value: 'USD',
-                        child: Text('Dólares (US\$)'),
+                        child: Text('Dólares (\$)'),
                       ),
                     ],
                     onChanged: editing

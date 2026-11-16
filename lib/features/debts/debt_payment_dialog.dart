@@ -125,7 +125,7 @@ class _DebtPaymentDialogState extends State<DebtPaymentDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final symbol = widget.currency == 'USD' ? 'US\$' : 'C\$';
+    final symbol = widget.currency == 'USD' ? '\$' : 'C\$';
     return AlertDialog(
       title: const Text('Registrar abono'),
       content: SizedBox(

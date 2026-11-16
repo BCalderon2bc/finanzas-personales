@@ -70,7 +70,7 @@ class TransactionDetailsDialog extends StatelessWidget {
                     '${tx['destination_currency']}',
                   ),
                 ),
-                _detail('Tasa C\$ por US\$ 1', '${tx['exchange_rate']}'),
+                _detail('Tasa C\$ por \$ 1', '${tx['exchange_rate']}'),
               ],
               _detail('Categoría', category),
               if (tx['expense_kind'] == 'card_insurance')

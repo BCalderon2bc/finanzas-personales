@@ -1,7 +1,9 @@
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/physics.dart';
 
-/// Billetera horizontal con una tarjeta completa por página en celular.
+/// Billetera horizontal con navegación por tarjeta en celular.
 class ResponsiveWallet extends StatefulWidget {
   const ResponsiveWallet({
     super.key,
@@ -13,6 +15,8 @@ class ResponsiveWallet extends StatefulWidget {
     required this.itemBuilder,
     this.onSelected,
     this.desktopItemWidth = 320,
+    this.showNextOnMobile = false,
+    this.uniformMobileHeight = false,
     this.revealSelectionOnDesktop = false,
   });
   final List<Map<String, dynamic>> items;
@@ -23,6 +27,8 @@ class ResponsiveWallet extends StatefulWidget {
   final Widget Function(Map<String, dynamic>, bool) itemBuilder;
   final ValueChanged<String>? onSelected;
   final double desktopItemWidth;
+  final bool showNextOnMobile;
+  final bool uniformMobileHeight;
   final bool revealSelectionOnDesktop;
 
   @override
@@ -38,6 +44,7 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
   double? mobilePageWidth;
   int? lastSelectedIndex;
   bool aligning = false;
+  bool selectionScheduled = false;
   bool canScrollLeft = false;
   bool canScrollRight = false;
   bool checkingScrollEdges = false;
@@ -66,6 +73,38 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
     if (index != visibleIndex) {
       setState(() => visibleIndex = index);
     }
+    if (widget.showNextOnMobile && !aligning) {
+      selectVisibleCard(width);
+    }
+  }
+
+  void selectVisibleCard(double extent) {
+    final onSelected = widget.onSelected;
+    if (selectionScheduled ||
+        onSelected == null ||
+        '${widget.items[visibleIndex]['id']}' == widget.selectedId) {
+      return;
+    }
+    selectionScheduled = true;
+    final previousSelection = widget.selectedId;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      selectionScheduled = false;
+      if (!mounted ||
+          mobilePageWidth != extent ||
+          widget.selectedId != previousSelection ||
+          visibleIndex >= widget.items.length ||
+          ModalRoute.of(context)?.isCurrent == false) {
+        return;
+      }
+      final selected = widget.onSelected;
+      final id = '${widget.items[visibleIndex]['id']}';
+      if (selected == null || id == widget.selectedId) return;
+
+      // The scroll position already follows the gesture.
+      lastSelectedIndex = visibleIndex;
+      selected(id);
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   void alignMobilePage(double width, int index) {
@@ -133,6 +172,7 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
 
   bool selectSettledPage(ScrollEndNotification notification) {
     if (notification.depth != 0 ||
+        widget.showNextOnMobile ||
         aligning ||
         mobilePageWidth == null ||
         widget.onSelected == null ||
@@ -250,8 +290,15 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
                 .toInt();
         final desktopWidth =
             (box.maxWidth - 14 * (desktopColumns - 1)) / desktopColumns;
-        final itemWidth = mobile ? box.maxWidth : desktopWidth;
-        final itemExtent = mobile ? itemWidth : itemWidth + 14;
+        final peek =
+            mobile && widget.showNextOnMobile && widget.items.length > 1
+            ? (box.maxWidth * 0.15).clamp(0.0, 64.0).toDouble()
+            : 0.0;
+        final mobileGap = peek > 0 ? 8.0 : 0.0;
+        final itemWidth = mobile
+            ? box.maxWidth - peek - mobileGap
+            : desktopWidth;
+        final itemExtent = itemWidth + (mobile ? mobileGap : 14);
         final selectedIndex = widget.items.indexWhere(
           (item) => '${item['id']}' == widget.selectedId,
         );
@@ -259,12 +306,12 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
           desktopSelection = null;
           pendingDesktopReveal = null;
           final targetIndex = selectedIndex < 0 ? 0 : selectedIndex;
-          if (mobilePageWidth != itemWidth ||
+          if (mobilePageWidth != itemExtent ||
               lastSelectedIndex != targetIndex) {
-            mobilePageWidth = itemWidth;
+            mobilePageWidth = itemExtent;
             lastSelectedIndex = targetIndex;
             visibleIndex = targetIndex;
-            alignMobilePage(itemWidth, targetIndex);
+            alignMobilePage(itemExtent, targetIndex);
           }
         } else {
           mobilePageWidth = null;
@@ -278,8 +325,9 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
         if (showDesktopArrows) updateScrollEdges();
         final index = visibleIndex.clamp(0, widget.items.length - 1).toInt();
         final activeId = '${widget.items[index]['id']}';
+        final naturalCardHeight = mobile && !widget.uniformMobileHeight;
         final cards = Row(
-          crossAxisAlignment: mobile
+          crossAxisAlignment: naturalCardHeight
               ? CrossAxisAlignment.start
               : CrossAxisAlignment.stretch,
           children: widget.items
@@ -288,9 +336,9 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
               .map(
                 (entry) => Padding(
                   padding: EdgeInsets.only(
-                    right: mobile || entry.key == widget.items.length - 1
-                        ? 0
-                        : 14,
+                    right: entry.key == widget.items.length - 1
+                        ? peek + mobileGap
+                        : (mobile ? mobileGap : 14),
                   ),
                   child: SizedBox(
                     width: itemWidth,
@@ -312,12 +360,18 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
           controller: controller,
           primary: false,
           physics: mobile
-              ? const PageScrollPhysics(parent: ClampingScrollPhysics())
+              ? peek > 0
+                    ? _WalletPagePhysics(
+                        itemExtent,
+                        parent: const ClampingScrollPhysics(),
+                      )
+                    : const PageScrollPhysics(parent: ClampingScrollPhysics())
               : const ClampingScrollPhysics(),
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.only(bottom: 12),
-          child: mobile ? cards : IntrinsicHeight(child: cards),
+          child: naturalCardHeight ? cards : IntrinsicHeight(child: cards),
         );
+        final scrollBehavior = ScrollConfiguration.of(context);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -362,7 +416,7 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
               children: [
                 ClipRect(
                   child: _WalletViewport(
-                    activeId: mobile ? activeId : null,
+                    activeId: naturalCardHeight ? activeId : null,
                     measurements: measurements,
                     bottomPadding: 12,
                     child: NotificationListener<ScrollMetricsNotification>(
@@ -375,7 +429,17 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
                       },
                       child: NotificationListener<ScrollEndNotification>(
                         onNotification: selectSettledPage,
-                        child: strip,
+                        child: mobile && widget.showNextOnMobile
+                            ? ScrollConfiguration(
+                                behavior: scrollBehavior.copyWith(
+                                  dragDevices: {
+                                    ...scrollBehavior.dragDevices,
+                                    PointerDeviceKind.mouse,
+                                  },
+                                ),
+                                child: strip,
+                              )
+                            : strip,
                       ),
                     ),
                   ),
@@ -399,6 +463,43 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
           ],
         );
       },
+    );
+  }
+}
+
+class _WalletPagePhysics extends ScrollPhysics {
+  const _WalletPagePhysics(this.extent, {super.parent});
+
+  final double extent;
+
+  @override
+  _WalletPagePhysics applyTo(ScrollPhysics? ancestor) =>
+      _WalletPagePhysics(extent, parent: buildParent(ancestor));
+
+  @override
+  Simulation? createBallisticSimulation(
+    ScrollMetrics position,
+    double velocity,
+  ) {
+    if ((position.pixels <= position.minScrollExtent && velocity <= 0) ||
+        (position.pixels >= position.maxScrollExtent && velocity >= 0)) {
+      return super.createBallisticSimulation(position, velocity);
+    }
+    final tolerance = toleranceFor(position);
+    var page = position.pixels / extent;
+    if (velocity.abs() > tolerance.velocity) {
+      page += velocity.sign * 0.5;
+    }
+    final target = (page.round() * extent)
+        .clamp(position.minScrollExtent, position.maxScrollExtent)
+        .toDouble();
+    if ((target - position.pixels).abs() < tolerance.distance) return null;
+    return ScrollSpringSimulation(
+      spring,
+      position.pixels,
+      target,
+      velocity,
+      tolerance: tolerance,
     );
   }
 }

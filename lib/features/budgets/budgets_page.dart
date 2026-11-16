@@ -1,3 +1,4 @@
+import '../../widgets/collapsible_filters.dart';
 import '../../widgets/page_intro.dart';
 import '../../widgets/date_period_field.dart';
 import '../../data/period_logic.dart';
@@ -306,20 +307,24 @@ class _BudgetsPageState extends State<BudgetsPage> {
         maxWidth: 1150,
         child: Column(
           children: [
-            GuideAnchor(
-              id: 'month',
-              child: DatePeriodField(
-                start: periodStart,
-                end: periodEnd,
-                enabled: !loading && !saving,
-                onChanged: (range) {
-                  setState(() {
-                    month = range.start;
-                    customEnd = range.end;
-                  });
-                  loadData();
-                },
-              ),
+            CollapsibleFilters(
+              children: [
+                GuideAnchor(
+                  id: 'month',
+                  child: DatePeriodField(
+                    start: periodStart,
+                    end: periodEnd,
+                    enabled: !loading && !saving,
+                    onChanged: (range) {
+                      setState(() {
+                        month = range.start;
+                        customEnd = range.end;
+                      });
+                      loadData();
+                    },
+                  ),
+                ),
+              ],
             ),
             Expanded(
               child: loading

@@ -1,5 +1,5 @@
+import '../../widgets/collapsible_filters.dart';
 import '../../data/transaction_repository.dart';
-import '../../widgets/page_intro.dart';
 import '../person_accounts/receipt_draft_field.dart';
 import '../../widgets/adaptive_layout.dart';
 import '../help/app_help.dart';
@@ -431,12 +431,6 @@ class _DebtsPageState extends State<DebtsPage> {
                     compactLayout(context) ? 24 : 100,
                   ),
                   children: [
-                    const PageIntro(
-                      icon: Icons.handshake_outlined,
-                      title: 'Lo que debes',
-                      description:
-                          'Consulta el capital pendiente y revisa los abonos de cada deuda.',
-                    ),
                     GuideAnchor(
                       id: 'summary',
                       child: DebtsSummary(
@@ -445,62 +439,70 @@ class _DebtsPageState extends State<DebtsPage> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    GuideAnchor(
-                      id: 'search',
-                      child: TextField(
-                        controller: searchController,
-                        decoration: InputDecoration(
-                          labelText: 'Buscar descripción o acreedor',
-                          prefixIcon: const Icon(Icons.search),
-                          suffixIcon: searchController.text.isEmpty
-                              ? null
-                              : IconButton(
-                                  tooltip: 'Limpiar búsqueda',
-                                  icon: const Icon(Icons.close),
-                                  onPressed: () =>
-                                      setState(() => searchController.clear()),
-                                ),
+                    CollapsibleFilters(
+                      children: [
+                        GuideAnchor(
+                          id: 'search',
+                          child: TextField(
+                            controller: searchController,
+                            decoration: InputDecoration(
+                              labelText: 'Buscar descripción o acreedor',
+                              prefixIcon: const Icon(Icons.search),
+                              suffixIcon: searchController.text.isEmpty
+                                  ? null
+                                  : IconButton(
+                                      tooltip: 'Limpiar búsqueda',
+                                      icon: const Icon(Icons.close),
+                                      onPressed: () => setState(
+                                        () => searchController.clear(),
+                                      ),
+                                    ),
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
                         ),
-                        onChanged: (_) => setState(() {}),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
+                        const SizedBox(height: 12),
 
-                    DropdownButtonFormField<String>(
-                      initialValue: filter,
-                      decoration: const InputDecoration(
-                        labelText: 'Mostrar deudas',
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'all', child: Text('Todas')),
-                        DropdownMenuItem(
-                          value: 'active',
-                          child: Text('Activas'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'overdue',
-                          child: Text('Con capital vencido'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'today',
-                          child: Text('Con vencimiento hoy'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'paused',
-                          child: Text('Pausadas'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'paid',
-                          child: Text('Saldadas'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'cancelled',
-                          child: Text('Canceladas'),
+                        DropdownButtonFormField<String>(
+                          initialValue: filter,
+                          decoration: const InputDecoration(
+                            labelText: 'Mostrar deudas',
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'all',
+                              child: Text('Todas'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'active',
+                              child: Text('Activas'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'overdue',
+                              child: Text('Con capital vencido'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'today',
+                              child: Text('Con vencimiento hoy'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'paused',
+                              child: Text('Pausadas'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'paid',
+                              child: Text('Saldadas'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'cancelled',
+                              child: Text('Canceladas'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) setState(() => filter = value);
+                          },
                         ),
                       ],
-                      onChanged: (value) {
-                        if (value != null) setState(() => filter = value);
-                      },
                     ),
                     const SizedBox(height: 12),
                     const Padding(

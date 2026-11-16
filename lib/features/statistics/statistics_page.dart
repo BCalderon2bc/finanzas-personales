@@ -1,3 +1,4 @@
+import '../../widgets/collapsible_filters.dart';
 import 'dart:async';
 
 import '../../data/exchange_rate.dart';
@@ -113,7 +114,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
         child: ListView(
           padding: EdgeInsets.all(pageGutter(context)),
           children: [
-            filters(),
+            CollapsibleFilters(children: [filters()]),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -152,7 +153,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
                 ),
               )
             else ...[
-              Text('Tasa configurada: US\$ 1 = C\$ ${rate!.decimal}'),
+              Text('Tasa configurada: \$ 1 = C\$ ${rate!.decimal}'),
               const SizedBox(height: 12),
               if (view == _StatisticsView.debts)
                 obligationPanels(rate!)

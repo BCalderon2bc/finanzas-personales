@@ -101,7 +101,7 @@ Uint8List reportExcel(ExportReport report) {
     summary.appendRow([
       x.TextCellValue('SUMAS POR MONEDA'),
       x.TextCellValue('Córdobas C\$'),
-      x.TextCellValue('Dólares US\$'),
+      x.TextCellValue('Dólares \$'),
     ]);
     final labels = report.totals.map((t) => t.label).toSet();
     for (final label in labels) {
@@ -452,7 +452,7 @@ Future<Uint8List> reportPdf(
         ],
         if (person == null && report.showTotalsSummary)
           pw.TableHelper.fromTextArray(
-            headers: ['Concepto', 'Córdobas C\$', 'Dólares US\$'],
+            headers: ['Concepto', 'Córdobas C\$', 'Dólares \$'],
             data: [
               for (final label in report.totals.map((t) => t.label).toSet())
                 [
@@ -496,7 +496,7 @@ Future<Uint8List> reportPdf(
                             'Descripción' => 3.2,
                             'Moneda' => 1.1,
                             'Importe original' => 1.5,
-                            'Tasa C\$/US\$' => 1.4,
+                            'Tasa C\$/\$' => 1.4,
                             'Variación C\$' => 1.5,
                             'Saldo C\$' => 1.4,
                             'Quién debe después' => 3.0,

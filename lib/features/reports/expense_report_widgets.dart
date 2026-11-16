@@ -1,3 +1,4 @@
+import '../../data/exchange_rate.dart';
 import '../credit_cards/credit_card_balances.dart'
     show cardPointsRedemption, cardPointsRedemptionLabel;
 import 'package:flutter/material.dart';
@@ -261,22 +262,44 @@ class ExpenseCategoryCard extends StatelessWidget {
   }
 }
 
+int expenseReportAmount(
+  Map<String, dynamic> transaction,
+  String currency,
+  ExchangeRate? exchangeRate,
+) {
+  final amount = moneyCents(transaction['amount']);
+  return exchangeRate?.convert(
+        amount,
+        transaction['currency'] as String,
+        currency,
+      ) ??
+      amount;
+}
+
 class ExpenseDetailTile extends StatelessWidget {
   const ExpenseDetailTile({
     super.key,
     required this.transaction,
     required this.currency,
+    this.exchangeRate,
   });
   final Map<String, dynamic> transaction;
   final String currency;
+  final ExchangeRate? exchangeRate;
 
   @override
   Widget build(BuildContext context) {
     final tx = transaction;
     final card = tx['source'] == 'credit_card';
     final debt = tx['source'] == 'debt_payment';
-    final amount = moneyCents(tx['amount']);
-    final refund = amount < 0;
+    final originalCurrency = tx['currency'] as String;
+    final originalAmount = moneyCents(tx['amount']);
+    final amount = expenseReportAmount(tx, currency, exchangeRate);
+    final refund = originalAmount < 0;
+    String component(int cents) => expenseMoney(
+      exchangeRate?.convert(cents, originalCurrency, currency) ?? cents,
+      currency,
+    );
     final color = refund ? const Color(0xFF35745C) : const Color(0xFF3C70AA);
     final description = tx['description']?.toString().trim() ?? '';
     final reference = tx['reference']?.toString().trim() ?? '';
@@ -359,20 +382,29 @@ class ExpenseDetailTile extends StatelessWidget {
                     color: color,
                   ),
                 ),
+                if (originalCurrency != currency)
+                  Text(
+                    'Original · ${expenseMoney(originalAmount, originalCurrency)}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
                 if (debt) ...[
                   const SizedBox(height: 7),
                   Text(
-                    'Intereses: ${expenseMoney(moneyCents(tx['interest_amount']), currency)}',
+                    'Capital: ${component(moneyCents(tx['principal_amount']))}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  Text(
+                    'Intereses: ${component(moneyCents(tx['interest_amount']))}',
                     style: const TextStyle(fontSize: 12),
                   ),
                   if (insurance != 0)
                     Text(
-                      'Seguro: ${expenseMoney(insurance, currency)}',
+                      'Seguro: ${component(insurance)}',
                       style: const TextStyle(fontSize: 12),
                     ),
                   if (otherFees != 0)
                     Text(
-                      'Comisiones y otros cargos: ${expenseMoney(otherFees, currency)}',
+                      'Comisiones y otros cargos: ${component(otherFees)}',
                       style: const TextStyle(fontSize: 12),
                     ),
                 ],

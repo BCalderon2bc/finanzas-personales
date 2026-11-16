@@ -242,6 +242,43 @@ class DashboardQuickActions extends StatelessWidget {
   }
 }
 
+/// Muestra las cinco categorías principales y permite desplegar las demás
+/// sin abandonar el dashboard, igual que la sección Próximos pagos.
+class _ExpandableCategoryRows extends StatefulWidget {
+  const _ExpandableCategoryRows({required this.rows});
+
+  final List<Widget> rows;
+
+  @override
+  State<_ExpandableCategoryRows> createState() => _ExpandableCategoryRowsState();
+}
+
+class _ExpandableCategoryRowsState extends State<_ExpandableCategoryRows> {
+  bool expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final count = widget.rows.length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ...widget.rows.take(expanded ? count : 5),
+        if (count > 5)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => setState(() => expanded = !expanded),
+              icon: Icon(expanded
+                  ? Icons.keyboard_arrow_up_rounded
+                  : Icons.keyboard_arrow_down_rounded),
+              label: Text(expanded ? 'Mostrar menos' : 'Ver todas ($count)'),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class DashboardPanels extends StatelessWidget {
   const DashboardPanels({
     super.key,
@@ -324,7 +361,8 @@ class DashboardPanels extends StatelessWidget {
                 style: TextStyle(color: _muted),
               ),
             ),
-          ...entries.take(5).map((entry) {
+          _ExpandableCategoryRows(
+            rows: entries.map((entry) {
             final style = data.categoryStyles[entry.key];
             final uncategorized = entry.key == 'none';
             final color = uncategorized
@@ -404,19 +442,12 @@ class DashboardPanels extends StatelessWidget {
                 ],
               ),
             );
-          }),
+            }).toList(),
+          ),
           if (entries.isNotEmpty)
             const Text(
               'Porcentajes entre categorías con gasto neto positivo.',
               style: TextStyle(color: _muted, fontSize: 11),
-            ),
-          if (entries.length > 5)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                '${entries.length - 5} categorías más en el reporte.',
-                style: const TextStyle(color: _muted, fontSize: 11),
-              ),
             ),
           if (entries.any((entry) => entry.value < 0))
             const Padding(
@@ -685,9 +716,23 @@ class DashboardPanels extends StatelessWidget {
   );
 
   Widget accountsPanel() {
-    final accounts = data.accounts
-        .where((a) => a['currency'] == currency)
-        .take(5);
+    // Mostrar cuentas de ambas monedas con su saldo original.
+    // Orden: saldo positivo primero, luego de mayor a menor; en empates USD antes de NIO.
+    final accounts = [...data.accounts]
+      ..sort((a, b) {
+        final aBalance = (a['original_balance_cents'] ?? a['balance_cents']) as int;
+        final bBalance = (b['original_balance_cents'] ?? b['balance_cents']) as int;
+        final aPositive = aBalance > 0;
+        final bPositive = bBalance > 0;
+        if (aPositive != bPositive) return aPositive ? -1 : 1;
+        final byBalance = bBalance.compareTo(aBalance);
+        if (byBalance != 0) return byBalance;
+        final aCurrency = (a['original_currency'] ?? a['currency']).toString();
+        final bCurrency = (b['original_currency'] ?? b['currency']).toString();
+        if (aCurrency != bCurrency) return aCurrency == 'USD' ? -1 : 1;
+        return a['name'].toString().compareTo(b['name'].toString());
+      });
+    final visibleAccounts = accounts.take(5).toList();
     const types = {
       'cash': 'Efectivo',
       'savings': 'Ahorro',
@@ -704,12 +749,12 @@ class DashboardPanels extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (accounts.isEmpty)
+          if (visibleAccounts.isEmpty)
             const Text(
-              'No hay cuentas activas en esta moneda.',
+              'No hay cuentas activas.',
               style: TextStyle(color: _muted),
             ),
-          ...accounts.map(
+          ...visibleAccounts.map(
             (a) => Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Row(
@@ -749,7 +794,10 @@ class DashboardPanels extends StatelessWidget {
                   const SizedBox(width: 8),
                   Flexible(
                     child: Text(
-                      money(a['balance_cents'] as int),
+                      dashboardMoney(
+                        (a['original_balance_cents'] ?? a['balance_cents']) as int,
+                        (a['original_currency'] ?? a['currency']).toString(),
+                      ),
                       textAlign: TextAlign.right,
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
@@ -764,16 +812,20 @@ class DashboardPanels extends StatelessWidget {
   }
 
   Widget recentPanel() {
-    final events = data.events
-        .where((e) => e.currency == currency)
-        .take(6)
-        .toList();
+    // Los movimientos recientes son independientes del filtro de moneda.
+    // Mostrar ambas monedas, ordenadas del mas reciente al mas antiguo.
+    final events = [...data.events]
+      ..sort((a, b) {
+        final byDate = b.date.compareTo(a.date);
+        return byDate != 0 ? byDate : a.id.compareTo(b.id);
+      });
+    final recentEvents = events.take(10).toList();
     return _Panel(
       title: 'Actividad reciente del período',
       icon: Icons.history_rounded,
       action: 'Ver movimientos',
       onAction: () => onOpen(DashboardTarget.transactions),
-      child: events.isEmpty
+      child: recentEvents.isEmpty
           ? const Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
               child: Column(
@@ -781,7 +833,7 @@ class DashboardPanels extends StatelessWidget {
                   Icon(Icons.receipt_long_outlined, size: 36, color: _muted),
                   SizedBox(height: 10),
                   Text(
-                    'Sin actividad para este rango y moneda.',
+                    'Sin actividad para este período.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: _muted),
                   ),
@@ -789,8 +841,8 @@ class DashboardPanels extends StatelessWidget {
               ),
             )
           : Column(
-              children: List.generate(events.length, (index) {
-                final e = events[index];
+              children: List.generate(recentEvents.length, (index) {
+                final e = recentEvents[index];
                 final color = e.flow > 0
                     ? _green
                     : e.flow < 0
@@ -817,7 +869,7 @@ class DashboardPanels extends StatelessWidget {
                       ? '+'
                       : e.flow < 0
                       ? '−'
-                      : ''}${money(e.cents)}',
+                      : ''}${dashboardMoney(e.cents, e.currency)}',
                   style: TextStyle(color: color, fontWeight: FontWeight.w700),
                 );
 
@@ -916,7 +968,7 @@ class DashboardPanels extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if (index < events.length - 1)
+                    if (index < recentEvents.length - 1)
                       const Divider(height: 1, color: _border),
                   ],
                 );

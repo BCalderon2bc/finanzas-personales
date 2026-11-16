@@ -6,13 +6,15 @@ class CreditCardPaymentDialog extends StatefulWidget {
   const CreditCardPaymentDialog({
     super.key,
     required this.accounts,
-    required this.currency,
+    this.currency,
+    this.statementsByCurrency = const {},
     this.statements = const [],
     this.initialStatementId,
     this.initialAmountCents,
   });
   final List<Map<String, dynamic>> accounts;
-  final String currency;
+  final String? currency;
+  final Map<String, List<Map<String, dynamic>>> statementsByCurrency;
   final List<Map<String, dynamic>> statements;
   final String? initialStatementId;
   final int? initialAmountCents;
@@ -27,17 +29,40 @@ class _CreditCardPaymentDialogState extends State<CreditCardPaymentDialog> {
   final amount = TextEditingController(), reference = TextEditingController();
   String? accountId, statementId;
 
+  String? get currency =>
+      widget.currency ??
+      widget.accounts
+          .firstWhere(
+            (account) => account['id'].toString() == accountId,
+            orElse: () => const {},
+          )['currency']
+          ?.toString();
+
+  List<Map<String, dynamic>> get statements => widget.currency != null
+      ? widget.statements
+      : widget.statementsByCurrency[currency] ?? const [];
+
+  String? defaultStatement() =>
+      statements.length == 1 ? statements.first['id'].toString() : null;
+
+  void selectAccount(String? id) {
+    setState(() {
+      final previousCurrency = currency;
+      accountId = id;
+      if (currency != previousCurrency) {
+        amount.clear();
+        statementId = defaultStatement();
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
     if (widget.initialAmountCents != null) {
       amount.text = (widget.initialAmountCents! / 100).toStringAsFixed(2);
     }
-    statementId =
-        widget.initialStatementId ??
-        (widget.statements.length == 1
-            ? '${widget.statements.first['id']}'
-            : null);
+    statementId = widget.initialStatementId ?? defaultStatement();
   }
 
   @override
@@ -81,24 +106,25 @@ class _CreditCardPaymentDialogState extends State<CreditCardPaymentDialog> {
                       (a) => DropdownMenuItem(
                         value: a['id'].toString(),
                         child: Text(
-                          a['name'].toString(),
+                          "${a['currency'] == 'USD' ? '\$' : 'C\$'} · ${a['name']}",
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     )
                     .toList(),
-                onChanged: (value) => setState(() => accountId = value),
+                onChanged: selectAccount,
                 validator: (value) =>
                     value == null ? 'Selecciona una cuenta' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: amount,
+                enabled: currency != null,
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
                 decoration: InputDecoration(
-                  labelText: 'Monto (${widget.currency})',
+                  labelText: currency == null ? 'Monto' : 'Monto ($currency)',
                 ),
                 validator: (value) {
                   final text = (value ?? '').trim();
@@ -111,8 +137,9 @@ class _CreditCardPaymentDialogState extends State<CreditCardPaymentDialog> {
                 },
               ),
               const SizedBox(height: 12),
-              if (widget.statements.isNotEmpty) ...[
+              if (statements.isNotEmpty) ...[
                 DropdownButtonFormField<String>(
+                  key: ValueKey(currency),
                   initialValue: statementId ?? 'none',
                   isExpanded: true,
                   decoration: const InputDecoration(
@@ -123,7 +150,7 @@ class _CreditCardPaymentDialogState extends State<CreditCardPaymentDialog> {
                       value: 'none',
                       child: Text('Sin asignar a un corte'),
                     ),
-                    ...widget.statements.map(
+                    ...statements.map(
                       (s) => DropdownMenuItem(
                         value: '${s['id']}',
                         child: Text(

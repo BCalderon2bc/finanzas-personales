@@ -9,10 +9,12 @@ class DatePeriodField extends StatelessWidget {
     required this.end,
     required this.onChanged,
     this.enabled = true,
+    this.minColumnWidth = 164,
   });
   final DateTime start, end;
   final ValueChanged<DateTimeRange> onChanged;
   final bool enabled;
+  final double minColumnWidth;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -45,7 +47,7 @@ class DatePeriodField extends StatelessWidget {
               ),
             );
         return AdaptiveColumns(
-          minColumnWidth: 164,
+          minColumnWidth: minColumnWidth,
           children: [
             button('Fecha inicial', start, true),
             button('Fecha final', end, false),

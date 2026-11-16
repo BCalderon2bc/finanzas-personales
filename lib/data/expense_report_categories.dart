@@ -1,5 +1,5 @@
 const expenseReportCategoryLabels = {
-  'debt_costs': 'Costos de deuda',
+  'debt_costs': 'Abonos de deuda',
   'card_purchases': 'Compras de tarjeta',
   'card_interest': 'Intereses de tarjeta',
   'card_fees': 'Comisiones y cargos de tarjeta',

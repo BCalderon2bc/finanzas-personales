@@ -3,6 +3,7 @@ import '../../core/supabase_client.dart';
 import '../../data/credit_card_additional_repository.dart';
 import '../../data/payment_agenda_labels.dart';
 import '../../utils/money.dart';
+import '../../widgets/adaptive_layout.dart';
 import '../../widgets/bank_brand.dart';
 import 'credit_card_face.dart';
 import 'credit_card_balances.dart';
@@ -12,6 +13,7 @@ class CreditCardDetails extends StatefulWidget {
     super.key,
     required this.card,
     required this.balances,
+    required this.usedLimit,
     this.onEdit,
     this.onToggle,
     this.onHistory,
@@ -22,6 +24,7 @@ class CreditCardDetails extends StatefulWidget {
   });
   final Map<String, dynamic> card;
   final Map<String, int?> balances;
+  final int? usedLimit;
   final VoidCallback? onEdit,
       onToggle,
       onHistory,
@@ -74,8 +77,8 @@ class _CreditCardDetailsState extends State<CreditCardDetails> {
     final active = card['is_active'] == true;
     final base = card['currency'].toString();
     final limit = moneyCents(card['credit_limit']);
-    final used = cardLimitUsed(card, balances['NIO'], balances['USD']);
-    final available = cardAvailable(card, balances['NIO'], balances['USD']);
+    final used = widget.usedLimit;
+    final available = cardAvailable(card, used);
     final rate = card['limit_exchange_rate'];
     final exceeded = used != null && used > limit;
     final color = exceeded ? Theme.of(context).colorScheme.error : blue;
@@ -123,6 +126,17 @@ class _CreditCardDetailsState extends State<CreditCardDetails> {
       );
     }
 
+    final compact = compactLayout(context);
+    final bankStatus = Wrap(
+      spacing: 12,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        BankLogo(name: cardBankName(card), width: 110, height: 30),
+        Chip(label: Text(active ? 'Activa' : 'Inactiva')),
+      ],
+    );
+
     return Card(
       margin: EdgeInsets.zero,
       child: Padding(
@@ -133,27 +147,29 @@ class _CreditCardDetailsState extends State<CreditCardDetails> {
             Row(
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'TARJETA TITULAR',
-                        style: TextStyle(
-                          color: muted,
-                          fontSize: 10,
-                          letterSpacing: 1.2,
+                  child: compact
+                      ? bankStatus
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'TARJETA TITULAR',
+                              style: TextStyle(
+                                color: muted,
+                                fontSize: 10,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              agendaCardLabel(card),
+                              style: const TextStyle(
+                                fontSize: 21,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        agendaCardLabel(card),
-                        style: const TextStyle(
-                          fontSize: 21,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
                 PopupMenuButton<String>(
                   enabled: widget.onEdit != null || widget.onToggle != null,
@@ -179,16 +195,7 @@ class _CreditCardDetailsState extends State<CreditCardDetails> {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 12,
-              runSpacing: 10,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                BankLogo(name: cardBankName(card), width: 110, height: 30),
-                Chip(label: Text(active ? 'Activa' : 'Inactiva')),
-              ],
-            ),
+            if (!compact) ...[const SizedBox(height: 16), bankStatus],
             const SizedBox(height: 12),
             LayoutBuilder(
               builder: (context, box) =>
@@ -277,7 +284,7 @@ class _CreditCardDetailsState extends State<CreditCardDetails> {
                       Text(
                         rate == null
                             ? 'Edita la tarjeta para indicar la tasa de tu banco si necesitas estimar el disponible entre ambas monedas.'
-                            : 'Tasa registrada: C\$ $rate por US\$ 1. El banco puede aplicar otra tasa al procesar los movimientos.',
+                            : 'Tasa registrada: C\$ $rate por \$ 1. El banco puede aplicar otra tasa al procesar los movimientos.',
                         style: const TextStyle(color: muted, fontSize: 12),
                       ),
                       const SizedBox(height: 8),

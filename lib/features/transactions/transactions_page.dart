@@ -1,3 +1,4 @@
+import '../../utils/card_cash_advance.dart';
 import '../../widgets/mobile_navigation.dart';
 import '../person_accounts/receipt_history.dart';
 import '../person_accounts/receipt_draft_field.dart';
@@ -18,7 +19,6 @@ import 'transaction_filter.dart';
 import 'transaction_filters_bar.dart';
 import 'transaction_details_dialog.dart';
 import 'transaction_tile.dart';
-import 'transaction_balances.dart';
 
 class TransactionsPage extends StatefulWidget {
   const TransactionsPage({super.key});
@@ -81,7 +81,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
       }
       final accountRows = await supabase
           .from('accounts')
-          .select('id, name, currency, opening_balance, is_active')
+          .select('id, name, currency, is_active')
           .eq('user_id', user.id)
           .order('name');
       final categoryRows = await supabase
@@ -92,12 +92,6 @@ class _TransactionsPageState extends State<TransactionsPage> {
       final transactionRows = await loadUserTransactions(user.id);
       final paymentRows = await loadUserCardPayments(user.id);
       final debtPaymentRows = await loadUserDebtPayments(user.id);
-      calculateBalances(
-        List<Map<String, dynamic>>.from(accountRows),
-        transactionRows,
-        cardPayments: paymentRows,
-        debtPayments: debtPaymentRows,
-      );
       if (!mounted || request != requestId) {
         return;
       }
@@ -240,8 +234,10 @@ class _TransactionsPageState extends State<TransactionsPage> {
       } else {
         final changes = <String, dynamic>{
           for (final key in [
+            'account_id',
+            'destination_account_id',
             'amount',
-            if (!fx) 'category_id',
+            if (!fx) ...['transaction_type', 'currency', 'category_id'],
             'description',
             if (!fx) 'expense_kind',
             'reference',
@@ -394,30 +390,12 @@ class _TransactionsPageState extends State<TransactionsPage> {
     return rows;
   }
 
-  Widget _buildBalanceCards() {
-    final balances = calculateBalances(
-      accounts,
-      transactions,
-      cardPayments: cardPayments,
-      debtPayments: debtPayments,
-    );
-    int nioCents = 0, usdCents = 0;
-    for (final account in accounts.where((a) => a['is_active'] == true)) {
-      final balance = balances[account['id'].toString()] ?? 0;
-      if (account['currency'] == 'USD') {
-        usdCents += balance;
-      } else {
-        nioCents += balance;
-      }
-    }
-    return TransactionBalances(nioCents: nioCents, usdCents: usdCents);
-  }
-
   Widget _transactionCard(Map<String, dynamic> tx) {
     final external = [
       'credit_card_payment',
       'debt_payment',
       'receivable_loan',
+      cashAdvanceDepositSource,
     ].contains(tx['source']);
     return TransactionTile(
       transaction: tx,
@@ -591,11 +569,6 @@ class _TransactionsPageState extends State<TransactionsPage> {
                         compact ? 24 : 100,
                       ),
                       children: [
-                        GuideAnchor(
-                          id: 'balances',
-                          child: _buildBalanceCards(),
-                        ),
-                        const SizedBox(height: 16),
                         GuideAnchor(
                           id: 'filters',
                           child: TransactionFiltersBar(

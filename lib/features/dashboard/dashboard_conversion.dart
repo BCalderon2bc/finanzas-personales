@@ -50,6 +50,9 @@ DashboardOverview convertDashboard(
     final currency = account['currency'].toString();
     result.accounts.add({
       ...account,
+      // Conservar valores originales para mostrar las cuentas sin conversión.
+      'original_currency': currency,
+      'original_balance_cents': account['balance_cents'],
       'currency': target,
       'balance_cents': rate.convert(
         account['balance_cents'] as int,
@@ -76,25 +79,9 @@ DashboardOverview convertDashboard(
       ),
     });
   }
-  for (final event in source.events) {
-    final original = event.currency == target
-        ? ''
-        : ' · Original: ${dashboardMoney(event.cents, event.currency)}';
-    result.events.add(
-      DashboardEvent(
-        event.id,
-        event.date,
-        event.title,
-        '${event.detail}$original',
-        target,
-        rate.convert(event.cents, event.currency, target),
-        event.flow,
-        event.target,
-        event.entityId,
-        event.categoryId,
-      ),
-    );
-  }
+  // La actividad reciente muestra siempre el monto y la moneda originales.
+  // No convertir los eventos al filtro global ni agregar "Original:" al detalle.
+  result.events.addAll(source.events);
   result.accounts.sort(
     (a, b) => (b['balance_cents'] as int).compareTo(a['balance_cents'] as int),
   );

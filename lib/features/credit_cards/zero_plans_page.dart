@@ -1,3 +1,4 @@
+import '../../widgets/collapsible_filters.dart';
 import '../person_accounts/receipt_draft_field.dart';
 import '../help/app_help.dart';
 import 'package:flutter/material.dart';
@@ -962,7 +963,7 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
                               ),
                             ),
                           Text(
-                            'Disponible estimado: ${cardMoney(cardAvailable(card!, cardBalance(card!, data!.transactions, 'NIO'), cardBalance(card!, data!.transactions, 'USD')), '${card!['currency']}')}',
+                            'Disponible estimado: ${cardMoney(cardAvailable(card!, cardUsed(card!, data!.transactions)), '${card!['currency']}')}',
                           ),
                           const Padding(
                             padding: EdgeInsets.symmetric(vertical: 10),
@@ -970,14 +971,19 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
                               'Si una cuota está incluida en el corte del banco, registra ese corte con su monto real y vincula la cuota. Este módulo no calcula ni modifica automáticamente tu saldo al corte ni el pago mínimo.',
                             ),
                           ),
-                          GuideAnchor(
-                            id: 'voided',
-                            child: SwitchListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: const Text('Mostrar planes anulados'),
-                              value: showVoided,
-                              onChanged: (v) => setState(() => showVoided = v),
-                            ),
+                          CollapsibleFilters(
+                            children: [
+                              GuideAnchor(
+                                id: 'voided',
+                                child: SwitchListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: const Text('Mostrar planes anulados'),
+                                  value: showVoided,
+                                  onChanged: (v) =>
+                                      setState(() => showVoided = v),
+                                ),
+                              ),
+                            ],
                           ),
                           if (plans.isEmpty)
                             const Padding(

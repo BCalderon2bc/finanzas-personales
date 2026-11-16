@@ -111,7 +111,7 @@ class _BudgetFormDialogState extends State<BudgetFormDialog> {
                 decoration: const InputDecoration(labelText: 'Moneda'),
                 items: const [
                   DropdownMenuItem(value: 'NIO', child: Text('Córdobas (C\$)')),
-                  DropdownMenuItem(value: 'USD', child: Text('Dólares (US\$)')),
+                  DropdownMenuItem(value: 'USD', child: Text('Dólares (\$)')),
                 ],
                 onChanged: editing
                     ? null

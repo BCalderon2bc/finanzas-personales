@@ -70,11 +70,6 @@ const guideCatalog = <String, List<GuideStep>>{
       'Aquí aparecen ingresos, gastos, transferencias y pagos de otros módulos, con los últimos ingresados primero.',
     ),
     GuideStep(
-      'balances',
-      'Saldos separados',
-      'Córdobas y dólares se mantienen separados. Estos saldos incluyen las operaciones registradas desde tus cuentas.',
-    ),
-    GuideStep(
       'filters',
       'Encuentra un registro',
       'Filtra por cuenta, tipo, fechas o texto. La fecha de un movimiento puede ser anterior al día en que lo ingresaste.',
@@ -114,7 +109,7 @@ const guideCatalog = <String, List<GuideStep>>{
     GuideStep(
       'rate',
       'Revisa la conversión',
-      'Escribe córdobas por US\$1. Por ejemplo, US\$10 a tasa 36.50 recibe C\$365.00. Comprueba el monto recibido antes de guardar.',
+      'Escribe córdobas por \$1. Por ejemplo, \$10 a tasa 36.50 recibe C\$365.00. Comprueba el monto recibido antes de guardar.',
     ),
     GuideStep(
       'date',
@@ -352,7 +347,7 @@ const guideCatalog = <String, List<GuideStep>>{
     GuideStep(
       'rate',
       'Córdobas por un dólar',
-      'Escribe una tasa positiva. Por ejemplo, 36.50 significa C\$36.50 por US\$1.',
+      'Escribe una tasa positiva. Por ejemplo, 36.50 significa C\$36.50 por \$1.',
     ),
     GuideStep(
       'save',

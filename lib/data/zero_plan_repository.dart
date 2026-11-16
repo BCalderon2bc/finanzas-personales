@@ -23,7 +23,8 @@ Future<ZeroPlanData> loadZeroPlans(String uid) async {
     statementRows('card_zero_allocations', '*', uid),
     statementRows(
       'credit_card_transactions',
-      'id,credit_card_id,account_id,transaction_type,amount,currency,transaction_date,description,is_voided',
+      'id,credit_card_id,account_id,transaction_type,amount,currency,transaction_date,description,is_voided,'
+          'charge_kind,cash_advance_fee,excludes_from_limit',
       uid,
     ),
   ]);

@@ -1,4 +1,4 @@
-import '../../widgets/page_intro.dart';
+import '../../widgets/collapsible_filters.dart';
 import '../../widgets/adaptive_layout.dart';
 import '../help/app_help.dart';
 import 'package:flutter/material.dart';
@@ -98,7 +98,6 @@ class _PersonAccountsPageState extends State<PersonAccountsPage> {
         params: {'p_share': share['id'], 'p_accept': accept},
       );
       if (!mounted) return;
-      if (accept) setState(() => sharedOnly = true);
       await load();
     } catch (e) {
       message('No se pudo responder a la invitación: $e');
@@ -152,7 +151,7 @@ class _PersonAccountsPageState extends State<PersonAccountsPage> {
         .where(
           (a) =>
               (archived || a['is_active'] == true) &&
-              owns(a) != sharedOnly &&
+              (!sharedOnly || !owns(a)) &&
               accountName(
                 a,
               ).toLowerCase().contains(search.text.trim().toLowerCase()),
@@ -162,7 +161,7 @@ class _PersonAccountsPageState extends State<PersonAccountsPage> {
     String? invalid;
     try {
       for (final a in accounts.where(
-        (a) => a['is_active'] == true && owns(a) != sharedOnly,
+        (a) => a['is_active'] == true && (!sharedOnly || !owns(a)),
       )) {
         final b = balance(a);
         if (b > 0)
@@ -241,12 +240,6 @@ class _PersonAccountsPageState extends State<PersonAccountsPage> {
                           compact ? 24 : 110,
                         ),
                         children: [
-                          const PageIntro(
-                            icon: Icons.people_alt_outlined,
-                            title: 'Saldos entre personas',
-                            description:
-                                'Consulta cuánto debes y cuánto te deben. Los saldos se muestran en córdobas.',
-                          ),
                           for (final invite in shares.where(
                             (s) =>
                                 s['member_id'] == null &&
@@ -286,13 +279,6 @@ class _PersonAccountsPageState extends State<PersonAccountsPage> {
                                 ),
                               ),
                             ),
-                          SwitchListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('Compartidas conmigo'),
-                            value: sharedOnly,
-                            onChanged: (value) =>
-                                setState(() => sharedOnly = value),
-                          ),
                           const SizedBox(height: 16),
                           AdaptiveColumns(
                             minColumnWidth: 135,
@@ -322,22 +308,33 @@ class _PersonAccountsPageState extends State<PersonAccountsPage> {
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
                           const SizedBox(height: 10),
-                          GuideAnchor(
-                            id: 'filter',
-                            child: TextField(
-                              controller: search,
-                              onChanged: (_) => setState(() {}),
-                              decoration: const InputDecoration(
-                                labelText: 'Buscar persona',
-                                prefixIcon: Icon(Icons.search),
+                          CollapsibleFilters(
+                            children: [
+                              SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: const Text('Solo compartidas conmigo'),
+                                value: sharedOnly,
+                                onChanged: (value) =>
+                                    setState(() => sharedOnly = value),
                               ),
-                            ),
-                          ),
-                          SwitchListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('Mostrar archivadas'),
-                            value: archived,
-                            onChanged: (v) => setState(() => archived = v),
+                              GuideAnchor(
+                                id: 'filter',
+                                child: TextField(
+                                  controller: search,
+                                  onChanged: (_) => setState(() {}),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Buscar persona',
+                                    prefixIcon: Icon(Icons.search),
+                                  ),
+                                ),
+                              ),
+                              SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: const Text('Mostrar archivadas'),
+                                value: archived,
+                                onChanged: (v) => setState(() => archived = v),
+                              ),
+                            ],
                           ),
                           if (visible.isEmpty)
                             Padding(

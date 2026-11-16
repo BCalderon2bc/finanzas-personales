@@ -26,24 +26,22 @@ List<Map<String, dynamic>> debtPaymentExpenses(
 ) {
   final expenses = <Map<String, dynamic>>[];
   for (final payment in payments) {
-    final interest = moneyCents(payment['interest_amount']);
-    final fees = moneyCents(payment['fee_amount']);
-    if (interest + fees <= 0) continue;
+    final total = debtPaymentTotalCents(payment);
+    if (total <= 0) continue;
     final debt = payment['debts'];
     final name = debt is Map ? debt['description']?.toString() ?? '' : '';
     expenses.add({
       'id': payment['id'],
       'transaction_type': 'expense',
-      'amount': (interest + fees) / 100,
+      'amount': total / 100,
       'currency': payment['currency'],
       'transaction_date': payment['payment_date'],
       'created_at': payment['created_at'],
       'category_id': null,
-      'description': name.isEmpty
-          ? 'Costos de deuda'
-          : 'Costos de deuda: $name',
+      'description': name.isEmpty ? 'Abono de deuda' : 'Abono de deuda: $name',
       'reference': payment['reference'],
       'source': 'debt_payment',
+      'principal_amount': payment['principal_amount'],
       'interest_amount': payment['interest_amount'],
       'fee_amount': payment['fee_amount'],
       'insurance_amount': payment['insurance_amount'] ?? 0,

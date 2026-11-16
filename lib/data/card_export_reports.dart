@@ -1,4 +1,3 @@
-import '../utils/card_cash_advance.dart';
 import '../utils/money.dart';
 import '../features/credit_cards/credit_card_balances.dart';
 import 'export_report_models.dart';
@@ -26,7 +25,6 @@ ExportReport creditCardsExport({
   final details = <List<Object?>>[];
   const labels = {
     'purchase': 'Compra',
-    cardCashAdvance: cardCashAdvanceLabel,
     'payment': 'Pago',
     'refund': 'Reembolso',
     'insurance': 'Seguro de tarjeta',
@@ -71,9 +69,7 @@ ExportReport creditCardsExport({
         reportDate(date),
         reportCreditMovementCardLabel(card, row),
         labels[cardMovementType(type, row['charge_kind'])],
-        isCardCashAdvance(row)
-            ? '${row['description'] ?? ''} · ${cardCashAdvanceBreakdown(row)}'
-            : '${row['description'] ?? ''}',
+        '${row['description'] ?? ''}',
         c == 'NIO' ? MoneyCell(amount) : null,
         c == 'USD' ? MoneyCell(amount) : null,
         '${row['reference'] ?? ''}',
@@ -94,7 +90,7 @@ ExportReport creditCardsExport({
           'Movimiento',
           'Descripción',
           'Importe C\$',
-          'Importe US\$',
+          'Importe \$',
           'Referencia',
         ],
         details,
@@ -266,7 +262,7 @@ ExportReport debitCardsExport({
         if (!allAccounts) 'Tarjetas vinculadas',
         'Moneda',
         'Saldo C\$',
-        'Saldo US\$',
+        'Saldo \$',
       ], summary),
       ReportTable('Movimientos de cuentas', [
         'Fecha',
@@ -274,9 +270,9 @@ ExportReport debitCardsExport({
         'Movimiento',
         'Descripción',
         'Variación C\$',
-        'Variación US\$',
+        'Variación \$',
         'Saldo C\$',
-        'Saldo US\$',
+        'Saldo \$',
         'Referencia',
       ], detail),
     ],
@@ -364,9 +360,7 @@ ExportReport creditCardExpensesExport({
     final c = '${tx['currency']}';
     if (!charges.containsKey(c)) throw StateError('Moneda no admitida.');
     final refund = tx['transaction_type'] == 'refund';
-    final advance = isCardCashAdvance(tx);
-    final amount = advance ? cardCashAdvanceFee(tx) : moneyCents(tx['amount']);
-    if (advance && amount == 0) continue;
+    final amount = moneyCents(tx['amount']);
     if (refund) {
       refunds[c] = refunds[c]! + amount;
     } else {
@@ -376,7 +370,6 @@ ExportReport creditCardExpensesExport({
       tx['transaction_type'],
       tx['charge_kind'],
     )) {
-      cardCashAdvance => cardCashAdvanceFeeLabel,
       'purchase' => 'Compra',
       'interest' => 'Intereses',
       'fee' => 'Comisión',
@@ -412,7 +405,7 @@ ExportReport creditCardExpensesExport({
         'Tipo',
         'Descripción',
         'Importe C\$',
-        'Importe US\$',
+        'Importe \$',
         'Referencia',
       ], rows),
     ],
@@ -425,7 +418,7 @@ ExportReport creditCardExpensesExport({
         ],
     ],
     notes: const [
-      'Pagos de tarjeta y préstamos desde tarjeta se excluyen del gasto. Los retiros incluyen solo su comisión en el gasto. Cada compra se cuenta una vez. Los reembolsos restan. Las monedas se presentan separadas.',
+      'Pagos de tarjeta y préstamos desde tarjeta se excluyen del gasto. Cada compra se cuenta una vez. Los reembolsos restan. Las monedas se presentan separadas.',
     ],
   );
 }

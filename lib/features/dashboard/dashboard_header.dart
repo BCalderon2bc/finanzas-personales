@@ -24,6 +24,7 @@ class DashboardHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     Widget dateButton(String title, DateTime date, VoidCallback onTap) =>
         OutlinedButton(
           onPressed: loading ? null : onTap,
@@ -51,7 +52,17 @@ class DashboardHeader extends StatelessWidget {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         SegmentedButton<String>(
-          showSelectedIcon: false,
+          style: ButtonStyle(
+            backgroundColor: WidgetStateProperty.resolveWith<Color?>(
+              (states) =>
+                  states.contains(WidgetState.selected) ? colors.primary : null,
+            ),
+            foregroundColor: WidgetStateProperty.resolveWith<Color?>(
+              (states) => states.contains(WidgetState.selected)
+                  ? colors.onPrimary
+                  : null,
+            ),
+          ),
           segments: const [
             ButtonSegment(value: 'NIO', label: Text('Córdobas')),
             ButtonSegment(value: 'USD', label: Text('Dólares')),

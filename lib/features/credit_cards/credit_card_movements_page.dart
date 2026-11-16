@@ -1,3 +1,5 @@
+import '../../widgets/collapsible_filters.dart';
+import '../../utils/card_cash_advance.dart';
 import '../../data/credit_card_additional_repository.dart';
 import '../../data/payment_agenda_labels.dart' show additionalCardLabel;
 import '../../data/period_logic.dart' show includesDay;
@@ -253,12 +255,13 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
     if (loading ||
         saving ||
         tx['is_receivable_funding'] == true ||
-        ![
-          'purchase',
-          'interest',
-          'fee',
-          'refund',
-        ].contains(tx['transaction_type'])) {
+        (!isCardCashAdvance(tx) &&
+            ![
+              'purchase',
+              'interest',
+              'fee',
+              'refund',
+            ].contains(tx['transaction_type']))) {
       return;
     }
     setState(() => saving = true);
@@ -289,6 +292,37 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
             ..sort(
               (a, b) => a['name'].toString().compareTo(b['name'].toString()),
             );
+      final advance = isCardCashAdvance(tx);
+      final cashAccounts = <Map<String, dynamic>>[];
+      if (advance) {
+        for (var offset = 0; ; offset += 500) {
+          final page = await supabase
+              .from('accounts')
+              .select('id,name,currency,is_active')
+              .eq('user_id', user.id)
+              .eq('account_type', 'cash')
+              .order('id')
+              .range(offset, offset + 499);
+          cashAccounts.addAll(page);
+          if (page.length < 500) break;
+        }
+        final accountId = tx['cash_advance_account_id'];
+        if (accountId != null &&
+            !cashAccounts.any((a) => a['id'] == accountId)) {
+          final account = await supabase
+              .from('accounts')
+              .select('id,name,currency')
+              .eq('user_id', user.id)
+              .eq('id', accountId)
+              .maybeSingle();
+          if (account == null) {
+            throw StateError(
+              'La cuenta vinculada al retiro no está disponible.',
+            );
+          }
+          cashAccounts.add(account);
+        }
+      }
       if (!mounted) return;
       final data = await showDialog<Map<String, dynamic>>(
         context: context,
@@ -296,12 +330,15 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
           currency: tx['currency'].toString(),
           categories: available,
           movement: tx,
+          cashAccounts: cashAccounts,
           additionalCards: additionalCards.values.toList(),
         ),
       );
       if (data == null || !mounted) return;
       final changes = <String, dynamic>{
         for (final key in [
+          'excludes_from_limit',
+          if (advance) ...['cash_advance_fee', 'cash_advance_account_id'],
           'transaction_type',
           'charge_kind',
           'additional_card_id',
@@ -410,6 +447,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
               'id, additional_card_id, transaction_type, charge_kind, amount, currency, transaction_date, created_at, '
               'description, reference, account_id, account_debit_amount, account_debit_currency, payment_exchange_rate, '
               'category_id, is_voided, is_receivable_funding, void_reason, voided_at, '
+              'cash_advance_fee, cash_advance_account_id, excludes_from_limit, '
               'accounts!credit_card_transactions_account_id_user_id_fkey(name), categories(name)',
             )
             .eq('credit_card_id', widget.cardId)
@@ -493,7 +531,10 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
 
   Widget movementCard(Map<String, dynamic> tx) {
     final type = tx['transaction_type'].toString();
-    final displayType = cardMovementType(type, tx['charge_kind']);
+    final advance = isCardCashAdvance(tx);
+    final displayType = advance
+        ? cardCashAdvanceLabel
+        : cardMovementType(type, tx['charge_kind']);
     final increases = ['purchase', 'interest', 'fee'].contains(type);
     final decreases = ['payment', 'refund'].contains(type);
     final date = DateTime.tryParse('${tx['transaction_date']}')?.toLocal();
@@ -570,7 +611,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
                 'Débito de cuenta: ${cardMoney(moneyCents(tx['account_debit_amount']), '${tx['account_debit_currency']}')}',
               ),
             if (type == 'payment' && tx['payment_exchange_rate'] != null)
-              Text('Tasa: C\$ ${tx['payment_exchange_rate']} por US\$1'),
+              Text('Tasa: C\$ ${tx['payment_exchange_rate']} por \$1'),
             if (category.isNotEmpty) Text('Categoría: $category'),
             if (reference.isNotEmpty) ...[
               const SizedBox(height: 6),
@@ -601,7 +642,20 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
               count: countFor(tx),
               onClosed: refreshReceiptCounts,
             ),
-            if (tx['is_receivable_funding'] != true &&
+            if (tx['excludes_from_limit'] == true)
+              Text(
+                advance ? 'La comisión no consume límite' : 'No consume límite',
+              ),
+            if (advance && !voided)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: saving ? null : () => editMovement(tx),
+                  child: const Text('Editar retiro'),
+                ),
+              ),
+            if (!advance &&
+                tx['is_receivable_funding'] != true &&
                 ['purchase', 'interest', 'fee', 'refund'].contains(type))
               Wrap(
                 alignment: WrapAlignment.end,
@@ -660,168 +714,121 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
     );
   }
 
-  Widget filtersPanel(BuildContext context) => Card(
-    margin: EdgeInsets.zero,
-    child: Padding(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Text(
-              'Filtrar movimientos',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-          ),
-          DatePeriodField(
-            start: dateFilter.start,
-            end: dateFilter.end,
-            onChanged: (range) {
-              if (mounted) setState(() => dateFilter = range);
-            },
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: GuideAnchor(
-              id: 'type',
-              child: DropdownButtonFormField<String>(
-                initialValue: filter,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Tipo de movimiento',
-                ),
-                items: [
-                  const DropdownMenuItem(value: 'all', child: Text('Todos')),
-                  ...types.entries.map(
-                    (e) => DropdownMenuItem(
-                      value: e.key,
-                      child: Text(e.value, overflow: TextOverflow.ellipsis),
-                    ),
-                  ),
-                ],
-                onChanged: (value) {
-                  if (value != null) setState(() => filter = value);
-                },
-              ),
-            ),
-          ),
-          ExpansionTile(
-            title: Text(
-              'Más filtros · ${(currencyFilter == 'all' ? 0 : 1) + (statusFilter == 'valid' ? 0 : 1) + (additionalFilter == null ? 0 : 1) + (receiptFilter == ReceiptFilter.all ? 0 : 1)} activos',
-            ),
-            subtitle: Text(
-              statusFilter == 'valid'
-                  ? 'Vigentes'
-                  : statusFilter == 'voided'
-                  ? 'Anulados'
-                  : 'Todos los estados',
-            ),
-            children: [
-              const SizedBox(height: 4),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: AdaptiveColumns(
-                  minColumnWidth: 216,
-                  maxColumns: additionalCards.isEmpty ? 4 : 3,
-                  children: [
-                    if (additionalCards.isNotEmpty)
-                      DropdownButtonFormField<String>(
-                        key: ValueKey(additionalFilter),
-                        initialValue: additionalFilter ?? 'all',
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Tarjeta del movimiento',
-                        ),
-                        items: [
-                          const DropdownMenuItem(
-                            value: 'all',
-                            child: Text('Todas'),
-                          ),
-                          const DropdownMenuItem(
-                            value: '',
-                            child: Text('Titular / cuenta compartida'),
-                          ),
-                          for (final card in additionalCards.values)
-                            DropdownMenuItem(
-                              value: card['id'].toString(),
-                              child: Text(
-                                additionalCardLabel(card),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                        ],
-                        onChanged: (value) => setState(
-                          () =>
-                              additionalFilter = value == 'all' ? null : value,
-                        ),
-                      ),
-                    GuideAnchor(
-                      id: 'currency',
-                      child: DropdownButtonFormField<String>(
-                        initialValue: currencyFilter,
-                        isExpanded: true,
-                        decoration: const InputDecoration(labelText: 'Moneda'),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'all',
-                            child: Text('Ambas monedas'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'NIO',
-                            child: Text('Córdobas'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'USD',
-                            child: Text('Dólares'),
-                          ),
-                        ],
-                        onChanged: (v) {
-                          if (v != null) {
-                            setState(() => currencyFilter = v);
-                          }
-                        },
-                      ),
-                    ),
-                    GuideAnchor(
-                      id: 'state',
-                      child: DropdownButtonFormField<String>(
-                        initialValue: statusFilter,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Estado del registro',
-                        ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'valid',
-                            child: Text('Vigentes'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'voided',
-                            child: Text('Anulados'),
-                          ),
-                          DropdownMenuItem(value: 'all', child: Text('Todos')),
-                        ],
-                        onChanged: (value) {
-                          if (value != null)
-                            setState(() => statusFilter = value);
-                        },
-                      ),
-                    ),
-                    if (receiptCounts != null)
-                      ReceiptFilterField(
-                        value: receiptFilter,
-                        onChanged: (value) =>
-                            setState(() => receiptFilter = value),
-                      ),
-                  ],
+  Widget filtersPanel(BuildContext context) => CollapsibleFilters(
+    summary: statusFilter == 'valid'
+        ? 'Vigentes'
+        : statusFilter == 'voided'
+        ? 'Anulados'
+        : 'Todos los estados',
+    children: [
+      DatePeriodField(
+        start: dateFilter.start,
+        end: dateFilter.end,
+        onChanged: (range) {
+          if (mounted) setState(() => dateFilter = range);
+        },
+      ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: GuideAnchor(
+          id: 'type',
+          child: DropdownButtonFormField<String>(
+            initialValue: filter,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Tipo de movimiento'),
+            items: [
+              const DropdownMenuItem(value: 'all', child: Text('Todos')),
+              ...types.entries.map(
+                (e) => DropdownMenuItem(
+                  value: e.key,
+                  child: Text(e.value, overflow: TextOverflow.ellipsis),
                 ),
               ),
             ],
+            onChanged: (value) {
+              if (value != null) setState(() => filter = value);
+            },
           ),
-        ],
+        ),
       ),
-    ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: AdaptiveColumns(
+          minColumnWidth: 216,
+          maxColumns: additionalCards.isEmpty ? 4 : 3,
+          children: [
+            if (additionalCards.isNotEmpty)
+              DropdownButtonFormField<String>(
+                key: ValueKey(additionalFilter),
+                initialValue: additionalFilter ?? 'all',
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Tarjeta del movimiento',
+                ),
+                items: [
+                  const DropdownMenuItem(value: 'all', child: Text('Todas')),
+                  const DropdownMenuItem(
+                    value: '',
+                    child: Text('Titular / cuenta compartida'),
+                  ),
+                  for (final card in additionalCards.values)
+                    DropdownMenuItem(
+                      value: card['id'].toString(),
+                      child: Text(
+                        additionalCardLabel(card),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+                onChanged: (value) => setState(
+                  () => additionalFilter = value == 'all' ? null : value,
+                ),
+              ),
+            GuideAnchor(
+              id: 'currency',
+              child: DropdownButtonFormField<String>(
+                initialValue: currencyFilter,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Moneda'),
+                items: const [
+                  DropdownMenuItem(value: 'all', child: Text('Ambas monedas')),
+                  DropdownMenuItem(value: 'NIO', child: Text('Córdobas')),
+                  DropdownMenuItem(value: 'USD', child: Text('Dólares')),
+                ],
+                onChanged: (v) {
+                  if (v != null) {
+                    setState(() => currencyFilter = v);
+                  }
+                },
+              ),
+            ),
+            GuideAnchor(
+              id: 'state',
+              child: DropdownButtonFormField<String>(
+                initialValue: statusFilter,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Estado del registro',
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'valid', child: Text('Vigentes')),
+                  DropdownMenuItem(value: 'voided', child: Text('Anulados')),
+                  DropdownMenuItem(value: 'all', child: Text('Todos')),
+                ],
+                onChanged: (value) {
+                  if (value != null) setState(() => statusFilter = value);
+                },
+              ),
+            ),
+            if (receiptCounts != null)
+              ReceiptFilterField(
+                value: receiptFilter,
+                onChanged: (value) => setState(() => receiptFilter = value),
+              ),
+          ],
+        ),
+      ),
+    ],
   );
 
   @override

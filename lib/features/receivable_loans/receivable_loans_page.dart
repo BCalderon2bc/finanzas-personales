@@ -1,4 +1,4 @@
-import '../../widgets/page_intro.dart';
+import '../../widgets/collapsible_filters.dart';
 import '../person_accounts/receipt_history.dart';
 import '../person_accounts/receipt_draft_field.dart';
 import '../../widgets/adaptive_layout.dart';
@@ -420,9 +420,14 @@ class _ReceivableLoansPageState extends State<ReceivableLoansPage> {
                 : ListView(
                     children: [
                       if (counts != null)
-                        ReceiptFilterField(
-                          value: filter,
-                          onChanged: (value) => update(() => filter = value),
+                        CollapsibleFilters(
+                          children: [
+                            ReceiptFilterField(
+                              value: filter,
+                              onChanged: (value) =>
+                                  update(() => filter = value),
+                            ),
+                          ],
                         ),
                       ...rows
                           .where(
@@ -772,12 +777,6 @@ class _ReceivableLoansPageState extends State<ReceivableLoansPage> {
                         compactLayout(context) ? 24 : 110,
                       ),
                       children: [
-                        const PageIntro(
-                          icon: Icons.payments_outlined,
-                          title: 'Lo que te deben',
-                          description:
-                              'Revisa el saldo de cada préstamo y registra los cobros recibidos.',
-                        ),
                         GuideAnchor(
                           id: 'summary',
                           child: ReceivableLoansSummary(
@@ -786,50 +785,54 @@ class _ReceivableLoansPageState extends State<ReceivableLoansPage> {
                           ),
                         ),
                         const SizedBox(height: 20),
-                        GuideAnchor(
-                          id: 'search',
-                          child: TextField(
-                            controller: search,
-                            onChanged: (_) => setState(() {}),
-                            decoration: const InputDecoration(
-                              labelText: 'Buscar persona o descripción',
-                              prefixIcon: Icon(Icons.search),
+                        CollapsibleFilters(
+                          children: [
+                            GuideAnchor(
+                              id: 'search',
+                              child: TextField(
+                                controller: search,
+                                onChanged: (_) => setState(() {}),
+                                decoration: const InputDecoration(
+                                  labelText: 'Buscar persona o descripción',
+                                  prefixIcon: Icon(Icons.search),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        DropdownButtonFormField<String>(
-                          initialValue: filter,
-                          decoration: const InputDecoration(
-                            labelText: 'Mostrar',
-                          ),
-                          items: const [
-                            DropdownMenuItem(
-                              value: 'pending',
-                              child: Text('Pendientes'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'overdue',
-                              child: Text('Vencidos'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'paid',
-                              child: Text('Capital recuperado'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'all',
-                              child: Text('Todos los vigentes'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'voided',
-                              child: Text('Anulados'),
+                            const SizedBox(height: 12),
+                            DropdownButtonFormField<String>(
+                              initialValue: filter,
+                              decoration: const InputDecoration(
+                                labelText: 'Mostrar',
+                              ),
+                              items: const [
+                                DropdownMenuItem(
+                                  value: 'pending',
+                                  child: Text('Pendientes'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'overdue',
+                                  child: Text('Vencidos'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'paid',
+                                  child: Text('Capital recuperado'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'all',
+                                  child: Text('Todos los vigentes'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'voided',
+                                  child: Text('Anulados'),
+                                ),
+                              ],
+                              onChanged: (v) {
+                                if (v != null) {
+                                  setState(() => filter = v);
+                                }
+                              },
                             ),
                           ],
-                          onChanged: (v) {
-                            if (v != null) {
-                              setState(() => filter = v);
-                            }
-                          },
                         ),
                         const SizedBox(height: 16),
                         if (visible.isEmpty)

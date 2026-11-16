@@ -1,3 +1,4 @@
+import '../../widgets/collapsible_filters.dart';
 import '../../widgets/adaptive_layout.dart';
 import 'package:flutter/material.dart';
 import 'transaction_filter.dart';
@@ -135,7 +136,6 @@ class _TransactionFiltersBarState extends State<TransactionFiltersBar> {
     final accountName = widget.accounts
         .where((a) => '${a['id']}' == accountId)
         .firstOrNull?['name'];
-    final extraCount = (accountId != null ? 1 : 0) + (activeReceipt ? 1 : 0);
     final chips = [
       if (filter.query.trim().isNotEmpty)
         removable(
@@ -167,58 +167,58 @@ class _TransactionFiltersBarState extends State<TransactionFiltersBar> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TextField(
-          controller: searchController,
-          decoration: InputDecoration(
-            labelText: 'Buscar descripción o referencia',
-            prefixIcon: const Icon(Icons.search),
-            suffixIcon: filter.query.isEmpty
-                ? null
-                : IconButton(
-                    tooltip: 'Limpiar búsqueda',
-                    icon: const Icon(Icons.close_rounded),
-                    onPressed: () =>
-                        widget.onChanged(filter.copyWith(query: '')),
-                  ),
-          ),
-          onChanged: (value) => widget.onChanged(filter.copyWith(query: value)),
-        ),
-        const SizedBox(height: 12),
-        AdaptiveColumns(
-          minColumnWidth: 235,
+        CollapsibleFilters(
+          summary: dateLabel,
           children: [
-            DropdownButtonFormField<String>(
-              key: ValueKey('type-${filter.type}'),
-              initialValue: filter.type,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Tipo de movimiento',
+            TextField(
+              controller: searchController,
+              decoration: InputDecoration(
+                labelText: 'Buscar descripción o referencia',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: filter.query.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Limpiar búsqueda',
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () =>
+                            widget.onChanged(filter.copyWith(query: '')),
+                      ),
               ),
-              items: [
-                for (final type in typeLabels.entries)
-                  DropdownMenuItem(value: type.key, child: Text(type.value)),
+              onChanged: (value) =>
+                  widget.onChanged(filter.copyWith(query: value)),
+            ),
+            const SizedBox(height: 12),
+            AdaptiveColumns(
+              minColumnWidth: 235,
+              children: [
+                DropdownButtonFormField<String>(
+                  key: ValueKey('type-${filter.type}'),
+                  initialValue: filter.type,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Tipo de movimiento',
+                  ),
+                  items: [
+                    for (final type in typeLabels.entries)
+                      DropdownMenuItem(
+                        value: type.key,
+                        child: Text(type.value),
+                      ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      widget.onChanged(filter.copyWith(type: value));
+                    }
+                  },
+                ),
+                OutlinedButton.icon(
+                  onPressed: chooseDates,
+                  icon: const Icon(Icons.date_range),
+                  label: Text(dateLabel),
+                ),
               ],
-              onChanged: (value) {
-                if (value != null) {
-                  widget.onChanged(filter.copyWith(type: value));
-                }
-              },
             ),
-            OutlinedButton.icon(
-              onPressed: chooseDates,
-              icon: const Icon(Icons.date_range),
-              label: Text(dateLabel),
-            ),
-          ],
-        ),
-        ExpansionTile(
-          tilePadding: EdgeInsets.zero,
-          title: Text(
-            extraCount == 0
-                ? 'Más filtros'
-                : 'Más filtros · $extraCount activos',
-          ),
-          children: [
+            const SizedBox(height: 12),
             AdaptiveColumns(
               minColumnWidth: 235,
               children: [

@@ -133,7 +133,7 @@ class _ReceivableLoanFormDialogState extends State<ReceivableLoanFormDialog> {
                     ),
                     DropdownMenuItem(
                       value: 'USD',
-                      child: Text('Dólares (US\$)'),
+                      child: Text('Dólares (\$)'),
                     ),
                   ],
                   onChanged: (v) {

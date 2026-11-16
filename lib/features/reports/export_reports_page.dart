@@ -1,4 +1,4 @@
-import '../../widgets/page_intro.dart';
+import '../../widgets/collapsible_filters.dart';
 import '../../widgets/adaptive_layout.dart';
 import '../../data/exchange_rate.dart';
 import '../../data/financial_settings_repository.dart';
@@ -532,12 +532,6 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
             child: ListView(
               padding: EdgeInsets.all(pageGutter(context)),
               children: [
-                const PageIntro(
-                  icon: Icons.file_download_outlined,
-                  title: 'Prepara tu reporte',
-                  description:
-                      'Elige los datos que quieres descargar o compartir en PDF o Excel. Los importes conservan su moneda original.',
-                ),
                 GuideAnchor(
                   id: 'kind',
                   child: DropdownButtonFormField<String>(
@@ -611,302 +605,318 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                           },
                   ),
                 ),
-                const SizedBox(height: 14),
-                if (kind == 'movements') ...[
-                  DropdownButtonFormField<IncomeExpenseSelection>(
-                    initialValue: selection,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Incluir'),
-                    items: const [
-                      DropdownMenuItem(
-                        value: IncomeExpenseSelection.both,
-                        child: Text('Ambos'),
-                      ),
-                      DropdownMenuItem(
-                        value: IncomeExpenseSelection.income,
-                        child: Text('Solo ingresos'),
-                      ),
-                      DropdownMenuItem(
-                        value: IncomeExpenseSelection.expenses,
-                        child: Text('Solo gastos'),
-                      ),
-                    ],
-                    onChanged: busy
-                        ? null
-                        : (value) {
-                            if (value == null) return;
-                            setState(() {
-                              selection = value;
-                              clear();
-                            });
-                          },
-                  ),
-                  const SizedBox(height: 14),
-                ],
-                if (kind != 'person')
-                  GuideAnchor(
-                    id: 'currency',
-                    child: DropdownButtonFormField<String>(
-                      initialValue: currency,
-                      isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Moneda'),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'all',
-                          child: Text('Ambas, con totales separados'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'NIO',
-                          child: Text('Córdobas · NIO'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'USD',
-                          child: Text('Dólares · USD'),
-                        ),
-                      ],
-                      onChanged: busy
-                          ? null
-                          : (v) {
-                              if (v != null) {
+                CollapsibleFilters(
+                  children: [
+                    const SizedBox(height: 14),
+                    if (kind == 'movements') ...[
+                      DropdownButtonFormField<IncomeExpenseSelection>(
+                        initialValue: selection,
+                        isExpanded: true,
+                        decoration: const InputDecoration(labelText: 'Incluir'),
+                        items: const [
+                          DropdownMenuItem(
+                            value: IncomeExpenseSelection.both,
+                            child: Text('Ambos'),
+                          ),
+                          DropdownMenuItem(
+                            value: IncomeExpenseSelection.income,
+                            child: Text('Solo ingresos'),
+                          ),
+                          DropdownMenuItem(
+                            value: IncomeExpenseSelection.expenses,
+                            child: Text('Solo gastos'),
+                          ),
+                        ],
+                        onChanged: busy
+                            ? null
+                            : (value) {
+                                if (value == null) return;
                                 setState(() {
-                                  currency = v;
+                                  selection = value;
                                   clear();
                                 });
-                              }
-                            },
-                    ),
-                  ),
-                const SizedBox(height: 14),
-                if (kind == 'credit_cards' ||
-                    kind == 'credit_card_expenses' ||
-                    kind == 'debit_cards') ...[
-                  DropdownButtonFormField<String>(
-                    key: ValueKey('report-card-$kind-$cardId'),
-                    initialValue: cardId ?? '',
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Tarjeta'),
-                    items: [
-                      const DropdownMenuItem(value: '', child: Text('Todas')),
-                      ...((kind == 'credit_cards' ||
-                                  kind == 'credit_card_expenses')
-                              ? creditCards
-                              : debitCards)
-                          .map(
-                            (card) => DropdownMenuItem(
-                              value: '${card['id']}',
+                              },
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+                    if (kind != 'person')
+                      GuideAnchor(
+                        id: 'currency',
+                        child: DropdownButtonFormField<String>(
+                          initialValue: currency,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Moneda',
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'all',
+                              child: Text('Ambas, con totales separados'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'NIO',
+                              child: Text('Córdobas · NIO'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'USD',
+                              child: Text('Dólares · USD'),
+                            ),
+                          ],
+                          onChanged: busy
+                              ? null
+                              : (v) {
+                                  if (v != null) {
+                                    setState(() {
+                                      currency = v;
+                                      clear();
+                                    });
+                                  }
+                                },
+                        ),
+                      ),
+                    const SizedBox(height: 14),
+                    if (kind == 'credit_cards' ||
+                        kind == 'credit_card_expenses' ||
+                        kind == 'debit_cards') ...[
+                      DropdownButtonFormField<String>(
+                        key: ValueKey('report-card-$kind-$cardId'),
+                        initialValue: cardId ?? '',
+                        isExpanded: true,
+                        decoration: const InputDecoration(labelText: 'Tarjeta'),
+                        items: [
+                          const DropdownMenuItem(
+                            value: '',
+                            child: Text('Todas'),
+                          ),
+                          ...((kind == 'credit_cards' ||
+                                      kind == 'credit_card_expenses')
+                                  ? creditCards
+                                  : debitCards)
+                              .map(
+                                (card) => DropdownMenuItem(
+                                  value: '${card['id']}',
+                                  child: Text(
+                                    (kind == 'credit_cards' ||
+                                            kind == 'credit_card_expenses')
+                                        ? agendaCardLabel(card)
+                                        : reportDebitCardLabel(
+                                            card,
+                                            account: card['accounts'] as Map?,
+                                          ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ),
+                        ],
+                        onChanged: busy
+                            ? null
+                            : (v) => setState(() {
+                                cardId = v == '' ? null : v;
+                                additionalCardFilter = null;
+                                additionalCards =
+                                    kind == 'credit_card_expenses' &&
+                                        cardId != null
+                                    ? loadReportAdditionals(cardId!)
+                                    : null;
+                                clear();
+                              }),
+                      ),
+                      const SizedBox(height: 12),
+                      if (kind == 'credit_card_expenses' && cardId != null) ...[
+                        additionalCardSelector(),
+                        const SizedBox(height: 12),
+                      ],
+                      if (kind == 'debit_cards')
+                        const Text(
+                          'Se muestran todos los movimientos de la cuenta vinculada; una cuenta con varias tarjetas se suma una sola vez.',
+                        ),
+                    ],
+                    if (kind == 'accounts') ...[
+                      DropdownButtonFormField<String>(
+                        key: ValueKey('report-account-$accountId'),
+                        initialValue: accountId ?? '',
+                        isExpanded: true,
+                        decoration: const InputDecoration(labelText: 'Cuenta'),
+                        items: [
+                          const DropdownMenuItem(
+                            value: '',
+                            child: Text('Todas las cuentas'),
+                          ),
+                          ...bankAccounts.map(
+                            (a) => DropdownMenuItem(
+                              value: '${a['id']}',
                               child: Text(
-                                (kind == 'credit_cards' ||
-                                        kind == 'credit_card_expenses')
-                                    ? agendaCardLabel(card)
-                                    : reportDebitCardLabel(
-                                        card,
-                                        account: card['accounts'] as Map?,
-                                      ),
+                                '${accountBankLabel(a)} · ${a['name']} · ${a['currency']}',
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ),
-                    ],
-                    onChanged: busy
-                        ? null
-                        : (v) => setState(() {
-                            cardId = v == '' ? null : v;
-                            additionalCardFilter = null;
-                            additionalCards =
-                                kind == 'credit_card_expenses' && cardId != null
-                                ? loadReportAdditionals(cardId!)
-                                : null;
-                            clear();
-                          }),
-                  ),
-                  const SizedBox(height: 12),
-                  if (kind == 'credit_card_expenses' && cardId != null) ...[
-                    additionalCardSelector(),
-                    const SizedBox(height: 12),
-                  ],
-                  if (kind == 'debit_cards')
-                    const Text(
-                      'Se muestran todos los movimientos de la cuenta vinculada; una cuenta con varias tarjetas se suma una sola vez.',
-                    ),
-                ],
-                if (kind == 'accounts') ...[
-                  DropdownButtonFormField<String>(
-                    key: ValueKey('report-account-$accountId'),
-                    initialValue: accountId ?? '',
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Cuenta'),
-                    items: [
-                      const DropdownMenuItem(
-                        value: '',
-                        child: Text('Todas las cuentas'),
-                      ),
-                      ...bankAccounts.map(
-                        (a) => DropdownMenuItem(
-                          value: '${a['id']}',
-                          child: Text(
-                            '${accountBankLabel(a)} · ${a['name']} · ${a['currency']}',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-                    ],
-                    onChanged: busy
-                        ? null
-                        : (value) => setState(() {
-                            accountId = value == '' ? null : value;
-                            clear();
-                          }),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                if (kind == 'person') ...[
-                  GuideAnchor(
-                    id: 'rate',
-                    child: TextField(
-                      controller: settlementRate,
-                      enabled: !busy,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'Tasa para pagar: C\$ por US\$ 1',
-                        helperText:
-                            'Revisa la tasa acordada. Se usa para mostrar cómo pagar el saldo completo en dólares. No cambia las tasas del historial.',
-                        helperMaxLines: 3,
-                      ),
-                      onChanged: (_) => setState(clear),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  TextField(
-                    controller: reportOwner,
-                    enabled: !busy,
-                    maxLength: 120,
-                    decoration: const InputDecoration(
-                      labelText: 'Tu nombre en el reporte',
-                      helperText:
-                          'Se usa para indicar quién debe pagar y quién debe recibir. No modifica tu perfil.',
-                      helperMaxLines: 3,
-                    ),
-                    onChanged: (_) => setState(clear),
-                  ),
-                  const SizedBox(height: 10),
-
-                  if (loadingPeople)
-                    const LinearProgressIndicator()
-                  else if (peopleError != null) ...[
-                    Text('No se pudieron cargar las personas: $peopleError'),
-                    TextButton(
-                      onPressed: busy ? null : loadPeople,
-                      child: const Text('Reintentar'),
-                    ),
-                  ] else if (people.isEmpty)
-                    const Text(
-                      'Primero agrega una persona en Cuentas con personas.',
-                    )
-                  else
-                    GuideAnchor(
-                      id: 'person',
-                      child: DropdownButtonFormField<String>(
-                        key: ValueKey('person-$personId'),
-                        initialValue: personId,
-                        isExpanded: true,
-                        decoration: const InputDecoration(labelText: 'Persona'),
-                        items: people
-                            .map(
-                              (p) => DropdownMenuItem(
-                                value: '${p['id']}',
-                                child: Text(
-                                  '${p['name']}${p['is_active'] == true ? '' : ' · Archivada'}',
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            )
-                            .toList(),
+                        ],
                         onChanged: busy
                             ? null
-                            : (v) => setState(() {
-                                personId = v;
+                            : (value) => setState(() {
+                                accountId = value == '' ? null : value;
                                 clear();
                               }),
                       ),
-                    ),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Todo el historial'),
-                    value: allHistory,
-                    onChanged: busy
-                        ? null
-                        : (v) => setState(() {
-                            allHistory = v;
-                            clear();
-                          }),
-                  ),
-                  const Text(
-                    'Incluye ambas monedas con su tasa registrada. El saldo se presenta en córdobas; los anulados se excluyen.',
-                  ),
-                  const SizedBox(height: 10),
-                ],
-                if (kind == 'movements' ||
-                    kind == 'credit_cards' ||
-                    kind == 'credit_card_expenses' ||
-                    kind == 'accounts' ||
-                    kind == 'debit_cards' ||
-                    kind == 'person' && !allHistory)
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.date_range),
-                    label: Text('${reportDate(start)} – ${reportDate(end)}'),
-                    onPressed: busy
-                        ? null
-                        : () async {
-                            final value = await showDateRangePicker(
-                              context: context,
-                              firstDate: DateTime(2000),
-                              lastDate: kind == 'person'
-                                  ? DateTime(2100)
-                                  : DateTime.now(),
-                              initialDateRange: DateTimeRange(
-                                start: start,
-                                end: end,
-                              ),
-                            );
-                            if (value != null && mounted) {
-                              setState(() {
-                                start = value.start;
-                                end = value.end;
+                      const SizedBox(height: 12),
+                    ],
+                    if (kind == 'person') ...[
+                      GuideAnchor(
+                        id: 'rate',
+                        child: TextField(
+                          controller: settlementRate,
+                          enabled: !busy,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          decoration: const InputDecoration(
+                            labelText: 'Tasa para pagar: C\$ por \$ 1',
+                            helperText:
+                                'Revisa la tasa acordada. Se usa para mostrar cómo pagar el saldo completo en dólares. No cambia las tasas del historial.',
+                            helperMaxLines: 3,
+                          ),
+                          onChanged: (_) => setState(clear),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      TextField(
+                        controller: reportOwner,
+                        enabled: !busy,
+                        maxLength: 120,
+                        decoration: const InputDecoration(
+                          labelText: 'Tu nombre en el reporte',
+                          helperText:
+                              'Se usa para indicar quién debe pagar y quién debe recibir. No modifica tu perfil.',
+                          helperMaxLines: 3,
+                        ),
+                        onChanged: (_) => setState(clear),
+                      ),
+                      const SizedBox(height: 10),
+
+                      if (loadingPeople)
+                        const LinearProgressIndicator()
+                      else if (peopleError != null) ...[
+                        Text(
+                          'No se pudieron cargar las personas: $peopleError',
+                        ),
+                        TextButton(
+                          onPressed: busy ? null : loadPeople,
+                          child: const Text('Reintentar'),
+                        ),
+                      ] else if (people.isEmpty)
+                        const Text(
+                          'Primero agrega una persona en Cuentas con personas.',
+                        )
+                      else
+                        GuideAnchor(
+                          id: 'person',
+                          child: DropdownButtonFormField<String>(
+                            key: ValueKey('person-$personId'),
+                            initialValue: personId,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Persona',
+                            ),
+                            items: people
+                                .map(
+                                  (p) => DropdownMenuItem(
+                                    value: '${p['id']}',
+                                    child: Text(
+                                      '${p['name']}${p['is_active'] == true ? '' : ' · Archivada'}',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: busy
+                                ? null
+                                : (v) => setState(() {
+                                    personId = v;
+                                    clear();
+                                  }),
+                          ),
+                        ),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Todo el historial'),
+                        value: allHistory,
+                        onChanged: busy
+                            ? null
+                            : (v) => setState(() {
+                                allHistory = v;
                                 clear();
-                              });
-                            }
-                          },
-                  ),
-                if (kind == 'budgets')
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.calendar_month),
-                    label: Text(
-                      '${month.month.toString().padLeft(2, '0')}/${month.year}',
-                    ),
-                    onPressed: busy
-                        ? null
-                        : () async {
-                            final value = await showDatePicker(
-                              context: context,
-                              initialDate: month,
-                              firstDate: DateTime(2000),
-                              lastDate: DateTime(2100),
-                            );
-                            if (value != null && mounted) {
-                              setState(() {
-                                month = DateTime(value.year, value.month);
-                                clear();
-                              });
-                            }
-                          },
-                  ),
-                if (kind == 'debts')
-                  const Text(
-                    'Deudas y cuotas se exportan con sus saldos actuales, no como un saldo histórico del mes.',
-                  ),
+                              }),
+                      ),
+                      const Text(
+                        'Incluye ambas monedas con su tasa registrada. El saldo se presenta en córdobas; los anulados se excluyen.',
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                    if (kind == 'movements' ||
+                        kind == 'credit_cards' ||
+                        kind == 'credit_card_expenses' ||
+                        kind == 'accounts' ||
+                        kind == 'debit_cards' ||
+                        kind == 'person' && !allHistory)
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.date_range),
+                        label: Text(
+                          '${reportDate(start)} – ${reportDate(end)}',
+                        ),
+                        onPressed: busy
+                            ? null
+                            : () async {
+                                final value = await showDateRangePicker(
+                                  context: context,
+                                  firstDate: DateTime(2000),
+                                  lastDate: kind == 'person'
+                                      ? DateTime(2100)
+                                      : DateTime.now(),
+                                  initialDateRange: DateTimeRange(
+                                    start: start,
+                                    end: end,
+                                  ),
+                                );
+                                if (value != null && mounted) {
+                                  setState(() {
+                                    start = value.start;
+                                    end = value.end;
+                                    clear();
+                                  });
+                                }
+                              },
+                      ),
+                    if (kind == 'budgets')
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.calendar_month),
+                        label: Text(
+                          '${month.month.toString().padLeft(2, '0')}/${month.year}',
+                        ),
+                        onPressed: busy
+                            ? null
+                            : () async {
+                                final value = await showDatePicker(
+                                  context: context,
+                                  initialDate: month,
+                                  firstDate: DateTime(2000),
+                                  lastDate: DateTime(2100),
+                                );
+                                if (value != null && mounted) {
+                                  setState(() {
+                                    month = DateTime(value.year, value.month);
+                                    clear();
+                                  });
+                                }
+                              },
+                      ),
+                    if (kind == 'debts')
+                      const Text(
+                        'Deudas y cuotas se exportan con sus saldos actuales, no como un saldo histórico del mes.',
+                      ),
+                  ],
+                ),
                 const SizedBox(height: 18),
                 GuideAnchor(
                   id: 'prepare',

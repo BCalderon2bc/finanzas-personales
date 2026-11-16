@@ -1,4 +1,5 @@
 import '../../data/exchange_rate.dart';
+import '../../data/expense_report_categories.dart';
 import '../../data/export_report_models.dart';
 
 class StatisticsSummary {
@@ -23,7 +24,7 @@ class StatisticsSummary {
       movementCount++;
       final rowIncome = rate.convert(row.income, row.currency, currency);
       final rowExpense = rate.convert(row.expense, row.currency, currency);
-      final name = categories[row.categoryId] ?? 'Sin categoría';
+      final name = _categoryName(row, categories);
       if (row.income > 0) {
         incomeCount++;
         if (rowIncome > 0)
@@ -50,6 +51,35 @@ class StatisticsSummary {
     }
     expenseCategories = _rank(byCategory);
     incomeCategories = _rank(incomeByCategory);
+  }
+
+  // Mantiene la misma clasificación automática del reporte Gastos por categoría.
+  // Los movimientos de cuentas sin categoría asignada siguen siendo auténticos
+  // gastos pendientes de clasificar.
+  static String _categoryName(
+    ExportMovement movement,
+    Map<String, String> categories,
+  ) {
+    final id = movement.categoryId?.trim();
+    if (id != null && id.isNotEmpty && id != 'null') {
+      return categories[id] ?? 'Categoría no disponible';
+    }
+
+    final type = movement.values.length > 1
+        ? movement.values[1]?.toString() ?? ''
+        : '';
+    final automaticKey = switch (type) {
+      'Abono de préstamo' => 'debt_costs',
+      'Compra con tarjeta' => 'card_purchases',
+      'Intereses de tarjeta' => 'card_interest',
+      'Comisión de tarjeta' => 'card_fees',
+      'Seguro de tarjeta' => 'card_insurance',
+      'Devolución de tarjeta' => 'card_refunds',
+      'Retiro de efectivo' => 'card_fees',
+      'Ajuste de tarjeta por revisar' => 'card_other',
+      _ => 'uncategorized',
+    };
+    return expenseReportCategoryLabels[automaticKey] ?? 'Sin categoría';
   }
 
   int income = 0, netExpenses = 0, grossExpenses = 0, refunds = 0;

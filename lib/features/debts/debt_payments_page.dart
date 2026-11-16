@@ -1,3 +1,4 @@
+import '../../widgets/collapsible_filters.dart';
 import '../../widgets/adaptive_layout.dart';
 import '../person_accounts/receipt_history.dart';
 import 'package:flutter/material.dart';
@@ -353,10 +354,14 @@ class _DebtPaymentsPageState extends State<DebtPaymentsPage> {
                       ),
                     ),
                   if (receiptCounts != null)
-                    ReceiptFilterField(
-                      value: receiptFilter,
-                      onChanged: (value) =>
-                          setState(() => receiptFilter = value),
+                    CollapsibleFilters(
+                      children: [
+                        ReceiptFilterField(
+                          value: receiptFilter,
+                          onChanged: (value) =>
+                              setState(() => receiptFilter = value),
+                        ),
+                      ],
                     ),
                   ...payments
                       .where(

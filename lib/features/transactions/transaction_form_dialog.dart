@@ -31,6 +31,13 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
   final descriptionController = TextEditingController();
   final referenceController = TextEditingController();
   bool get editing => widget.transaction != null;
+  bool get editingFx => widget.transaction?['source'] == 'fx_transfer';
+
+  List<Map<String, dynamic>> get originAccounts => widget.accounts
+      .where(
+        (a) => !editingFx || a['currency'] == widget.transaction?['currency'],
+      )
+      .toList();
 
   String transactionType = 'expense';
   String? accountId;
@@ -89,7 +96,13 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
       .toList();
 
   List<Map<String, dynamic>> get availableDestinations =>
-      widget.accounts.where((a) => a['id'].toString() != accountId).toList();
+      widget.accounts.where((a) {
+        if (a['id'].toString() == accountId) return false;
+        if (editingFx) {
+          return a['currency'] == widget.transaction?['destination_currency'];
+        }
+        return !editing || widget.practice || a['currency'] == selectedCurrency;
+      }).toList();
 
   String get destinationCurrency =>
       widget.accounts
@@ -248,7 +261,7 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
                               child: Text('Transferencia'),
                             ),
                           ],
-                          onChanged: editing
+                          onChanged: editingFx
                               ? null
                               : (value) {
                                   if (value == null) return;
@@ -268,22 +281,24 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
                           decoration: const InputDecoration(
                             labelText: 'Cuenta de origen',
                           ),
-                          items: widget.accounts
+                          items: originAccounts
                               .map(
                                 (a) => DropdownMenuItem(
                                   value: a['id'].toString(),
                                   child: Text(
-                                    '${a['name']} (${a['currency'] == 'USD' ? 'US\$' : 'C\$'})',
+                                    '${a['name']} (${a['currency'] == 'USD' ? '\$' : 'C\$'})',
                                   ),
                                 ),
                               )
                               .toList(),
-                          onChanged: editing
-                              ? null
-                              : (value) => setState(() {
-                                  accountId = value;
-                                  destinationAccountId = null;
-                                }),
+                          onChanged: (value) => setState(() {
+                            accountId = value;
+                            if (!availableDestinations.any(
+                              (a) => a['id'].toString() == destinationAccountId,
+                            )) {
+                              destinationAccountId = null;
+                            }
+                          }),
                           validator: (value) =>
                               value == null ? 'Selecciona una cuenta' : null,
                         ),
@@ -305,8 +320,13 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
                             ? destinationAccountId
                             : null,
                         isExpanded: true,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           labelText: 'Cuenta de destino',
+                          helperText: editing && !widget.practice
+                              ? (editingFx
+                                    ? 'Moneda de destino: ${widget.transaction?['destination_currency']}'
+                                    : 'Selecciona una cuenta en $selectedCurrency.')
+                              : null,
                         ),
                         items: availableDestinations
                             .map(
@@ -316,10 +336,8 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
                               ),
                             )
                             .toList(),
-                        onChanged: editing
-                            ? null
-                            : (value) =>
-                                  setState(() => destinationAccountId = value),
+                        onChanged: (value) =>
+                            setState(() => destinationAccountId = value),
                         validator: (value) => value == null
                             ? 'Selecciona la cuenta destino'
                             : null,
@@ -328,11 +346,14 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
                     if (availableDestinations.isEmpty)
                       const Padding(
                         padding: EdgeInsets.only(top: 8),
-                        child: Text('No hay otras cuentas activas.'),
+                        child: Text(
+                          'No hay cuentas disponibles para el destino.',
+                        ),
                       ),
                   ] else if (filteredCategories.isNotEmpty) ...[
                     const SizedBox(height: 14),
                     DropdownButtonFormField<String>(
+                      key: ValueKey(transactionType),
                       initialValue:
                           filteredCategories.any(
                             (c) => c['id'].toString() == categoryId,
@@ -370,7 +391,7 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
                       ),
                       decoration: InputDecoration(
                         labelText:
-                            'Monto (${selectedCurrency == 'USD' ? 'US\$' : 'C\$'})',
+                            'Monto (${selectedCurrency == 'USD' ? '\$' : 'C\$'})',
                       ),
                       validator: (value) {
                         final amount = double.tryParse(
@@ -398,7 +419,7 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
                           decimal: true,
                         ),
                         decoration: const InputDecoration(
-                          labelText: 'Tasa: Córdobas por US\$ 1',
+                          labelText: 'Tasa: Córdobas por \$ 1',
                           helperText:
                               'Usa la tasa aplicada por tu banco. Máximo seis decimales.',
                           helperMaxLines: 2,

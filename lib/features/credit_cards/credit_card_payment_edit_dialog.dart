@@ -214,7 +214,7 @@ class _CreditCardPaymentEditDialogState
                       decimal: true,
                     ),
                     decoration: const InputDecoration(
-                      labelText: 'Tasa: córdobas por US\$1',
+                      labelText: 'Tasa: córdobas por \$1',
                       helperText:
                           'El débito de cuenta se redondea a dos decimales.',
                       helperMaxLines: 2,

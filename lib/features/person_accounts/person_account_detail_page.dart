@@ -1,3 +1,4 @@
+import '../../widgets/collapsible_filters.dart';
 import 'receipt_history.dart';
 import 'receipt_draft_field.dart';
 import '../../widgets/adaptive_layout.dart';
@@ -607,7 +608,7 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
                       ),
                       if (row['currency'] == 'USD')
                         Text(
-                          'Tasa: C\$${row['exchange_rate']} / US\$1 · Equivalente: ${formatMoneyCents(moneyCents(row['amount_nio']), 'NIO')}',
+                          'Tasa: C\$${row['exchange_rate']} / \$1 · Equivalente: ${formatMoneyCents(moneyCents(row['amount_nio']), 'NIO')}',
                         ),
                       if (!voided)
                         Padding(
@@ -746,20 +747,24 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
         style: Theme.of(context).textTheme.bodySmall,
       ),
       const SizedBox(height: 10),
-      AdaptiveColumns(
-        minColumnWidth: 235,
+      CollapsibleFilters(
         children: [
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Mostrar anulados'),
-            value: showVoided,
-            onChanged: (v) => setState(() => showVoided = v),
+          AdaptiveColumns(
+            minColumnWidth: 235,
+            children: [
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Mostrar anulados'),
+                value: showVoided,
+                onChanged: (v) => setState(() => showVoided = v),
+              ),
+              if (receiptCounts != null)
+                ReceiptFilterField(
+                  value: receiptFilter,
+                  onChanged: (value) => setState(() => receiptFilter = value),
+                ),
+            ],
           ),
-          if (receiptCounts != null)
-            ReceiptFilterField(
-              value: receiptFilter,
-              onChanged: (value) => setState(() => receiptFilter = value),
-            ),
         ],
       ),
       const SizedBox(height: 10),
