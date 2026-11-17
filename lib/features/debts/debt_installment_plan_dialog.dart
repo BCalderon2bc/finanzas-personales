@@ -1,3 +1,4 @@
+import '../../core/app_theme.dart' show appMuted;
 import 'package:flutter/material.dart';
 import '../../data/card_statement_logic.dart';
 
@@ -203,7 +204,7 @@ class _DebtInstallmentPlanDialogState extends State<DebtInstallmentPlanDialog> {
                   const Text(
                     'El nuevo calendario reemplaza al vigente y conserva el anterior con sus pagos en el historial. '
                     'La primera fecha se respeta exactamente; el día habitual se usa desde la segunda cuota.',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF596B7D)),
+                    style: TextStyle(fontSize: 12, color: appMuted),
                   ),
                 ] else ...[
                   const SizedBox(height: 12),

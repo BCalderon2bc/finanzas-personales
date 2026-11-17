@@ -1,3 +1,4 @@
+import '../../core/app_theme.dart' show appMuted, primaryColor;
 import 'zero_plans_agenda.dart';
 import '../../data/payment_agenda_labels.dart';
 import 'package:flutter/material.dart';
@@ -110,13 +111,13 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
     final coveredMinimum =
         item.kind == AgendaKind.cardPayment && item.minimumRemaining == 0;
     final color = isCut
-        ? const Color(0xFF3C70AA)
+        ? primaryColor
         : days < 0 &&
               (loan || (!coveredMinimum && item.minimumRemaining != null))
         ? const Color(0xFFA3453D)
         : days <= 0
         ? const Color(0xFF886128)
-        : const Color(0xFF3C70AA);
+        : primaryColor;
     final when = days < 0
         ? '${isCut ? 'Pasó' : 'Venció'} hace ${-days} ${days == -1 ? 'día' : 'días'}'
         : days == 0
@@ -241,7 +242,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
                   child: Icon(
                     Icons.chevron_right_rounded,
                     size: 20,
-                    color: Color(0xFF596B7D),
+                    color: appMuted,
                   ),
                 ),
               ],
@@ -280,10 +281,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
         children: [
           Row(
             children: [
-              const Icon(
-                Icons.event_available_outlined,
-                color: Color(0xFF3C70AA),
-              ),
+              const Icon(Icons.event_available_outlined, color: primaryColor),
               const SizedBox(width: 9),
               const Expanded(
                 child: Text(
@@ -300,7 +298,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
           ),
           const Text(
             'Fechas pasadas, hoy y próximos 7 días. Importes en la moneda del pago.',
-            style: TextStyle(color: Color(0xFF596B7D), fontSize: 12),
+            style: TextStyle(color: appMuted, fontSize: 12),
           ),
           if (loading)
             const Padding(
@@ -347,11 +345,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
                   'solo aparece como recordatorio sin monto. Los préstamos muestran su fecha registrada de vencimiento y '
                   'el capital pendiente si no hay cuotas configuradas. Con un calendario vigente, muestra sus cuotas pendientes, sin sumarlas otra vez al capital. Los pagos cubiertos no aparecen como pendientes. '
                   'La agenda se calcula al actualizar el inicio y es independiente del mes del reporte.',
-                  style: TextStyle(
-                    color: Color(0xFF596B7D),
-                    fontSize: 12,
-                    height: 1.5,
-                  ),
+                  style: TextStyle(color: appMuted, fontSize: 12, height: 1.5),
                 ),
               ),
             ],

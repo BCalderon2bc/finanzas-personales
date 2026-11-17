@@ -67,7 +67,7 @@ const guideCatalog = <String, List<GuideStep>>{
     GuideStep(
       'title',
       'Historial de tu dinero',
-      'Aquí aparecen ingresos, gastos, transferencias y pagos de otros módulos, con los últimos ingresados primero.',
+      'Aquí aparecen ingresos, gastos, transferencias y pagos de otros módulos, ordenados por fecha del movimiento, de más reciente a más antiguo.',
     ),
     GuideStep(
       'filters',

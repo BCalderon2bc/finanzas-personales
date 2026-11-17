@@ -1,3 +1,4 @@
+import '../../core/app_theme.dart' show appMuted, primaryColor;
 import '../help/app_help.dart';
 import 'package:flutter/material.dart';
 import '../../core/supabase_client.dart';
@@ -193,7 +194,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           children: [
                             const Icon(
                               Icons.currency_exchange_rounded,
-                              color: Color(0xFF3C70AA),
+                              color: primaryColor,
                               size: 36,
                             ),
                             const SizedBox(height: 14),
@@ -248,17 +249,14 @@ class _SettingsPageState extends State<SettingsPage> {
                               'No cambia las monedas ni los importes de tus cuentas, '
                               'tarjetas o movimientos. Tampoco registra ganancias o pérdidas cambiarias. '
                               'Se aplica la misma tasa al mes seleccionado y al mes anterior.',
-                              style: TextStyle(
-                                color: Color(0xFF596B7D),
-                                height: 1.5,
-                              ),
+                              style: TextStyle(color: appMuted, height: 1.5),
                             ),
                             if (current?.updatedAt case final date?) ...[
                               const SizedBox(height: 12),
                               Text(
                                 'Última actualización: ${date.day}/${date.month}/${date.year}',
                                 style: const TextStyle(
-                                  color: Color(0xFF596B7D),
+                                  color: appMuted,
                                   fontSize: 12,
                                 ),
                               ),

@@ -1,3 +1,4 @@
+import '../../core/app_theme.dart';
 import '../statistics/statistics_page.dart';
 import '../recurring_expenses/recurring_expenses_page.dart';
 import '../help/app_help.dart';
@@ -27,6 +28,7 @@ class DashboardNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     Widget destination(String title, IconData icon, DashboardTarget target) =>
         ListTile(
           leading: Icon(icon),
@@ -63,10 +65,19 @@ class DashboardNavigation extends StatelessWidget {
       leading: Icon(icon),
       title: Text(title),
       childrenPadding: const EdgeInsets.only(left: 12),
-      children: children,
+      children: [
+        ListTileTheme.merge(
+          textColor: appNavigationText,
+          iconColor: appNavigationText,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: children,
+          ),
+        ),
+      ],
     );
 
-    return Drawer(
+    final drawer = Drawer(
       child: PrimaryScrollController.none(
         child: SafeArea(
           child: Column(
@@ -82,6 +93,7 @@ class DashboardNavigation extends StatelessWidget {
                       child: Text(
                         'Mi Billete',
                         style: TextStyle(
+                          color: Colors.white,
                           fontSize: 24,
                           fontWeight: FontWeight.w700,
                         ),
@@ -102,9 +114,8 @@ class DashboardNavigation extends StatelessWidget {
                               Expanded(
                                 child: Text(
                                   activeName ?? 'Usuario activo',
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.titleMedium,
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(color: Colors.white),
                                 ),
                               ),
                             ],
@@ -112,7 +123,9 @@ class DashboardNavigation extends StatelessWidget {
                           const SizedBox(height: 4),
                           Text(
                             activeEmail,
-                            style: Theme.of(context).textTheme.bodyMedium,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: appNavigationText,
+                            ),
                           ),
                         ],
                       ),
@@ -120,6 +133,11 @@ class DashboardNavigation extends StatelessWidget {
                     const Divider(),
                     ListTile(
                       selected: true,
+                      selectedColor: Colors.white,
+                      selectedTileColor: appNavigationSelection,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       leading: const Icon(Icons.dashboard_outlined),
                       title: const Text('Resumen principal'),
                       onTap: () => Navigator.pop(context),
@@ -236,6 +254,31 @@ class DashboardNavigation extends StatelessWidget {
           ),
         ),
       ),
+    );
+    return Theme(
+      data: theme.copyWith(
+        colorScheme: theme.colorScheme.copyWith(
+          onSurface: Colors.white,
+          onSurfaceVariant: appNavigationText,
+        ),
+        listTileTheme: theme.listTileTheme.copyWith(
+          iconColor: appNavigationText,
+          textColor: appNavigationText,
+          selectedColor: Colors.white,
+          selectedTileColor: appNavigationSelection,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        expansionTileTheme: const ExpansionTileThemeData(
+          textColor: Colors.white,
+          iconColor: Colors.white,
+          collapsedTextColor: appNavigationText,
+          collapsedIconColor: appNavigationText,
+        ),
+        iconTheme: const IconThemeData(color: appNavigationText),
+      ),
+      child: drawer,
     );
   }
 }

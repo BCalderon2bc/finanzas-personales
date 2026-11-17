@@ -1,3 +1,4 @@
+import '../../core/app_theme.dart' show appMuted;
 import '../../utils/card_cash_advance.dart';
 import '../../widgets/mobile_navigation.dart';
 import '../person_accounts/receipt_history.dart';
@@ -256,16 +257,34 @@ class _TransactionsPageState extends State<TransactionsPage> {
             originalDate.day != selectedDate.day) {
           changes['transaction_date'] = result['transaction_date'];
         }
-        final updated = await supabase
-            .from(table)
-            .update(changes)
-            .eq('id', transaction['id'])
-            .eq('user_id', user.id)
-            .select('id');
-        if (updated.isEmpty) {
-          throw StateError(
-            'No se actualizó: puede que ya no exista o falten permisos.',
+        if (fx && transaction['source'] != 'fx_transfer') {
+          await supabase.rpc(
+            'convert_transaction_to_fx',
+            params: {
+              'p_id': transaction['id'],
+              'p_account_id': result['account_id'],
+              'p_destination_account_id': result['destination_account_id'],
+              'p_amount': result['amount'],
+              'p_currency': result['currency'],
+              'p_destination_currency': result['destination_currency'],
+              'p_exchange_rate': result['exchange_rate'],
+              'p_transaction_date': changes['transaction_date'],
+              'p_description': result['description'],
+              'p_reference': result['reference'],
+            },
           );
+        } else {
+          final updated = await supabase
+              .from(table)
+              .update(changes)
+              .eq('id', transaction['id'])
+              .eq('user_id', user.id)
+              .select('id');
+          if (updated.isEmpty) {
+            throw StateError(
+              'No se actualizó: puede que ya no exista o falten permisos.',
+            );
+          }
         }
       }
       if (!mounted) {
@@ -386,7 +405,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
         };
       }),
     ];
-    rows.sort(compareNewestEntry);
+    rows.sort(compareNewestMovement);
     return rows;
   }
 
@@ -445,7 +464,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
       const Padding(
         padding: EdgeInsets.only(bottom: 8),
         child: Text(
-          'Últimos ingresados primero',
+          'Movimientos más recientes primero',
           style: TextStyle(fontSize: 12),
         ),
       ),
@@ -588,7 +607,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
                           child: Text(
                             '${visibleTransactions.length} de ${movements.length} movimientos',
                             style: const TextStyle(
-                              color: Color(0xFF596B7D),
+                              color: appMuted,
                               fontSize: 12,
                             ),
                           ),

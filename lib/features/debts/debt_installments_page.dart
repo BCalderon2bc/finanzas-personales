@@ -1,3 +1,4 @@
+import '../../core/app_theme.dart' show appMuted;
 import '../../widgets/collapsible_filters.dart';
 import '../../data/transaction_repository.dart';
 import '../person_accounts/receipt_draft_field.dart';
@@ -528,10 +529,7 @@ class _DebtInstallmentsPageState extends State<DebtInstallmentsPage> {
                         const Text(
                           'Un abono se vincula completo a una cuota. Vincularlo no descuenta dinero otra vez. Si se anula, deja de cubrirla. '
                           'Si liquidaste el préstamo anticipadamente, revisa y archiva las cuotas futuras que ya no correspondan.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF596B7D),
-                          ),
+                          style: TextStyle(fontSize: 12, color: appMuted),
                         ),
                       ],
                     ),

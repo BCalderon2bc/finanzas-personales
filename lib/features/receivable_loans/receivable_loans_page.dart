@@ -1,3 +1,5 @@
+import '../../core/app_theme.dart'
+    show appMuted, appNegative, appPositive, primaryColor;
 import '../../widgets/collapsible_filters.dart';
 import '../person_accounts/receipt_history.dart';
 import '../person_accounts/receipt_draft_field.dart';
@@ -515,10 +517,12 @@ class _ReceivableLoansPageState extends State<ReceivableLoansPage> {
     final voided = loan['is_voided'] == true;
     final overdue = receivableOverdue(loan, pending, DateTime.now());
     final color = voided
-        ? const Color(0xFF596B7D)
+        ? appMuted
         : overdue
-        ? const Color(0xFFA3453D)
-        : const Color(0xFF796A9C);
+        ? appNegative
+        : pending == 0
+        ? appPositive
+        : primaryColor;
     final due = DateTime.tryParse('${loan['due_date']}');
     final hasPayments = payments.any(
       (p) =>
@@ -528,7 +532,7 @@ class _ReceivableLoansPageState extends State<ReceivableLoansPage> {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(compactLayout(context) ? 14 : 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -586,7 +590,7 @@ class _ReceivableLoansPageState extends State<ReceivableLoansPage> {
             const SizedBox(height: 16),
             Text(
               voided ? 'Registro sin efecto en saldos' : 'Capital que te deben',
-              style: const TextStyle(color: Color(0xFF596B7D), fontSize: 12),
+              style: const TextStyle(color: appMuted, fontSize: 12),
             ),
             Text(
               receivableMoney(voided ? 0 : pending, currency),
@@ -623,7 +627,7 @@ class _ReceivableLoansPageState extends State<ReceivableLoansPage> {
                   : loan['credit_card_id'] != null
                   ? 'Origen: crédito · ${creditCardName(loan['credit_card_id'])}'
                   : 'Origen: cuenta / débito · ${accountName(loan['account_id'])}',
-              style: const TextStyle(color: Color(0xFF596B7D), fontSize: 12),
+              style: const TextStyle(color: appMuted, fontSize: 12),
             ),
             if ((loan['reference']?.toString() ?? '').isNotEmpty)
               SelectableText('Referencia: ${loan['reference']}'),

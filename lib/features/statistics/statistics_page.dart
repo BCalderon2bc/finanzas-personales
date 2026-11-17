@@ -1,3 +1,6 @@
+import '../../data/card_spending.dart';
+import '../dashboard/dashboard_financial_health.dart'
+    show CreditCardSpendingChart;
 import '../../widgets/collapsible_filters.dart';
 import 'dart:async';
 
@@ -159,6 +162,27 @@ class _StatisticsPageState extends State<StatisticsPage> {
                 obligationPanels(rate!)
               else
                 ...statistics(rate!),
+            ],
+            if (!loading && !failed && view != _StatisticsView.debts) ...[
+              const SizedBox(height: 12),
+              if (obligations case final data?)
+                CreditCardSpendingChart(
+                  spending: cardSpendingForPeriod(
+                    cards: data.cards,
+                    movements: data.cardMovements,
+                    start: range.start,
+                    end: range.end,
+                  ),
+                  currency: currency,
+                  exchangeRate: rate,
+                )
+              else
+                panel(
+                  'Gasto por tarjeta',
+                  const Text(
+                    'No se pudieron cargar los movimientos de tarjeta.',
+                  ),
+                ),
             ],
           ],
         ),

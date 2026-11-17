@@ -1,3 +1,4 @@
+import '../core/app_theme.dart' show appMuted, primaryColor;
 import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -377,7 +378,7 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
           children: [
             Row(
               children: [
-                Icon(widget.icon, color: const Color(0xFF3C70AA), size: 23),
+                Icon(widget.icon, color: primaryColor, size: 23),
                 const SizedBox(width: 9),
                 Expanded(
                   child: Text(
@@ -409,7 +410,7 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
               mobile && widget.items.length > 1
                   ? '${index + 1} de ${widget.items.length} · Desliza o usa las flechas'
                   : 'Selecciona una tarjeta para ver sus detalles.',
-              style: const TextStyle(color: Color(0xFF596B7D), fontSize: 13),
+              style: const TextStyle(color: appMuted, fontSize: 13),
             ),
             const SizedBox(height: 14),
             Stack(

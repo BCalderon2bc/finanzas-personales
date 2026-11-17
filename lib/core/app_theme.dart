@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 
-const primaryColor = Color(0xFF3C70AA);
-const appBackground = Color(0xFFF5F7FA);
-const appText = Color(0xFF243447);
-const appMuted = Color(0xFF596B7D);
-const appBorder = Color(0xFFDCE3EB);
+const appNavy = Color(0xFF304B64);
+const appNavigationText = Color(0xFFDCE7F1);
+const appNavigationSelection = Color(0xFF4E6D88);
+const primaryColor = Color(0xFF426583);
+const appBackground = Color(0xFFF1F5F9);
+const appText = Color(0xFF203449);
+const appPrimaryDeep = Color(0xFF36536D);
+const appSurfaceSubtle = Color(0xFFF7FAFC);
+const appSurfaceMuted = Color(0xFFE9EFF5);
+const appPrimaryTint = Color(0xFFDFE9F2);
+const appMuted = Color(0xFF526579);
+const appBorder = Color(0xFFDCE5EE);
 const appPositive = Color(0xFF35745C);
 const appWarning = Color(0xFF886128);
 const appNegative = Color(0xFFA3453D);
@@ -13,34 +20,38 @@ ThemeData createAppTheme() {
   final scheme = ColorScheme.fromSeed(seedColor: primaryColor).copyWith(
     primary: primaryColor,
     onPrimary: Colors.white,
-    primaryContainer: const Color(0xFFE5EDF6),
-    onPrimaryContainer: const Color(0xFF304F70),
-    secondary: const Color(0xFF627A91),
-    secondaryContainer: const Color(0xFFEBEFF4),
+    primaryContainer: appPrimaryTint,
+    onPrimaryContainer: const Color(0xFF2F4B65),
+    secondary: const Color(0xFF5C7184),
+    secondaryContainer: const Color(0xFFE8EEF4),
     onSecondaryContainer: appText,
     tertiary: appWarning,
     tertiaryContainer: const Color(0xFFF7EEDC),
     onTertiaryContainer: const Color(0xFF684A21),
     surface: Colors.white,
     surfaceContainerLowest: Colors.white,
-    surfaceContainerLow: const Color(0xFFF8FAFC),
-    surfaceContainer: const Color(0xFFF0F3F7),
-    surfaceContainerHigh: const Color(0xFFEAF0F5),
-    surfaceContainerHighest: const Color(0xFFE3EAF1),
+    surfaceContainerLow: appSurfaceSubtle,
+    surfaceContainer: appSurfaceMuted,
+    surfaceContainerHigh: const Color(0xFFE6EDF4),
+    surfaceContainerHighest: const Color(0xFFDFE8F0),
     onSurface: appText,
     onSurfaceVariant: appMuted,
-    outline: const Color(0xFF77899B),
+    outline: const Color(0xFF708499),
     outlineVariant: appBorder,
     error: appNegative,
     errorContainer: const Color(0xFFF9EBE8),
     onErrorContainer: const Color(0xFF79342E),
   );
-  final base = ThemeData(useMaterial3: true, colorScheme: scheme);
+  final base = ThemeData(
+    useMaterial3: true,
+    colorScheme: scheme,
+    fontFamily: 'Noto Sans',
+  );
   final controlShape = RoundedRectangleBorder(
     borderRadius: BorderRadius.circular(12),
   );
   final surfaceShape = RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(18),
+    borderRadius: BorderRadius.circular(14),
     side: const BorderSide(color: appBorder),
   );
   final inputBorder = OutlineInputBorder(
@@ -50,14 +61,14 @@ ThemeData createAppTheme() {
   final type = base.textTheme.copyWith(
     headlineMedium: base.textTheme.headlineMedium?.copyWith(
       fontWeight: FontWeight.w700,
-      letterSpacing: -0.6,
+      letterSpacing: -0.35,
     ),
     headlineSmall: base.textTheme.headlineSmall?.copyWith(
       fontWeight: FontWeight.w700,
       letterSpacing: -0.35,
     ),
     titleLarge: base.textTheme.titleLarge?.copyWith(
-      fontSize: 21,
+      fontSize: 22,
       fontWeight: FontWeight.w700,
       letterSpacing: -0.25,
     ),
@@ -77,19 +88,27 @@ ThemeData createAppTheme() {
     textTheme: type,
     scaffoldBackgroundColor: appBackground,
     appBarTheme: AppBarTheme(
-      backgroundColor: scheme.surface,
-      foregroundColor: appText,
+      backgroundColor: primaryColor,
+      foregroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 1,
       shadowColor: appText.withValues(alpha: .14),
       centerTitle: false,
-      titleTextStyle: type.titleLarge,
+      titleTextStyle: type.titleLarge?.copyWith(color: Colors.white),
+    ),
+    tabBarTheme: TabBarThemeData(
+      labelColor: primaryColor,
+      unselectedLabelColor: appMuted,
+      indicatorColor: primaryColor,
+      labelStyle: type.labelLarge,
+      unselectedLabelStyle: type.labelLarge,
     ),
     cardTheme: CardThemeData(
       color: scheme.surface,
       surfaceTintColor: Colors.transparent,
-      elevation: 0,
+      elevation: 1,
+      shadowColor: appNavy.withValues(alpha: .13),
       margin: const EdgeInsets.symmetric(vertical: 5),
       clipBehavior: Clip.antiAlias,
       shape: surfaceShape,
@@ -163,8 +182,27 @@ ThemeData createAppTheme() {
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
     ),
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: appNavy,
+      surfaceTintColor: Colors.transparent,
+      indicatorColor: appNavigationSelection,
+      iconTheme: WidgetStateProperty.resolveWith(
+        (states) => IconThemeData(
+          color: states.contains(WidgetState.selected)
+              ? Colors.white
+              : appNavigationText,
+        ),
+      ),
+      labelTextStyle: WidgetStateProperty.resolveWith(
+        (states) => type.labelMedium?.copyWith(
+          color: states.contains(WidgetState.selected)
+              ? Colors.white
+              : appNavigationText,
+        ),
+      ),
+    ),
     drawerTheme: DrawerThemeData(
-      backgroundColor: scheme.surface,
+      backgroundColor: appNavy,
       surfaceTintColor: Colors.transparent,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.horizontal(right: Radius.circular(20)),

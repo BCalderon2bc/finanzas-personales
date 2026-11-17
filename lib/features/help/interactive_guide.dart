@@ -1,3 +1,4 @@
+import '../../core/app_theme.dart' show appMuted, primaryColor;
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -450,7 +451,7 @@ class _GuideOverlayState extends State<_GuideOverlay>
                                 children: [
                                   const Icon(
                                     Icons.explore_outlined,
-                                    color: Color(0xFF3C70AA),
+                                    color: primaryColor,
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
@@ -470,7 +471,7 @@ class _GuideOverlayState extends State<_GuideOverlay>
                               ),
                               LinearProgressIndicator(
                                 value: (_index + 1) / widget.steps.length,
-                                color: const Color(0xFF3C70AA),
+                                color: primaryColor,
                               ),
                               const SizedBox(height: 12),
                               Column(
@@ -500,7 +501,7 @@ class _GuideOverlayState extends State<_GuideOverlay>
                                         'Este control aparece cuando hay datos o al elegir esa opción. Puedes continuar.',
                                         style: TextStyle(
                                           fontSize: 12,
-                                          color: Color(0xFF596B7D),
+                                          color: appMuted,
                                         ),
                                       ),
                                     ),

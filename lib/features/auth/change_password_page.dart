@@ -1,3 +1,4 @@
+import '../../core/app_theme.dart' show appMuted, primaryColor;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/supabase_client.dart';
@@ -166,9 +167,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
   @override
   Widget build(BuildContext context) {
-    const blue = Color(0xFF3C70AA),
-        green = Color(0xFF35745C),
-        muted = Color(0xFF596B7D);
+    const blue = primaryColor, green = Color(0xFF35745C), muted = appMuted;
     return PopScope(
       canPop: !saving,
       child: Scaffold(

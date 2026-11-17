@@ -1,3 +1,4 @@
+import '../../core/app_theme.dart' show primaryColor;
 import '../../widgets/mobile_navigation.dart';
 import '../../widgets/page_intro.dart';
 import '../../widgets/adaptive_layout.dart';
@@ -333,7 +334,7 @@ class _AccountsPageState extends State<AccountsPage> {
               const Icon(
                 Icons.account_balance_wallet_outlined,
                 size: 64,
-                color: Color(0xFF3C70AA),
+                color: primaryColor,
               ),
               const SizedBox(height: 16),
               const Text(

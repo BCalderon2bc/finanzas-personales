@@ -1,3 +1,4 @@
+import '../../core/app_theme.dart' show appBorder, appMuted, primaryColor;
 import 'package:flutter/material.dart';
 import '../../core/supabase_client.dart';
 import '../../data/credit_card_additional_repository.dart';
@@ -71,9 +72,7 @@ class _CreditCardDetailsState extends State<CreditCardDetails> {
   Widget build(BuildContext context) {
     final card = widget.card;
     final balances = widget.balances;
-    const blue = Color(0xFF3C70AA),
-        green = Color(0xFF35745C),
-        muted = Color(0xFF596B7D);
+    const blue = primaryColor, green = Color(0xFF35745C), muted = appMuted;
     final active = card['is_active'] == true;
     final base = card['currency'].toString();
     final limit = moneyCents(card['credit_limit']);
@@ -244,7 +243,7 @@ class _CreditCardDetailsState extends State<CreditCardDetails> {
                       : 0,
                   color: color,
                   minHeight: 9,
-                  backgroundColor: const Color(0xFFDCE3EB),
+                  backgroundColor: appBorder,
                 ),
               ),
               const SizedBox(height: 8),

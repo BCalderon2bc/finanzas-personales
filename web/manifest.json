@@ -6,8 +6,8 @@
     "name":  "Mi Billete - Finanzas personales",
     "short_name":  "Mi Billete",
     "description":  "Tus cuentas, tarjetas y metas financieras en un solo lugar.",
-    "theme_color":  "#005544",
-    "background_color":  "#F4FAF7",
+    "theme_color":  "#426583",
+    "background_color":  "#F1F5F9",
     "icons":  [
                   {
                       "src":  "icons/MiBillete-192.png",

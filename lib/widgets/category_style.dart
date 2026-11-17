@@ -1,3 +1,4 @@
+import '../core/app_theme.dart' show primaryColor;
 import 'package:flutter/material.dart';
 
 const categoryIconOptions = {
@@ -44,5 +45,5 @@ Color categoryColor(dynamic value, {bool income = false}) {
   if (RegExp(r'^[a-fA-F0-9]{6}$').hasMatch(hex)) {
     return Color(int.parse('FF$hex', radix: 16));
   }
-  return income ? const Color(0xFF047857) : const Color(0xFF3C70AA);
+  return income ? const Color(0xFF047857) : primaryColor;
 }

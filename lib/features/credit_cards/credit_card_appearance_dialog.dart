@@ -1,3 +1,4 @@
+import '../../core/app_theme.dart' show appMuted;
 import 'package:flutter/material.dart';
 import 'credit_card_face.dart';
 import 'credit_card_products.dart';
@@ -155,7 +156,7 @@ class _CreditCardAppearanceDialogState
             const SizedBox(height: 12),
             const Text(
               'Selecciona los datos de tu tarjeta. La imagen es una referencia visual.',
-              style: TextStyle(color: Color(0xFF596B7D), fontSize: 12),
+              style: TextStyle(color: appMuted, fontSize: 12),
             ),
           ],
         ),

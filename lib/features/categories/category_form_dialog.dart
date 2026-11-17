@@ -1,3 +1,4 @@
+import '../../core/app_theme.dart' show appMuted, appSurfaceMuted;
 import 'package:flutter/material.dart';
 import '../../widgets/category_style.dart';
 
@@ -159,7 +160,7 @@ class _CategoryFormDialogState extends State<CategoryFormDialog> {
                     padding: EdgeInsets.only(top: 8),
                     child: Text(
                       'El tipo se conserva para mantener la clasificación del historial.',
-                      style: TextStyle(color: Color(0xFF596B7D), fontSize: 12),
+                      style: TextStyle(color: appMuted, fontSize: 12),
                     ),
                   ),
                 const SizedBox(height: 22),
@@ -180,12 +181,8 @@ class _CategoryFormDialogState extends State<CategoryFormDialog> {
                           tooltip: entry.value.$2,
                           onPressed: () => setState(() => iconKey = entry.key),
                           style: IconButton.styleFrom(
-                            backgroundColor: selected
-                                ? color
-                                : const Color(0xFFF0F3F7),
-                            foregroundColor: selected
-                                ? Colors.white
-                                : const Color(0xFF596B7D),
+                            backgroundColor: selected ? color : appSurfaceMuted,
+                            foregroundColor: selected ? Colors.white : appMuted,
                             minimumSize: const Size(48, 48),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),

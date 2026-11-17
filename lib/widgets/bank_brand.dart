@@ -1,3 +1,4 @@
+import '../core/app_theme.dart' show appPrimaryDeep, primaryColor;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -38,7 +39,7 @@ List<Color> bankGradient(String name) => switch (bankKey(name)) {
   'ficohsa' => const [Color(0xFF00357D), Color(0xFF0058CB)],
   'atlantida' => const [Color(0xFF991B23), Color(0xFFDC242D)],
   'bfp' => const [Color(0xFF005780), Color(0xFF009B96)],
-  _ => const [Color(0xFF315E91), Color(0xFF3C70AA)],
+  _ => const [appPrimaryDeep, primaryColor],
 };
 
 class BankLogo extends StatelessWidget {
@@ -71,7 +72,7 @@ class BankLogo extends StatelessWidget {
       width: width,
       height: height,
       child: path == null
-          ? Icon(fallbackIcon, color: const Color(0xFF3C70AA))
+          ? Icon(fallbackIcon, color: primaryColor)
           : path.endsWith('.svg')
           ? SvgPicture.asset(path, fit: BoxFit.contain, semanticsLabel: name)
           : Image.asset(path, fit: BoxFit.contain, semanticLabel: name),

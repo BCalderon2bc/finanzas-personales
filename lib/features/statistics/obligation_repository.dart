@@ -19,12 +19,12 @@ Future<ObligationData> loadObligationData() async {
   ) = await (
     statementRows(
       'credit_cards',
-      'id,name,currency,opening_balance,opening_balance_nio,opening_balance_usd,card_reference,financial_institutions(name)',
+      'id,name,currency,opening_balance,opening_balance_nio,opening_balance_usd,card_reference,card_tier,card_product,limit_exchange_rate,financial_institutions(name)',
       uid,
     ),
     statementRows(
       'credit_card_transactions',
-      'id,credit_card_id,transaction_type,amount,currency,transaction_date,is_voided',
+      'id,credit_card_id,transaction_type,amount,currency,transaction_date,is_voided,is_receivable_funding',
       uid,
     ),
     statementRows(

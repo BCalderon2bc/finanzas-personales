@@ -94,7 +94,6 @@ class TransactionTile extends StatelessWidget {
         final subtitle = [
           if (description.isNotEmpty && !compactPayment) label,
           if (category.isNotEmpty) category,
-          if (external) 'Pago vinculado',
         ].join(' · ');
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
@@ -142,6 +141,19 @@ class TransactionTile extends StatelessWidget {
                   Text(accountLabel),
                   if (subtitle.isNotEmpty)
                     Text(subtitle, style: theme.textTheme.bodySmall),
+                  if (external)
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: TextButton.icon(
+                        onPressed: onTap,
+                        icon: const Icon(Icons.link_rounded, size: 18),
+                        label: Text(
+                          type == 'withdrawal'
+                              ? 'Ver préstamo vinculado'
+                              : 'Ver pago vinculado',
+                        ),
+                      ),
+                    ),
                   if (receiptCount > 0) ...[
                     const SizedBox(height: 6),
                     Text.rich(

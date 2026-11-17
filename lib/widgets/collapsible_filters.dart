@@ -9,9 +9,11 @@ class CollapsibleFilters extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Card(
     margin: EdgeInsets.zero,
+    color: Theme.of(context).colorScheme.primaryContainer,
     clipBehavior: Clip.antiAlias,
     child: ExpansionTile(
       maintainState: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       leading: const Icon(Icons.tune_rounded),
       title: const Text('Filtros'),
       subtitle: summary == null ? null : Text(summary!),

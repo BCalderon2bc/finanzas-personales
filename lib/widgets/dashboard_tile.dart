@@ -1,3 +1,4 @@
+import '../core/app_theme.dart' show appSurfaceMuted;
 import 'package:flutter/material.dart';
 
 class DashboardTile extends StatelessWidget {
@@ -32,7 +33,7 @@ class DashboardTile extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: enabled
                       ? colors.primary.withAlpha(20)
-                      : const Color(0xFFF0F3F7),
+                      : appSurfaceMuted,
                   borderRadius: BorderRadius.circular(15),
                 ),
                 child: Icon(

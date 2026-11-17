@@ -1,7 +1,10 @@
+import '../../data/card_spending.dart';
+import '../../utils/entry_order.dart';
 import '../../widgets/collapsible_filters.dart';
 import '../../utils/card_cash_advance.dart';
 import '../../data/credit_card_additional_repository.dart';
-import '../../data/payment_agenda_labels.dart' show additionalCardLabel;
+import '../../data/payment_agenda_labels.dart'
+    show additionalCardLabel, agendaCardLabel;
 import '../../data/period_logic.dart' show includesDay;
 import '../../widgets/adaptive_layout.dart';
 import '../../widgets/date_period_field.dart';
@@ -23,10 +26,14 @@ import '../../widgets/void_payment_dialog.dart';
 class CreditCardMovementsPage extends StatefulWidget {
   const CreditCardMovementsPage({
     super.key,
-    required this.cardId,
+    required String this.cardId,
     this.initialAdditionalId,
   });
-  final String cardId;
+  const CreditCardMovementsPage.all({super.key})
+    : cardId = null,
+      initialAdditionalId = null;
+
+  final String? cardId;
   final String? initialAdditionalId;
   @override
   State<CreditCardMovementsPage> createState() =>
@@ -35,6 +42,11 @@ class CreditCardMovementsPage extends StatefulWidget {
 
 class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
   List<Map<String, dynamic>> movements = [];
+  bool get allCards => widget.cardId == null;
+  Map<String, String> cardLabels = {};
+  String? cardFilter, categoryFilter;
+  DateTimeRange? allDatesFilter;
+  String search = '';
   String name = '', currencyFilter = 'all', filter = 'all';
   Map<String, Map<String, dynamic>> additionalCards = {};
   late String? additionalFilter = widget.initialAdditionalId;
@@ -77,7 +89,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
             as Map,
       );
       final payment = Map<String, dynamic>.from(preview['payment'] as Map);
-      if ('${payment['credit_card_id']}' != widget.cardId)
+      if ('${payment['credit_card_id']}' != tx['credit_card_id'].toString())
         throw StateError('El pago cambió de tarjeta. Actualiza.');
       final rows = await statementRows(
         'accounts',
@@ -211,7 +223,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
           .delete()
           .eq('id', tx['id'])
           .eq('user_id', user.id)
-          .eq('credit_card_id', widget.cardId)
+          .eq('credit_card_id', tx['credit_card_id'])
           .eq('transaction_type', tx['transaction_type']);
       final deleted = await (isPayment ? query.eq('is_voided', true) : query)
           .select('id');
@@ -331,7 +343,12 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
           categories: available,
           movement: tx,
           cashAccounts: cashAccounts,
-          additionalCards: additionalCards.values.toList(),
+          additionalCards: additionalCards.values
+              .where(
+                (card) =>
+                    !allCards || card['credit_card_id'] == tx['credit_card_id'],
+              )
+              .toList(),
         ),
       );
       if (data == null || !mounted) return;
@@ -367,7 +384,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
           .update(changes)
           .eq('id', tx['id'])
           .eq('user_id', user.id)
-          .eq('credit_card_id', widget.cardId)
+          .eq('credit_card_id', tx['credit_card_id'])
           .eq('transaction_type', tx['transaction_type'])
           .select('id');
       if (!mounted) return;
@@ -432,36 +449,73 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
     try {
       final user = supabase.auth.currentUser;
       if (user == null) throw Exception('Debes iniciar sesión nuevamente.');
-      final card = await supabase
-          .from('credit_cards')
-          .select('name')
-          .eq('id', widget.cardId)
-          .eq('user_id', user.id)
-          .single();
-      final additions = await loadAdditionalCards(widget.cardId, user.id);
+      final cardId = widget.cardId;
+      final cards = cardId == null
+          ? await statementRows(
+              'credit_cards',
+              'id, name, card_reference, financial_institutions(name)',
+              user.id,
+            )
+          : [
+              await supabase
+                  .from('credit_cards')
+                  .select('name')
+                  .eq('id', cardId)
+                  .eq('user_id', user.id)
+                  .single(),
+            ];
+      final additions = cardId == null
+          ? await statementRows(
+              'credit_card_additionals',
+              'id, credit_card_id, holder_name, last_four, is_active',
+              user.id,
+            )
+          : await loadAdditionalCards(cardId, user.id);
+      final labels = {
+        if (allCards)
+          for (final card in cards)
+            card['id'].toString(): agendaCardLabel(card, includeName: false),
+      };
       final rows = <Map<String, dynamic>>[];
       for (var offset = 0; ; offset += 500) {
-        final result = await supabase
+        final query = supabase
             .from('credit_card_transactions')
             .select(
-              'id, additional_card_id, transaction_type, charge_kind, amount, currency, transaction_date, created_at, '
+              'id, credit_card_id, additional_card_id, transaction_type, charge_kind, amount, currency, transaction_date, created_at, '
               'description, reference, account_id, account_debit_amount, account_debit_currency, payment_exchange_rate, '
               'category_id, is_voided, is_receivable_funding, void_reason, voided_at, '
               'cash_advance_fee, cash_advance_account_id, excludes_from_limit, '
               'accounts!credit_card_transactions_account_id_user_id_fkey(name), categories(name)',
             )
-            .eq('credit_card_id', widget.cardId)
-            .eq('user_id', user.id)
-            .order('created_at', ascending: false)
-            .order('id', ascending: false)
-            .range(offset, offset + 499);
+            .eq('user_id', user.id);
+        final result =
+            await (cardId == null ? query : query.eq('credit_card_id', cardId))
+                .order(
+                  allCards ? 'transaction_date' : 'created_at',
+                  ascending: false,
+                )
+                .order('id', ascending: false)
+                .range(offset, offset + 499);
         final page = List<Map<String, dynamic>>.from(result);
         rows.addAll(page);
         if (page.length < 500) break;
       }
       if (!mounted || request != requestId) return;
+      if (supabase.auth.currentUser?.id != user.id) {
+        throw StateError('La sesión cambió. Actualiza la pantalla.');
+      }
+      if (allCards) rows.sort(compareNewestMovement);
       setState(() {
-        name = card['name'].toString();
+        name = cardId == null ? '' : cards.single['name'].toString();
+        cardLabels = labels;
+        if (!labels.containsKey(cardFilter)) cardFilter = null;
+        if (!rows.any(
+          (row) =>
+              row['category_id']?.toString() == categoryFilter &&
+              relatedName(row['categories']).isNotEmpty,
+        )) {
+          categoryFilter = null;
+        }
         additionalCards = {for (final a in additions) a['id'].toString(): a};
         if (additionalFilter != '' &&
             !additionalCards.containsKey(additionalFilter)) {
@@ -497,7 +551,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
       await supabase.rpc(
         'void_credit_card_payment',
         params: {
-          'p_card_id': widget.cardId,
+          'p_card_id': tx['credit_card_id'],
           'p_payment_id': tx['id'],
           'p_reason': reason,
         },
@@ -596,9 +650,18 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
             ),
             const SizedBox(height: 4),
             Text(dateText, style: theme.textTheme.bodySmall),
+            if (allCards)
+              Text(
+                cardLabels[tx['credit_card_id'].toString()] ??
+                    'Tarjeta no disponible',
+              ),
             if (additional != null)
-              Text('Adicional · ${additionalCardLabel(additional)}')
-            else if (type != 'payment' && additionalCards.isNotEmpty)
+              Text(
+                'Adicional · ${allCards ? '••${additional['last_four']}' : additionalCardLabel(additional)}',
+              )
+            else if (!allCards &&
+                type != 'payment' &&
+                additionalCards.isNotEmpty)
               const Text('Tarjeta titular'),
             if (description.isNotEmpty) ...[
               const SizedBox(height: 6),
@@ -714,131 +777,249 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
     );
   }
 
-  Widget filtersPanel(BuildContext context) => CollapsibleFilters(
-    summary: statusFilter == 'valid'
-        ? 'Vigentes'
-        : statusFilter == 'voided'
-        ? 'Anulados'
-        : 'Todos los estados',
-    children: [
-      DatePeriodField(
-        start: dateFilter.start,
-        end: dateFilter.end,
-        onChanged: (range) {
-          if (mounted) setState(() => dateFilter = range);
-        },
-      ),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: GuideAnchor(
-          id: 'type',
-          child: DropdownButtonFormField<String>(
-            initialValue: filter,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Tipo de movimiento'),
-            items: [
-              const DropdownMenuItem(value: 'all', child: Text('Todos')),
-              ...types.entries.map(
-                (e) => DropdownMenuItem(
-                  value: e.key,
-                  child: Text(e.value, overflow: TextOverflow.ellipsis),
+  Widget filtersPanel(BuildContext context) {
+    final categories = {
+      for (final tx in movements)
+        if (tx['category_id'] != null &&
+            relatedName(tx['categories']).isNotEmpty)
+          tx['category_id'].toString(): relatedName(tx['categories']),
+    };
+    return CollapsibleFilters(
+      summary: statusFilter == 'valid'
+          ? 'Vigentes'
+          : statusFilter == 'voided'
+          ? 'Anulados'
+          : 'Todos los estados',
+      children: [
+        if (allCards) ...[
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: TextFormField(
+              initialValue: search,
+              onChanged: (value) => setState(() => search = value),
+              decoration: const InputDecoration(
+                labelText: 'Buscar descripción o referencia',
+                prefixIcon: Icon(Icons.search),
+              ),
+            ),
+          ),
+          Wrap(
+            alignment: WrapAlignment.center,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final range = await showDateRangePicker(
+                    context: context,
+                    firstDate: DateTime(1900),
+                    lastDate: DateTime(2200),
+                    initialDateRange: allDatesFilter,
+                  );
+                  if (mounted && range != null)
+                    setState(() => allDatesFilter = range);
+                },
+                icon: const Icon(Icons.date_range_outlined),
+                label: Text(
+                  allDatesFilter == null
+                      ? 'Todas las fechas'
+                      : '${MaterialLocalizations.of(context).formatShortDate(allDatesFilter!.start)} – '
+                            '${MaterialLocalizations.of(context).formatShortDate(allDatesFilter!.end)}',
                 ),
               ),
+              if (allDatesFilter != null)
+                IconButton(
+                  tooltip: 'Quitar filtro de fechas',
+                  onPressed: () => setState(() => allDatesFilter = null),
+                  icon: const Icon(Icons.clear),
+                ),
             ],
-            onChanged: (value) {
-              if (value != null) setState(() => filter = value);
+          ),
+        ] else
+          DatePeriodField(
+            start: dateFilter.start,
+            end: dateFilter.end,
+            onChanged: (range) {
+              if (mounted) setState(() => dateFilter = range);
             },
           ),
-        ),
-      ),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: AdaptiveColumns(
-          minColumnWidth: 216,
-          maxColumns: additionalCards.isEmpty ? 4 : 3,
-          children: [
-            if (additionalCards.isNotEmpty)
-              DropdownButtonFormField<String>(
-                key: ValueKey(additionalFilter),
-                initialValue: additionalFilter ?? 'all',
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Tarjeta del movimiento',
-                ),
-                items: [
-                  const DropdownMenuItem(value: 'all', child: Text('Todas')),
-                  const DropdownMenuItem(
-                    value: '',
-                    child: Text('Titular / cuenta compartida'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: GuideAnchor(
+            id: 'type',
+            child: DropdownButtonFormField<String>(
+              initialValue: filter,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Tipo de movimiento',
+              ),
+              items: [
+                const DropdownMenuItem(value: 'all', child: Text('Todos')),
+                ...types.entries.map(
+                  (e) => DropdownMenuItem(
+                    value: e.key,
+                    child: Text(e.value, overflow: TextOverflow.ellipsis),
                   ),
-                  for (final card in additionalCards.values)
-                    DropdownMenuItem(
-                      value: card['id'].toString(),
-                      child: Text(
-                        additionalCardLabel(card),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                ],
-                onChanged: (value) => setState(
-                  () => additionalFilter = value == 'all' ? null : value,
                 ),
-              ),
-            GuideAnchor(
-              id: 'currency',
-              child: DropdownButtonFormField<String>(
-                initialValue: currencyFilter,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Moneda'),
-                items: const [
-                  DropdownMenuItem(value: 'all', child: Text('Ambas monedas')),
-                  DropdownMenuItem(value: 'NIO', child: Text('Córdobas')),
-                  DropdownMenuItem(value: 'USD', child: Text('Dólares')),
-                ],
-                onChanged: (v) {
-                  if (v != null) {
-                    setState(() => currencyFilter = v);
-                  }
-                },
-              ),
+              ],
+              onChanged: (value) {
+                if (value != null) setState(() => filter = value);
+              },
             ),
-            GuideAnchor(
-              id: 'state',
-              child: DropdownButtonFormField<String>(
-                initialValue: statusFilter,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Estado del registro',
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'valid', child: Text('Vigentes')),
-                  DropdownMenuItem(value: 'voided', child: Text('Anulados')),
-                  DropdownMenuItem(value: 'all', child: Text('Todos')),
-                ],
-                onChanged: (value) {
-                  if (value != null) setState(() => statusFilter = value);
-                },
-              ),
-            ),
-            if (receiptCounts != null)
-              ReceiptFilterField(
-                value: receiptFilter,
-                onChanged: (value) => setState(() => receiptFilter = value),
-              ),
-          ],
+          ),
         ),
-      ),
-    ],
-  );
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: AdaptiveColumns(
+            minColumnWidth: allCards ? 320 : 216,
+            maxColumns: allCards || additionalCards.isNotEmpty ? 3 : 4,
+            children: [
+              if (allCards) ...[
+                DropdownButtonFormField<String>(
+                  key: ValueKey(('card', cardFilter)),
+                  initialValue: cardFilter ?? '',
+                  isExpanded: true,
+                  itemHeight: null,
+                  decoration: const InputDecoration(labelText: 'Tarjeta'),
+                  items: [
+                    const DropdownMenuItem(
+                      value: '',
+                      child: Text('Todas las tarjetas'),
+                    ),
+                    for (final entry in cardLabels.entries)
+                      DropdownMenuItem(
+                        value: entry.key,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Text(entry.value),
+                        ),
+                      ),
+                  ],
+                  onChanged: (value) =>
+                      setState(() => cardFilter = value == '' ? null : value),
+                ),
+                DropdownButtonFormField<String>(
+                  key: ValueKey(('category', categoryFilter)),
+                  initialValue: categories.containsKey(categoryFilter)
+                      ? categoryFilter
+                      : '',
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Categoría'),
+                  items: [
+                    const DropdownMenuItem(
+                      value: '',
+                      child: Text('Todas las categorías'),
+                    ),
+                    for (final entry in categories.entries)
+                      DropdownMenuItem(
+                        value: entry.key,
+                        child: Text(
+                          entry.value,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: (value) => setState(
+                    () => categoryFilter = value == '' ? null : value,
+                  ),
+                ),
+              ] else if (additionalCards.isNotEmpty)
+                DropdownButtonFormField<String>(
+                  key: ValueKey(additionalFilter),
+                  initialValue: additionalFilter ?? 'all',
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Tarjeta del movimiento',
+                  ),
+                  items: [
+                    const DropdownMenuItem(value: 'all', child: Text('Todas')),
+                    const DropdownMenuItem(
+                      value: '',
+                      child: Text('Titular / cuenta compartida'),
+                    ),
+                    for (final card in additionalCards.values)
+                      DropdownMenuItem(
+                        value: card['id'].toString(),
+                        child: Text(
+                          additionalCardLabel(card),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: (value) => setState(
+                    () => additionalFilter = value == 'all' ? null : value,
+                  ),
+                ),
+              GuideAnchor(
+                id: 'currency',
+                child: DropdownButtonFormField<String>(
+                  initialValue: currencyFilter,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Moneda'),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'all',
+                      child: Text('Ambas monedas'),
+                    ),
+                    DropdownMenuItem(value: 'NIO', child: Text('Córdobas')),
+                    DropdownMenuItem(value: 'USD', child: Text('Dólares')),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) {
+                      setState(() => currencyFilter = v);
+                    }
+                  },
+                ),
+              ),
+              GuideAnchor(
+                id: 'state',
+                child: DropdownButtonFormField<String>(
+                  initialValue: statusFilter,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Estado del registro',
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'valid', child: Text('Vigentes')),
+                    DropdownMenuItem(value: 'voided', child: Text('Anulados')),
+                    DropdownMenuItem(value: 'all', child: Text('Todos')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) setState(() => statusFilter = value);
+                  },
+                ),
+              ),
+              if (receiptCounts != null)
+                ReceiptFilterField(
+                  value: receiptFilter,
+                  onChanged: (value) => setState(() => receiptFilter = value),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final dateRange = allCards ? allDatesFilter : dateFilter;
+    final term = search.trim().toLowerCase();
     final visible = movements.where((tx) {
       final date = DateTime.tryParse('${tx['transaction_date']}')?.toLocal();
-      if (date == null ||
-          !includesDay(date, dateFilter.start, dateFilter.end)) {
+      if (dateRange != null &&
+          (date == null ||
+              !includesDay(date, dateRange.start, dateRange.end))) {
         return false;
       }
+      if (cardFilter != null && tx['credit_card_id'].toString() != cardFilter)
+        return false;
+      if (categoryFilter != null &&
+          tx['category_id'].toString() != categoryFilter)
+        return false;
+      if (term.isNotEmpty &&
+          ![tx['description'], tx['reference']].any(
+            (value) => (value?.toString() ?? '').toLowerCase().contains(term),
+          ))
+        return false;
       if (additionalFilter != null &&
           (tx['additional_card_id']?.toString() ?? '') != additionalFilter) {
         return false;
@@ -860,6 +1041,16 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
       return true;
     }).toList();
 
+    final spending = <String, int>{'USD': 0, 'NIO': 0};
+    if (allCards) {
+      for (final tx in visible) {
+        final currency = tx['currency'].toString();
+        if (spending.containsKey(currency)) {
+          spending[currency] = spending[currency]! + cardSpendingCents(tx);
+        }
+      }
+    }
+
     return GuideScope(
       topic: 'card_history',
       ready: !loading && error == null,
@@ -867,7 +1058,9 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
         appBar: AppBar(
           title: GuideAnchor(
             id: 'title',
-            child: const Text('Movimientos de tarjeta'),
+            child: Text(
+              allCards ? 'Movimientos de tarjetas' : 'Movimientos de tarjeta',
+            ),
           ),
           actions: [
             const AppHelpButton(topic: 'cards'),
@@ -879,7 +1072,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
           ],
         ),
         body: PageFrame(
-          maxWidth: 1000,
+          maxWidth: allCards ? 1440 : 1000,
           child: loading
               ? const Center(child: CircularProgressIndicator())
               : error != null
@@ -901,41 +1094,109 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
                 )
               : RefreshIndicator(
                   onRefresh: loadData,
-                  child: ListView(
+                  child: CustomScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: EdgeInsets.fromLTRB(
-                      pageGutter(context),
-                      16,
-                      pageGutter(context),
-                      24,
-                    ),
-                    children: [
-                      Text(
-                        name,
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                      const SizedBox(height: 16),
-                      filtersPanel(context),
-                      const SizedBox(height: 20),
-                      Text(
-                        '${visible.length} de ${movements.length} movimientos',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Últimos ingresados primero · + aumenta la deuda · − reduce la deuda',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      const SizedBox(height: 8),
-                      if (visible.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.all(24),
-                          child: Text(
-                            'No hay movimientos para este filtro.',
-                            textAlign: TextAlign.center,
-                          ),
+                    slivers: [
+                      SliverPadding(
+                        padding: EdgeInsets.fromLTRB(
+                          pageGutter(context),
+                          16,
+                          pageGutter(context),
+                          0,
                         ),
-                      ...visible.map(movementCard),
+                        sliver: SliverList.list(
+                          children: [
+                            if (!allCards) ...[
+                              Text(
+                                name,
+                                style: Theme.of(
+                                  context,
+                                ).textTheme.headlineSmall,
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                            if (allCards) ...[
+                              Text(
+                                'Gasto neto en tarjetas',
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: 8),
+                              AdaptiveColumns(
+                                minColumnWidth: 140,
+                                spacing: 8,
+                                children: [
+                                  for (final entry in spending.entries)
+                                    Card(
+                                      margin: EdgeInsets.zero,
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(12),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
+                                          children: [
+                                            Text(
+                                              entry.key == 'USD'
+                                                  ? 'Dólares'
+                                                  : 'Córdobas',
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              cardMoney(entry.value, entry.key),
+                                              style: Theme.of(
+                                                context,
+                                              ).textTheme.titleLarge,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Cargos menos devoluciones según los filtros.',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            filtersPanel(context),
+                            const SizedBox(height: 20),
+                            Text(
+                              '${visible.length} de ${movements.length} movimientos',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              allCards
+                                  ? 'Más recientes primero · + aumenta la deuda · − reduce la deuda'
+                                  : 'Últimos ingresados primero · + aumenta la deuda · − reduce la deuda',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            const SizedBox(height: 8),
+                            if (visible.isEmpty)
+                              const Padding(
+                                padding: EdgeInsets.all(24),
+                                child: Text(
+                                  'No hay movimientos para este filtro.',
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      SliverPadding(
+                        padding: EdgeInsets.fromLTRB(
+                          pageGutter(context),
+                          0,
+                          pageGutter(context),
+                          24,
+                        ),
+                        sliver: SliverList.builder(
+                          itemCount: visible.length,
+                          itemBuilder: (_, index) =>
+                              movementCard(visible[index]),
+                        ),
+                      ),
                     ],
                   ),
                 ),

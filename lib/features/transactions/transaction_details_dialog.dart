@@ -41,9 +41,23 @@ class TransactionDetailsDialog extends StatelessWidget {
               '${date.month.toString().padLeft(2, '0')}/${date.year}';
     final currency = tx['currency']?.toString() ?? 'NIO';
     final amount = moneyCents(tx['amount']);
+    final source = tx['source'];
+    final linkedPayment =
+        source == 'credit_card_payment' || source == 'debt_payment';
+    final receivable = source == 'receivable_loan';
+    final title = linkedPayment
+        ? (source == 'debt_payment'
+              ? 'Detalle del abono de deuda'
+              : 'Detalle del pago de tarjeta')
+        : receivable
+        ? (type == 'withdrawal' ? 'Detalle del préstamo' : 'Detalle del cobro')
+        : labels[type] ?? 'Movimiento';
+    final insurance = moneyCents(tx['insurance_amount'] ?? 0);
+    String money(Object? value) =>
+        formatMoneyCents(moneyCents(value ?? 0), currency);
 
     return AlertDialog(
-      title: Text(labels[type] ?? 'Movimiento'),
+      title: Text(title),
       content: SizedBox(
         width: 420,
         child: SingleChildScrollView(
@@ -72,7 +86,35 @@ class TransactionDetailsDialog extends StatelessWidget {
                 ),
                 _detail('Tasa C\$ por \$ 1', '${tx['exchange_rate']}'),
               ],
-              _detail('Categoría', category),
+              if (source == 'credit_card_payment') ...[
+                _detail(
+                  'Aplicado a la tarjeta',
+                  formatMoneyCents(
+                    moneyCents(tx['card_amount'] ?? tx['amount']),
+                    '${tx['card_currency'] ?? currency}',
+                  ),
+                ),
+                if (tx['payment_exchange_rate'] != null)
+                  _detail('Tasa de cambio', '${tx['payment_exchange_rate']}'),
+              ],
+              if (source == 'debt_payment' || receivable) ...[
+                if (tx['payment_total'] != null)
+                  _detail('Total del cobro', money(tx['payment_total'])),
+                _detail('Capital', money(tx['principal_amount'])),
+                if (tx['interest_amount'] != null)
+                  _detail('Intereses', money(tx['interest_amount'])),
+                if (insurance != 0)
+                  _detail('Seguro', formatMoneyCents(insurance, currency)),
+                if (tx['fee_amount'] != null)
+                  _detail(
+                    'Comisiones y otros cargos',
+                    formatMoneyCents(
+                      moneyCents(tx['fee_amount']) - insurance,
+                      currency,
+                    ),
+                  ),
+              ],
+              if (category.isNotEmpty) _detail('Categoría', category),
               if (tx['expense_kind'] == 'card_insurance')
                 _detail('Tipo de gasto', 'Seguro de tarjeta'),
               _detail('Descripción', tx['description']?.toString()),

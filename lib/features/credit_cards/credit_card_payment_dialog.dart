@@ -1,3 +1,4 @@
+import '../../core/app_theme.dart' show appMuted;
 import '../person_accounts/receipt_draft_field.dart';
 import 'package:flutter/material.dart';
 import '../../data/card_statement_logic.dart';
@@ -166,7 +167,7 @@ class _CreditCardPaymentDialogState extends State<CreditCardPaymentDialog> {
                 const SizedBox(height: 8),
                 const Text(
                   'Asigna solo pagos que no estén descontados del saldo al corte registrado.',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF596B7D)),
+                  style: TextStyle(fontSize: 12, color: appMuted),
                 ),
                 const SizedBox(height: 12),
               ],

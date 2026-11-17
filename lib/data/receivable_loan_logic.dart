@@ -103,7 +103,7 @@ List<Map<String, dynamic>> receivableAccountMovements(
         createdAt: loan['created_at'],
         description: 'Dinero prestado a ${loan['borrower_name']}',
         reference: loan['reference'],
-      ),
+      )..['principal_amount'] = loan['principal_amount'],
     );
   }
   for (final payment in payments.where((p) => p['is_voided'] != true)) {
@@ -118,18 +118,24 @@ List<Map<String, dynamic>> receivableAccountMovements(
       final capital = component == 'principal_amount';
       result.add(
         row(
-          id: 'receivable:payment:${payment['id']}:$component',
-          loanId: loan['id'].toString(),
-          accountId: payment['account_id'].toString(),
-          type: capital ? 'deposit' : 'income',
-          amount: payment[component],
-          currency: payment['currency'].toString(),
-          date: payment['payment_date'],
-          createdAt: payment['created_at'],
-          description:
-              '${capital ? 'Capital devuelto por' : 'Intereses cobrados a'} ${loan['borrower_name']}',
-          reference: payment['reference'],
-        ),
+            id: 'receivable:payment:${payment['id']}:$component',
+            loanId: loan['id'].toString(),
+            accountId: payment['account_id'].toString(),
+            type: capital ? 'deposit' : 'income',
+            amount: payment[component],
+            currency: payment['currency'].toString(),
+            date: payment['payment_date'],
+            createdAt: payment['created_at'],
+            description:
+                '${capital ? 'Capital devuelto por' : 'Intereses cobrados a'} ${loan['borrower_name']}',
+            reference: payment['reference'],
+          )
+          ..['principal_amount'] = payment['principal_amount']
+          ..['interest_amount'] = payment['interest_amount']
+          ..['payment_total'] =
+              (moneyCents(payment['principal_amount']) +
+                  moneyCents(payment['interest_amount'])) /
+              100,
       );
     }
   }

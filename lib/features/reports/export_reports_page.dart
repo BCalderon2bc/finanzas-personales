@@ -1,3 +1,5 @@
+import '../../core/app_theme.dart'
+    show appMuted, appPrimaryTint, appSurfaceSubtle;
 import '../../widgets/collapsible_filters.dart';
 import '../../widgets/adaptive_layout.dart';
 import '../../data/exchange_rate.dart';
@@ -949,8 +951,8 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                       case final PersonAccountExportReport personReport) ...[
                     Card(
                       color: personReport.settled
-                          ? const Color(0xFFEDF3F9)
-                          : const Color(0xFFEFF6FF),
+                          ? appPrimaryTint
+                          : appSurfaceSubtle,
                       child: Padding(
                         padding: const EdgeInsets.all(18),
                         child: Column(
@@ -1037,7 +1039,7 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                     padding: EdgeInsets.only(top: 10),
                     child: Text(
                       'En la web, el navegador gestiona la descarga. Compartir muestra los destinos disponibles en tu dispositivo.',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF596B7D)),
+                      style: TextStyle(fontSize: 12, color: appMuted),
                     ),
                   ),
                   if (pdfNotice != null)
@@ -1051,10 +1053,7 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                       padding: const EdgeInsets.only(bottom: 6),
                       child: Text(
                         n,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF596B7D),
-                        ),
+                        style: const TextStyle(fontSize: 12, color: appMuted),
                       ),
                     ),
                   ),

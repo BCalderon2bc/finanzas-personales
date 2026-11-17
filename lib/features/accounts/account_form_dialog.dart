@@ -1,3 +1,4 @@
+import '../../core/app_theme.dart' show appMuted;
 import '../../widgets/adaptive_layout.dart';
 import '../help/app_help.dart';
 import '../../data/account_share_logic.dart';
@@ -392,7 +393,7 @@ class _AccountFormDialogState extends State<AccountFormDialog> {
                     padding: EdgeInsets.only(top: 8),
                     child: Text(
                       'El tipo y la moneda se conservan al editar.',
-                      style: TextStyle(color: Color(0xFF596B7D), fontSize: 12),
+                      style: TextStyle(color: appMuted, fontSize: 12),
                     ),
                   ),
                 const SizedBox(height: 12),

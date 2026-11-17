@@ -1,3 +1,4 @@
+import '../../core/app_theme.dart' show appMuted;
 import '../../widgets/collapsible_filters.dart';
 import 'zero_plans_page.dart';
 import '../person_accounts/receipt_draft_field.dart';
@@ -14,7 +15,7 @@ import '../../data/card_statement_repository.dart';
 import '../../data/card_statement_pdf.dart';
 import 'credit_card_statement_form.dart';
 import 'credit_card_face.dart';
-import 'credit_card_payment_dialog.dart';
+import 'register_statement_payment.dart';
 import 'credit_card_balances.dart';
 
 class CreditCardStatementsPage extends StatefulWidget {
@@ -213,62 +214,17 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
       params: {'p_id': c['id']},
     );
   });
-  Future<void> pay(Map<String, dynamic> s, int cents) => perform((
-    userId,
-  ) async {
-    final rows = await statementRows(
-      'accounts',
-      'id,name,currency,is_active',
-      userId,
-    );
-    final accounts = rows
-        .where((a) => a['is_active'] == true && a['currency'] == s['currency'])
-        .toList();
-    if (!mounted) {
-      return;
-    }
-    if (accounts.isEmpty) {
-      message('Necesitas una cuenta activa en ${s['currency']}.');
-      return;
-    }
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (_) => CreditCardPaymentDialog(
-        accounts: accounts,
-        currency: '${s['currency']}',
-        statements: [s],
-        initialStatementId: '${s['id']}',
-        initialAmountCents: cents,
-      ),
-    );
-    if (result == null || !mounted) {
-      return;
-    }
-    sameOwner(userId);
-    final linked = result['statement_id'];
-    final receipt = result.remove(receiptDraftKey) as PendingReceipt?;
-    final saved = await supabase.rpc(
-      linked == null
-          ? 'register_credit_card_payment'
-          : 'register_credit_card_payment_for_statement',
-      params: {
-        'p_card_id': cardId,
-        'p_account_id': result['account_id'],
-        'p_amount': result['amount'],
-        'p_reference': result['reference'],
-        if (linked != null) 'p_statement_id': linked,
-      },
-    );
-    if (mounted)
-      await attachFinancialReceipt(
-        context,
-        receipt,
-        userId,
-        'credit_card_transactions',
-        saved,
-      );
-    message('Pago registrado.');
-  });
+  Future<void> pay(Map<String, dynamic> s, int cents) =>
+      perform((userId) async {
+        if (await registerStatementPayment(
+          context,
+          userId,
+          s,
+          initialAmountCents: cents,
+        )) {
+          message('Pago registrado.');
+        }
+      });
   Future<void> assign(Map<String, dynamic> s) => perform((userId) async {
     final used = data!.links.map((l) => '${l['payment_id']}').toSet();
     final available =
@@ -869,7 +825,7 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
                               'Usa Aplicar reversión con las reducciones confirmadas por el banco. El saldo y mínimo informados conservan sus importes originales; no descuentes de nuevo esas reducciones al editar el corte. '
                               'Cubrir el mínimo no significa liquidar la deuda ni garantiza evitar intereses.',
                               style: TextStyle(
-                                color: Color(0xFF596B7D),
+                                color: appMuted,
                                 fontSize: 12,
                                 height: 1.5,
                               ),

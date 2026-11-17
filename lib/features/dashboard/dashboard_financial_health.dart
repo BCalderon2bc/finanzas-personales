@@ -1,14 +1,18 @@
+import '../../widgets/bank_brand.dart' show bankKey;
+import '../../data/card_spending.dart';
+import '../../data/exchange_rate.dart';
+import '../../core/app_theme.dart'
+    show appBorder, appMuted, appSurfaceMuted, primaryColor;
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'dashboard_overview.dart';
-import '../../data/expense_report_categories.dart';
 
-const _blue = Color(0xFF3C70AA);
+const _blue = primaryColor;
 const _green = Color(0xFF35745C);
 const _red = Color(0xFFA3453D);
 const _amber = Color(0xFF886128);
-const _muted = Color(0xFF596B7D);
-const _border = Color(0xFFDCE3EB);
+const _muted = appMuted;
+const _border = appBorder;
 
 class DashboardFinancialHealth extends StatelessWidget {
   const DashboardFinancialHealth({
@@ -68,8 +72,9 @@ class DashboardFinancialHealth extends StatelessWidget {
       final entry = positiveCategories[i];
       categorySlices.add(
         _Slice(
-          expenseReportCategoryLabels[entry.key] ??
-              data.categoryNames[entry.key] ?? 'Categoría no disponible',
+          entry.key == 'none'
+              ? 'Sin categoría'
+              : data.categoryNames[entry.key] ?? 'Categoría no disponible',
           entry.value,
           palette[i],
         ),
@@ -90,18 +95,6 @@ class DashboardFinancialHealth extends StatelessWidget {
       0,
       (sum, e) => sum + e.value,
     );
-
-    final allCategoryLegend = <_Legend>[
-      for (var i = 0; i < positiveCategories.length; i++)
-        _Legend(
-          expenseReportCategoryLabels[positiveCategories[i].key] ??
-              data.categoryNames[positiveCategories[i].key] ??
-              'Categoría no disponible',
-          '${money(positiveCategories[i].value)} · '
-              '${positiveCategoryTotal == 0 ? '0' : (positiveCategories[i].value / positiveCategoryTotal * 100).toStringAsFixed(0)}%',
-          palette[i < 5 ? i : 5],
-        ),
-    ];
 
     final hasNegativeCategories = c.categories.values.any((value) => value < 0);
 
@@ -264,7 +257,6 @@ class DashboardFinancialHealth extends StatelessWidget {
                     slice.color,
                   );
                 }).toList(),
-                expandedLegend: allCategoryLegend,
                 footer: hasNegativeCategories
                     ? 'Las categorías con devoluciones netas negativas no '
                           'participan en este gráfico. Sí se incluyen en el gasto neto del período.'
@@ -429,7 +421,6 @@ class _ChartPanel extends StatelessWidget {
     required this.slices,
     required this.emptyText,
     required this.legend,
-    this.expandedLegend,
     required this.footer,
   });
 
@@ -438,7 +429,6 @@ class _ChartPanel extends StatelessWidget {
   final Color centerColor;
   final List<_Slice> slices;
   final List<_Legend> legend;
-  final List<_Legend>? expandedLegend;
 
   Widget compactPanel(BuildContext context) {
     final hasValues = slices.any((slice) => slice.value > 0);
@@ -485,10 +475,49 @@ class _ChartPanel extends StatelessWidget {
         ),
       ),
     );
-    final values = _CategoryLegendList(
-      legend: legend,
-      expandedLegend: expandedLegend,
-      compact: true,
+    final values = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: legend
+          .map(
+            (item) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    margin: const EdgeInsets.only(top: 5),
+                    decoration: BoxDecoration(
+                      color: item.color,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.label,
+                          style: const TextStyle(fontSize: 13, color: _muted),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          item.value,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+          .toList(),
     );
     return Container(
       padding: const EdgeInsets.all(16),
@@ -661,11 +690,44 @@ class _ChartPanel extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 22),
-          _CategoryLegendList(
-            legend: legend,
-            expandedLegend: expandedLegend,
-            compact: false,
-          ),
+          for (final item in legend)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 7),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 9,
+                    height: 9,
+                    margin: const EdgeInsets.only(top: 4),
+                    decoration: BoxDecoration(
+                      color: item.color,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 5,
+                    child: Text(
+                      item.label,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    flex: 6,
+                    child: Text(
+                      item.value,
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           const Divider(height: 26),
           Text(
             footer,
@@ -673,93 +735,6 @@ class _ChartPanel extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _CategoryLegendList extends StatefulWidget {
-  const _CategoryLegendList({
-    required this.legend,
-    required this.expandedLegend,
-    required this.compact,
-  });
-
-  final List<_Legend> legend;
-  final List<_Legend>? expandedLegend;
-  final bool compact;
-
-  @override
-  State<_CategoryLegendList> createState() => _CategoryLegendListState();
-}
-
-class _CategoryLegendListState extends State<_CategoryLegendList> {
-  bool expanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final canExpand = widget.expandedLegend != null &&
-        widget.expandedLegend!.length > 5;
-    final rows = expanded && canExpand
-        ? widget.expandedLegend!
-        : widget.legend;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final item in rows)
-          Padding(
-            padding: EdgeInsets.symmetric(vertical: widget.compact ? 6 : 7),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: widget.compact ? 8 : 9,
-                  height: widget.compact ? 8 : 9,
-                  margin: const EdgeInsets.only(top: 4),
-                  decoration: BoxDecoration(
-                    color: item.color,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 5,
-                  child: Text(
-                    item.label,
-                    style: TextStyle(
-                      fontSize: widget.compact ? 13 : 12,
-                      color: widget.compact ? _muted : null,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Flexible(
-                  flex: 6,
-                  child: Text(
-                    item.value,
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                      fontSize: widget.compact ? 13 : 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        if (canExpand)
-          Align(
-            alignment: Alignment.center,
-            child: TextButton.icon(
-              onPressed: () => setState(() => expanded = !expanded),
-              icon: Icon(expanded
-                  ? Icons.keyboard_arrow_up_rounded
-                  : Icons.keyboard_arrow_down_rounded),
-              label: Text(expanded
-                  ? 'Mostrar menos'
-                  : 'Ver todas (${widget.expandedLegend!.length})'),
-            ),
-          ),
-      ],
     );
   }
 }
@@ -781,7 +756,7 @@ class _DonutPainter extends CustomPainter {
       ..strokeWidth = stroke
       ..strokeCap = StrokeCap.butt;
 
-    paint.color = const Color(0xFFF0F3F7);
+    paint.color = appSurfaceMuted;
     canvas.drawCircle(center, radius, paint);
 
     final positive = slices.where((slice) => slice.value > 0).toList();
@@ -806,4 +781,156 @@ class _DonutPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DonutPainter oldDelegate) =>
       oldDelegate.slices != slices;
+}
+
+class CreditCardSpendingChart extends StatelessWidget {
+  const CreditCardSpendingChart({
+    super.key,
+    required this.spending,
+    required this.currency,
+    this.exchangeRate,
+  });
+
+  final List<CardSpending> spending;
+  final String currency;
+  final ExchangeRate? exchangeRate;
+
+  static const _red = Color(0xFFC5223A);
+  static const _gold = Color(0xFFA66D00);
+  static const _teal = Color(0xFF007B73);
+  static const _cardBlue = Color(0xFF175DC0);
+  static const _purple = Color(0xFF7641A7);
+  static const _green = Color(0xFF477B22);
+  static const _orange = Color(0xFFC04F19);
+  static const _charcoal = Color(0xFF293241);
+  static const _slate = Color(0xFF667687);
+
+  static const _palette = [
+    _purple,
+    _teal,
+    _cardBlue,
+    _red,
+    _gold,
+    _charcoal,
+    _green,
+    _orange,
+    _slate,
+  ];
+
+  Map<String, Color> _cardColors() {
+    final cards = <String, CardSpending>{
+      for (final part in spending) part.cardId: part,
+    };
+    final ids = cards.keys.toList()..sort();
+    final colors = <String, Color>{};
+    final used = <Color>{};
+
+    // Give every card a chance to use its tier color before bank colors.
+    for (final id in ids) {
+      final tierColor = switch (cards[id]!.tier) {
+        'gold' => _gold,
+        'black' => _charcoal,
+        'platinum' => _slate,
+        'signature' => _purple,
+        'infinite' => _cardBlue,
+        _ => null,
+      };
+      if (tierColor != null && used.add(tierColor)) colors[id] = tierColor;
+    }
+    for (final id in ids.where((id) => !colors.containsKey(id))) {
+      final bankColor = switch (bankKey(cards[id]!.bank)) {
+        'bac' || 'atlantida' => _red,
+        'lafise' || 'bfp' => _teal,
+        'ficohsa' || 'bdf' => _cardBlue,
+        'avanz' => _gold,
+        'banpro' => _green,
+        _ => null,
+      };
+      if (bankColor != null && used.add(bankColor)) colors[id] = bankColor;
+    }
+
+    final alternatives = _palette
+        .where((color) => !used.contains(color))
+        .iterator;
+    for (final id in ids.where((id) => !colors.containsKey(id))) {
+      if (alternatives.moveNext()) {
+        colors[id] = alternatives.current;
+        used.add(alternatives.current);
+        continue;
+      }
+
+      // Extend the palette for wallets with more cards than base colors.
+      var key = (colors.length * 0x9E3779) & 0xFFFFFF;
+      var variant = Color(0xFF000000 | key);
+      while (!used.add(variant)) {
+        key = (key + 0x9E3779) & 0xFFFFFF;
+        variant = Color(0xFF000000 | key);
+      }
+      colors[id] = variant;
+    }
+    return colors;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _cardColors();
+    final totals = <String, ({String label, int cents})>{};
+    var usedGeneralRate = false;
+    var omittedForeignSpending = false;
+    for (final part in spending) {
+      var cents = part.cents;
+      if (part.currency != currency && cents != 0) {
+        final rate = part.cardExchangeRate ?? exchangeRate;
+        if (rate == null) {
+          omittedForeignSpending = true;
+          continue;
+        }
+        usedGeneralRate = usedGeneralRate || part.cardExchangeRate == null;
+        cents = rate.convert(cents, part.currency, currency);
+      }
+      totals[part.cardId] = (
+        label: part.label,
+        cents: (totals[part.cardId]?.cents ?? 0) + cents,
+      );
+    }
+    final sorted = totals.entries.toList()
+      ..sort((a, b) {
+        final byAmount = b.value.cents.compareTo(a.value.cents);
+        return byAmount == 0 ? a.key.compareTo(b.key) : byAmount;
+      });
+    final slices = [
+      for (final item in sorted)
+        _Slice(item.value.label, item.value.cents, colors[item.key]!),
+    ];
+    final total = slices
+        .where((slice) => slice.value > 0)
+        .fold<int>(0, (sum, slice) => sum + slice.value);
+    return _ChartPanel(
+      title: 'Gasto por tarjeta de crédito',
+      subtitle: 'Gasto neto positivo · $currency',
+      icon: Icons.credit_card_outlined,
+      center: '${slices.length}',
+      centerLabel: slices.length == 1 ? 'tarjeta' : 'tarjetas',
+      centerColor: _blue,
+      slices: slices,
+      emptyText: 'Sin tarjetas con gasto neto positivo en el período.',
+      legend: [
+        for (final slice in slices)
+          _Legend(
+            slice.label,
+            '${dashboardMoney(slice.value, currency)}'
+            '${slice.value > 0 ? ' · ${(100 * slice.value / total).toStringAsFixed(0)}%' : ''}',
+            slice.color,
+          ),
+      ],
+      footer: [
+        'Solo los gastos netos positivos forman parte de la dona. Los pagos de tarjeta quedan fuera del gasto.',
+        'La conversión usa la tasa configurada en cada tarjeta.',
+        if (usedGeneralRate)
+          'Para tarjetas sin tasa propia se usó la tasa general.',
+        if (omittedForeignSpending)
+          'Los gastos en otra moneda sin una tasa disponible quedaron fuera del cálculo.',
+      ].join(' '),
+    );
+  }
 }

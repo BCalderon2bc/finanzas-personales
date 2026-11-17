@@ -1,3 +1,4 @@
+import '../../core/app_theme.dart' show appMuted, appPrimaryDeep, primaryColor;
 import 'package:flutter/material.dart';
 import '../../utils/money.dart';
 
@@ -23,9 +24,7 @@ class BudgetSummary extends StatelessWidget {
     final remaining = limit - used;
     final colors = remaining < 0
         ? const [Color(0xFF881337), Color(0xFFBE123C)]
-        : currency == 'USD'
-        ? const [Color(0xFF3E6D66), Color(0xFF4B7B72)]
-        : const [Color(0xFF315E91), Color(0xFF3C70AA)];
+        : const [appPrimaryDeep, primaryColor];
 
     Widget detail(String label, int amount) => Expanded(
       child: Column(
@@ -172,11 +171,7 @@ class BudgetSummary extends StatelessWidget {
           child: Text(
             'Incluye los presupuestos visibles y el gasto de cada uno en su período. '
             'El disponible neto puede coexistir con categorías excedidas.',
-            style: TextStyle(
-              color: Color(0xFF596B7D),
-              fontSize: 12,
-              height: 1.5,
-            ),
+            style: TextStyle(color: appMuted, fontSize: 12, height: 1.5),
           ),
         ),
       ],

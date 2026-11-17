@@ -1,3 +1,4 @@
+import '../../core/app_theme.dart' show appBorder, appMuted, appText;
 import 'package:flutter/material.dart';
 import '../../widgets/category_style.dart';
 
@@ -21,7 +22,7 @@ class CategoryTile extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: const BorderSide(color: Color(0xFFDCE3EB)),
+        side: const BorderSide(color: appBorder),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -52,18 +53,13 @@ class CategoryTile extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: active
-                            ? const Color(0xFF243447)
-                            : const Color(0xFF596B7D),
+                        color: active ? appText : appMuted,
                       ),
                     ),
                     const SizedBox(height: 5),
                     Text(
                       '${income ? 'Ingreso' : 'Gasto'} · ${active ? 'Activa' : 'Inactiva'}',
-                      style: const TextStyle(
-                        color: Color(0xFF596B7D),
-                        fontSize: 12,
-                      ),
+                      style: const TextStyle(color: appMuted, fontSize: 12),
                     ),
                   ],
                 ),

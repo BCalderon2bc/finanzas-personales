@@ -71,7 +71,7 @@ Future<DashboardOverview> loadDashboardOverview(
       'credit_cards',
       'id, name, currency, credit_limit, opening_balance, '
           'opening_balance_nio, opening_balance_usd, '
-          'limit_exchange_rate, is_active, card_reference, financial_institutions(name)',
+          'limit_exchange_rate, is_active, card_reference, card_tier, card_product, financial_institutions(name)',
       user.id,
     ),
     _dashboardRows(

@@ -1,3 +1,5 @@
+import '../../core/app_theme.dart'
+    show appBorder, appMuted, appSurfaceMuted, appSurfaceSubtle;
 import '../../widgets/account_share_section.dart';
 import 'package:flutter/material.dart';
 import '../../utils/money.dart';
@@ -20,8 +22,8 @@ class AccountDetails extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const muted = Color(0xFF596B7D);
-    const border = Color(0xFFDCE3EB);
+    const muted = appMuted;
+    const border = appBorder;
     final active = account['is_active'] != false;
     final type = account['account_type']?.toString() ?? '';
     final institution = account['financial_institutions'];
@@ -55,7 +57,7 @@ class AccountDetails extends StatelessWidget {
     Widget detail(String label, String value, IconData icon) => Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: appSurfaceSubtle,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: border),
       ),
@@ -121,9 +123,7 @@ class AccountDetails extends StatelessWidget {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: active
-                        ? const Color(0xFFECFDF5)
-                        : const Color(0xFFF0F3F7),
+                    color: active ? const Color(0xFFECFDF5) : appSurfaceMuted,
                     borderRadius: BorderRadius.circular(9),
                   ),
                   child: Text(

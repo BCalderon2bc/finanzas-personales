@@ -1,3 +1,4 @@
+import '../../core/app_theme.dart' show appMuted;
 import '../../widgets/adaptive_layout.dart';
 import '../help/app_help.dart';
 import 'package:flutter/material.dart';
@@ -333,7 +334,7 @@ class _CreditCardFormDialogState extends State<CreditCardFormDialog> {
                 const SizedBox(height: 8),
                 const Text(
                   'Las compras y pagos se registran en su moneda. El límite corresponde a toda la tarjeta.',
-                  style: TextStyle(color: Color(0xFF596B7D), fontSize: 12),
+                  style: TextStyle(color: appMuted, fontSize: 12),
                 ),
                 const SizedBox(height: 12),
                 GuideAnchor(
@@ -403,7 +404,7 @@ class _CreditCardFormDialogState extends State<CreditCardFormDialog> {
                 const SizedBox(height: 8),
                 const Text(
                   'Ingresa lo que debías antes del historial registrado. Los movimientos existentes se suman a estos importes.',
-                  style: TextStyle(color: Color(0xFF596B7D), fontSize: 12),
+                  style: TextStyle(color: appMuted, fontSize: 12),
                 ),
                 const SizedBox(height: 16),
                 dayField('Día de corte (opcional)', closing),

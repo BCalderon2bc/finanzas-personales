@@ -531,7 +531,7 @@ Future<Uint8List> reportPdf(
                 color: PdfColors.white,
               ),
               headerDecoration: const pw.BoxDecoration(
-                color: PdfColor.fromInt(0xFF3C70AA),
+                color: PdfColor.fromInt(0xFF426583),
               ),
               cellStyle: pw.TextStyle(
                 fontSize: table.columns.length >= 11

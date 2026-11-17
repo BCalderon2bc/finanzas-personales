@@ -21,9 +21,14 @@ String cardBankName(Map<String, dynamic> card) {
 String cardBankKey(String name) => bankKey(name);
 
 class CreditCardFace extends StatelessWidget {
-  const CreditCardFace({super.key, required this.card, this.compact = false});
+  const CreditCardFace({
+    super.key,
+    required this.card,
+    this.compact = false,
+    this.imageOnly = false,
+  });
   final Map<String, dynamic> card;
-  final bool compact;
+  final bool compact, imageOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -141,6 +146,27 @@ class CreditCardFace extends StatelessWidget {
       },
     );
 
+    final artwork = AspectRatio(
+      // A common viewport keeps portrait and landscape designs aligned.
+      // BoxFit.contain preserves the complete original card image.
+      aspectRatio: compact ? 1.586 : visual?.aspectRatio ?? 1.586,
+      child: visual == null
+          ? customFace()
+          : visual.asset.toLowerCase().endsWith('.svg')
+          ? SvgPicture.asset(
+              visual.asset,
+              fit: BoxFit.contain,
+              semanticsLabel: 'Diseño oficial de referencia: ${visual.label}',
+            )
+          : Image.asset(
+              visual.asset,
+              fit: BoxFit.contain,
+              semanticLabel: 'Diseño oficial de referencia: ${visual.label}',
+              errorBuilder: (_, error, stackTrace) => customFace(),
+            ),
+    );
+    if (imageOnly) return artwork;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -192,27 +218,7 @@ class CreditCardFace extends StatelessWidget {
             ],
           ),
         SizedBox(height: compact ? 6 : 12),
-        AspectRatio(
-          // A common viewport keeps portrait and landscape designs aligned.
-          // BoxFit.contain preserves the complete original card image.
-          aspectRatio: compact ? 1.586 : visual?.aspectRatio ?? 1.586,
-          child: visual == null
-              ? customFace()
-              : visual.asset.toLowerCase().endsWith('.svg')
-              ? SvgPicture.asset(
-                  visual.asset,
-                  fit: BoxFit.contain,
-                  semanticsLabel:
-                      'Diseño oficial de referencia: ${visual.label}',
-                )
-              : Image.asset(
-                  visual.asset,
-                  fit: BoxFit.contain,
-                  semanticLabel:
-                      'Diseño oficial de referencia: ${visual.label}',
-                  errorBuilder: (_, error, stackTrace) => customFace(),
-                ),
-        ),
+        artwork,
         SizedBox(height: compact ? 5 : 10),
         Text(
           visual?.label ??

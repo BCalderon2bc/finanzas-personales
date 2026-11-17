@@ -1,3 +1,5 @@
+import '../../core/app_theme.dart'
+    show appBorder, appMuted, appSurfaceSubtle, appText, primaryColor;
 import 'package:flutter/material.dart';
 import '../../utils/money.dart';
 import 'debt_due_status.dart';
@@ -50,10 +52,7 @@ class DebtCard extends StatelessWidget {
   Widget amountDetail(String label, int amount) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Text(
-        label,
-        style: const TextStyle(color: Color(0xFF596B7D), fontSize: 12),
-      ),
+      Text(label, style: const TextStyle(color: appMuted, fontSize: 12)),
       const SizedBox(height: 6),
       FittedBox(
         fit: BoxFit.scaleDown,
@@ -61,7 +60,7 @@ class DebtCard extends StatelessWidget {
         child: Text(
           money(amount),
           style: const TextStyle(
-            color: Color(0xFF243447),
+            color: appText,
             fontSize: 17,
             fontWeight: FontWeight.w700,
           ),
@@ -72,12 +71,12 @@ class DebtCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const blue = Color(0xFF3C70AA);
+    const blue = primaryColor;
     const green = Color(0xFF35745C);
     const red = Color(0xFFA3453D);
     const amber = Color(0xFF886128);
-    const muted = Color(0xFF596B7D);
-    const border = Color(0xFFDCE3EB);
+    const muted = appMuted;
+    const border = appBorder;
     final original = moneyCents(debt['original_amount']);
     final pending = debt['status'] == 'paid' ? 0 : original - paidCents;
     final status = debt['status']?.toString() ?? '';
@@ -165,7 +164,7 @@ class DebtCard extends StatelessWidget {
                             style: const TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF243447),
+                              color: appText,
                             ),
                           ),
                           if (creditor.isNotEmpty) ...[
@@ -243,7 +242,7 @@ class DebtCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
+                    color: appSurfaceSubtle,
                     borderRadius: BorderRadius.circular(15),
                   ),
                   child: Column(

@@ -1,3 +1,4 @@
+import '../../core/app_theme.dart' show appMuted;
 import '../../widgets/collapsible_filters.dart';
 import '../../widgets/date_period_field.dart';
 import '../../data/period_logic.dart';
@@ -198,7 +199,7 @@ class _MonthlyExpensesPageState extends State<MonthlyExpensesPage> {
           count: counts[group.key] ?? 0,
           positiveTotalCents: positiveTotal,
           color: group.key == 'uncategorized'
-              ? const Color(0xFF596B7D)
+              ? appMuted
               : categoryColor(style?['color']),
           icon: switch (group.key) {
             'debt_costs' => Icons.payments_outlined,

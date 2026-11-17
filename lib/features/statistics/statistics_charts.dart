@@ -1,11 +1,12 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../utils/money.dart';
+import '../../core/app_theme.dart' show primaryColor;
 
 const incomeColor = Color(0xFF277354);
 const expenseColor = Color(0xFFB14838);
 const categoryColors = [
-  Color(0xFF2865A2),
+  primaryColor,
   Color(0xFFB14838),
   Color(0xFF277354),
   Color(0xFF7554A3),

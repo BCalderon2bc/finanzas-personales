@@ -10,6 +10,7 @@ import '../../core/supabase_client.dart';
 import '../../utils/money.dart';
 import '../../data/card_statement_repository.dart';
 import 'credit_card_statements_page.dart';
+import 'card_payment_sheet_page.dart';
 import 'credit_card_period_summary.dart';
 import 'credit_card_balances.dart';
 import 'credit_card_form_dialog.dart';
@@ -516,6 +517,20 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
     }
   }
 
+  Future<void> allHistory() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => const CreditCardMovementsPage.all()),
+    );
+    if (mounted) await loadData();
+  }
+
+  Future<void> openPaymentSheet() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => const CardPaymentSheetPage()),
+    );
+    if (mounted) await loadData();
+  }
+
   String cardOrder = 'bank';
   String orderCurrency = 'USD';
 
@@ -570,6 +585,9 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final showActionLabels =
+        MediaQuery.sizeOf(context).width >=
+        950 * MediaQuery.textScalerOf(context).scale(14) / 14;
     final selected = selectedCard;
     return GuideScope(
       topic: 'cards',
@@ -693,65 +711,116 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
                               ),
                             )
                           else ...[
-                            AdaptiveColumns(
-                              minColumnWidth: 235,
+                            Row(
                               children: [
-                                DropdownButtonFormField<String>(
-                                  initialValue: cardOrder,
-                                  isExpanded: true,
-                                  decoration: InputDecoration(
-                                    isDense: compactLayout(context),
-                                    labelText: 'Ordenar por',
-                                    prefixIcon: const Icon(Icons.sort_rounded),
+                                if (!showActionLabels)
+                                  IconButton.outlined(
+                                    tooltip:
+                                        'Movimientos de todas las tarjetas',
+                                    onPressed: loading || saving
+                                        ? null
+                                        : allHistory,
+                                    icon: const Icon(Icons.history),
+                                  )
+                                else
+                                  OutlinedButton.icon(
+                                    onPressed: loading || saving
+                                        ? null
+                                        : allHistory,
+                                    icon: const Icon(Icons.history),
+                                    label: const Text(
+                                      'Movimientos de todas las tarjetas',
+                                    ),
                                   ),
-                                  items: const [
-                                    DropdownMenuItem(
-                                      value: 'bank',
-                                      child: Text('Banco A–Z'),
+                                const SizedBox(width: 8),
+                                if (!showActionLabels)
+                                  IconButton.outlined(
+                                    tooltip: 'Hoja de pagos de tarjetas',
+                                    onPressed: loading || saving
+                                        ? null
+                                        : openPaymentSheet,
+                                    icon: const Icon(
+                                      Icons.receipt_long_outlined,
                                     ),
-                                    DropdownMenuItem(
-                                      value: 'debt_desc',
-                                      child: Text('Mayor deuda primero'),
+                                  )
+                                else
+                                  OutlinedButton.icon(
+                                    onPressed: loading || saving
+                                        ? null
+                                        : openPaymentSheet,
+                                    icon: const Icon(
+                                      Icons.receipt_long_outlined,
                                     ),
-                                    DropdownMenuItem(
-                                      value: 'debt_asc',
-                                      child: Text('Menor deuda primero'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'name',
-                                      child: Text('Nombre A–Z'),
-                                    ),
-                                  ],
-                                  onChanged: (value) {
-                                    if (value != null) {
-                                      setState(() => cardOrder = value);
-                                    }
-                                  },
-                                ),
-                                if (cardOrder == 'debt_desc' ||
-                                    cardOrder == 'debt_asc')
-                                  DropdownButtonFormField<String>(
-                                    initialValue: orderCurrency,
-                                    isExpanded: true,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Comparar deuda en',
-                                    ),
-                                    items: const [
-                                      DropdownMenuItem(
-                                        value: 'USD',
-                                        child: Text('Dólares · USD'),
+                                    label: const Text('Hoja de pagos'),
+                                  ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: AdaptiveColumns(
+                                    minColumnWidth: 235,
+                                    children: [
+                                      DropdownButtonFormField<String>(
+                                        initialValue: cardOrder,
+                                        isExpanded: true,
+                                        decoration: InputDecoration(
+                                          isDense: compactLayout(context),
+                                          labelText: 'Ordenar por',
+                                          prefixIcon: const Icon(
+                                            Icons.sort_rounded,
+                                          ),
+                                        ),
+                                        items: const [
+                                          DropdownMenuItem(
+                                            value: 'bank',
+                                            child: Text('Banco A–Z'),
+                                          ),
+                                          DropdownMenuItem(
+                                            value: 'debt_desc',
+                                            child: Text('Mayor deuda primero'),
+                                          ),
+                                          DropdownMenuItem(
+                                            value: 'debt_asc',
+                                            child: Text('Menor deuda primero'),
+                                          ),
+                                          DropdownMenuItem(
+                                            value: 'name',
+                                            child: Text('Nombre A–Z'),
+                                          ),
+                                        ],
+                                        onChanged: (value) {
+                                          if (value != null) {
+                                            setState(() => cardOrder = value);
+                                          }
+                                        },
                                       ),
-                                      DropdownMenuItem(
-                                        value: 'NIO',
-                                        child: Text('Córdobas · NIO'),
-                                      ),
+                                      if (cardOrder == 'debt_desc' ||
+                                          cardOrder == 'debt_asc')
+                                        DropdownButtonFormField<String>(
+                                          initialValue: orderCurrency,
+                                          isExpanded: true,
+                                          decoration: const InputDecoration(
+                                            labelText: 'Comparar deuda en',
+                                          ),
+                                          items: const [
+                                            DropdownMenuItem(
+                                              value: 'USD',
+                                              child: Text('Dólares · USD'),
+                                            ),
+                                            DropdownMenuItem(
+                                              value: 'NIO',
+                                              child: Text('Córdobas · NIO'),
+                                            ),
+                                          ],
+                                          onChanged: (value) {
+                                            if (value != null) {
+                                              setState(
+                                                () => orderCurrency = value,
+                                              );
+                                            }
+                                          },
+                                        ),
                                     ],
-                                    onChanged: (value) {
-                                      if (value != null) {
-                                        setState(() => orderCurrency = value);
-                                      }
-                                    },
                                   ),
+                                ),
                               ],
                             ),
                             const SizedBox(height: 16),

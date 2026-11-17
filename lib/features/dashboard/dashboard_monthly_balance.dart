@@ -1,3 +1,4 @@
+import '../../core/app_theme.dart' show appMuted, appSurfaceMuted, primaryColor;
 import 'package:flutter/material.dart';
 import 'dashboard_overview.dart';
 
@@ -32,10 +33,7 @@ class DashboardMonthlyBalance extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(
-                  label,
-                  style: const TextStyle(color: Color(0xFF596B7D)),
-                ),
+                child: Text(label, style: const TextStyle(color: appMuted)),
               ),
               Text(
                 dashboardMoney(amount, currency),
@@ -49,7 +47,7 @@ class DashboardMonthlyBalance extends StatelessWidget {
             child: LinearProgressIndicator(
               value: maximum == 0 ? 0 : amount.abs() / maximum,
               minHeight: 10,
-              backgroundColor: const Color(0xFFF0F3F7),
+              backgroundColor: appSurfaceMuted,
               color: color,
             ),
           ),
@@ -66,7 +64,7 @@ class DashboardMonthlyBalance extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.bar_chart_rounded, color: Color(0xFF3C70AA)),
+                const Icon(Icons.bar_chart_rounded, color: primaryColor),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -77,10 +75,7 @@ class DashboardMonthlyBalance extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 4),
-            Text(
-              data.period.label,
-              style: const TextStyle(color: Color(0xFF596B7D)),
-            ),
+            Text(data.period.label, style: const TextStyle(color: appMuted)),
             const SizedBox(height: 20),
             bar('Ingresos', income, const Color(0xFF35745C)),
             bar(
@@ -121,7 +116,7 @@ class DashboardMonthlyBalance extends StatelessWidget {
                         : '${difference > 0 ? 'Mejoró' : 'Disminuyó'} '
                               '${dashboardMoney(difference.abs(), currency)} '
                               'frente al período anterior.',
-                    style: const TextStyle(color: Color(0xFF596B7D)),
+                    style: const TextStyle(color: appMuted),
                   ),
                 ],
               ),
@@ -129,7 +124,7 @@ class DashboardMonthlyBalance extends StatelessWidget {
             const SizedBox(height: 12),
             const Text(
               'Las barras comparan magnitudes. El resultado excluye transferencias y pagos de capital.',
-              style: TextStyle(color: Color(0xFF596B7D), fontSize: 12),
+              style: TextStyle(color: appMuted, fontSize: 12),
             ),
           ],
         ),

@@ -1,3 +1,5 @@
+import '../../core/app_theme.dart'
+    show appBorder, appMuted, appSurfaceSubtle, appText;
 import 'package:flutter/material.dart';
 import '../../utils/money.dart';
 import '../../widgets/category_style.dart';
@@ -22,8 +24,8 @@ class BudgetCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const muted = Color(0xFF596B7D);
-    const border = Color(0xFFDCE3EB);
+    const muted = appMuted;
+    const border = appBorder;
     final remaining = limitCents - usedCents;
     final exceeded = remaining < 0;
     final ratio = limitCents > 0 ? usedCents / limitCents : 0.0;
@@ -68,7 +70,7 @@ class BudgetCard extends StatelessWidget {
             child: Text(
               money(amount),
               style: const TextStyle(
-                color: Color(0xFF243447),
+                color: appText,
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
               ),
@@ -117,7 +119,7 @@ class BudgetCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF243447),
+                        color: appText,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -163,7 +165,7 @@ class BudgetCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: appSurfaceSubtle,
               borderRadius: BorderRadius.circular(15),
             ),
             child: Column(

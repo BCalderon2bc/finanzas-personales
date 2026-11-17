@@ -1,3 +1,4 @@
+import '../../core/app_theme.dart' show appMuted;
 import '../person_accounts/receipt_draft_field.dart';
 import 'package:flutter/material.dart';
 import '../../data/receivable_loan_logic.dart';
@@ -131,10 +132,7 @@ class _ReceivableLoanFormDialogState extends State<ReceivableLoanFormDialog> {
                       value: 'NIO',
                       child: Text('Córdobas (C\$)'),
                     ),
-                    DropdownMenuItem(
-                      value: 'USD',
-                      child: Text('Dólares (\$)'),
-                    ),
+                    DropdownMenuItem(value: 'USD', child: Text('Dólares (\$)')),
                   ],
                   onChanged: (v) {
                     if (v != null) {
@@ -207,10 +205,7 @@ class _ReceivableLoanFormDialogState extends State<ReceivableLoanFormDialog> {
                       padding: EdgeInsets.only(top: 8),
                       child: Text(
                         'No registres otra compra manual por este mismo préstamo. El cargo se crea al guardar.',
-                        style: TextStyle(
-                          color: Color(0xFF596B7D),
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: appMuted, fontSize: 12),
                       ),
                     ),
                 ],

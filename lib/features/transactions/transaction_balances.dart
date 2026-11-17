@@ -1,3 +1,4 @@
+import '../../core/app_theme.dart' show appMuted, appPrimaryDeep, primaryColor;
 import 'package:flutter/material.dart';
 import '../../utils/money.dart';
 
@@ -6,14 +7,16 @@ class TransactionBalances extends StatelessWidget {
     super.key,
     required this.nioCents,
     required this.usdCents,
+    this.onDetails,
   });
   final int nioCents, usdCents;
+  final ValueChanged<String>? onDetails;
 
   Widget balance(String currency, int cents) {
     final usd = currency == 'USD';
     final colors = usd
         ? const [Color(0xFF3E6D66), Color(0xFF4B7B72)]
-        : const [Color(0xFF315E91), Color(0xFF3C70AA)];
+        : const [appPrimaryDeep, primaryColor];
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -67,6 +70,15 @@ class TransactionBalances extends StatelessWidget {
               ),
             ),
           ),
+          if (onDetails != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: () => onDetails!(currency),
+                style: TextButton.styleFrom(foregroundColor: Colors.white),
+                child: const Text('Ver desglose'),
+              ),
+            ),
           const SizedBox(height: 8),
           Text(
             'Saldo registrado · cuentas activas',
@@ -103,7 +115,7 @@ class TransactionBalances extends StatelessWidget {
       const SizedBox(height: 10),
       const Text(
         'Los saldos incluyen todos los registros y no cambian con los filtros.',
-        style: TextStyle(color: Color(0xFF596B7D), fontSize: 12),
+        style: TextStyle(color: appMuted, fontSize: 12),
       ),
     ],
   );

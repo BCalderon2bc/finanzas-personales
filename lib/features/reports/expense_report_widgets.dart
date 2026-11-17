@@ -1,3 +1,12 @@
+import '../../core/app_theme.dart'
+    show
+        appBorder,
+        appMuted,
+        appPrimaryDeep,
+        appSurfaceMuted,
+        appSurfaceSubtle,
+        appText,
+        primaryColor;
 import '../../data/exchange_rate.dart';
 import '../credit_cards/credit_card_balances.dart'
     show cardPointsRedemption, cardPointsRedemptionLabel;
@@ -56,7 +65,7 @@ class ExpenseReportSummary extends StatelessWidget {
         gradient: LinearGradient(
           colors: total < 0
               ? const [Color(0xFF3E6D66), Color(0xFF4B7B72)]
-              : const [Color(0xFF315E91), Color(0xFF3C70AA)],
+              : const [appPrimaryDeep, primaryColor],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -155,7 +164,7 @@ class ExpenseCategoryCard extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: const BorderSide(color: Color(0xFFDCE3EB)),
+        side: const BorderSide(color: appBorder),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -184,7 +193,7 @@ class ExpenseCategoryCard extends StatelessWidget {
                         Text(
                           name,
                           style: const TextStyle(
-                            color: Color(0xFF243447),
+                            color: appText,
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
                           ),
@@ -192,17 +201,14 @@ class ExpenseCategoryCard extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           '$count movimientos',
-                          style: const TextStyle(
-                            color: Color(0xFF596B7D),
-                            fontSize: 12,
-                          ),
+                          style: const TextStyle(color: appMuted, fontSize: 12),
                         ),
                       ],
                     ),
                   ),
                   const Icon(
                     Icons.chevron_right_rounded,
-                    color: Color(0xFF596B7D),
+                    color: appMuted,
                     size: 20,
                   ),
                 ],
@@ -251,7 +257,7 @@ class ExpenseCategoryCard extends StatelessWidget {
                   value: ratio.clamp(0.0, 1.0).toDouble(),
                   minHeight: 7,
                   color: accent,
-                  backgroundColor: const Color(0xFFF0F3F7),
+                  backgroundColor: appSurfaceMuted,
                 ),
               ),
             ],
@@ -300,7 +306,7 @@ class ExpenseDetailTile extends StatelessWidget {
       exchangeRate?.convert(cents, originalCurrency, currency) ?? cents,
       currency,
     );
-    final color = refund ? const Color(0xFF35745C) : const Color(0xFF3C70AA);
+    final color = refund ? const Color(0xFF35745C) : primaryColor;
     final description = tx['description']?.toString().trim() ?? '';
     final reference = tx['reference']?.toString().trim() ?? '';
     final cardLabel = tx['card_label']?.toString().trim() ?? '';
@@ -331,7 +337,7 @@ class ExpenseDetailTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: appSurfaceSubtle,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -360,18 +366,12 @@ class ExpenseDetailTile extends StatelessWidget {
                 const SizedBox(height: 5),
                 Text(
                   '$dateText · $label',
-                  style: const TextStyle(
-                    color: Color(0xFF596B7D),
-                    fontSize: 12,
-                  ),
+                  style: const TextStyle(color: appMuted, fontSize: 12),
                 ),
                 if (card && cardLabel.isNotEmpty)
                   Text(
                     cardLabel,
-                    style: const TextStyle(
-                      color: Color(0xFF596B7D),
-                      fontSize: 12,
-                    ),
+                    style: const TextStyle(color: appMuted, fontSize: 12),
                   ),
                 const SizedBox(height: 9),
                 Text(
@@ -412,10 +412,7 @@ class ExpenseDetailTile extends StatelessWidget {
                   const SizedBox(height: 7),
                   SelectableText(
                     'Referencia: $reference',
-                    style: const TextStyle(
-                      color: Color(0xFF596B7D),
-                      fontSize: 12,
-                    ),
+                    style: const TextStyle(color: appMuted, fontSize: 12),
                   ),
                 ],
               ],

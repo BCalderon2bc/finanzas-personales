@@ -1,3 +1,4 @@
+import '../../core/app_theme.dart' show appMuted, primaryColor;
 import '../../widgets/collapsible_filters.dart';
 import '../../widgets/page_intro.dart';
 import '../../widgets/adaptive_layout.dart';
@@ -294,7 +295,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
                                 size: 18,
                                 color: type == 'income'
                                     ? const Color(0xFF047857)
-                                    : const Color(0xFF3C70AA),
+                                    : primaryColor,
                               ),
                               const SizedBox(width: 8),
                               Expanded(
@@ -309,7 +310,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
                               Text(
                                 '${visible.where((c) => c['category_type'] == type).length}',
                                 style: const TextStyle(
-                                  color: Color(0xFF596B7D),
+                                  color: appMuted,
                                   fontSize: 12,
                                 ),
                               ),

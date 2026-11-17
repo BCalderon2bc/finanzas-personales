@@ -1,3 +1,4 @@
+import '../../data/card_spending.dart';
 import '../../data/payment_agenda_labels.dart' show agendaCardLabel;
 import '../../data/period_logic.dart';
 import '../../utils/money.dart';
@@ -44,6 +45,12 @@ DashboardOverview buildDashboardOverview(
   final data = DashboardOverview(
     DateTime(period.start.year, period.start.month),
     period: period,
+  );
+  data.cardSpending = cardSpendingForPeriod(
+    cards: cards,
+    movements: cardTransactions,
+    start: period.start,
+    end: period.end,
   );
   final previous = period.previous;
   today = DateTime(today.year, today.month, today.day);

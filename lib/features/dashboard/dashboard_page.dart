@@ -1,3 +1,4 @@
+import '../../core/app_theme.dart' show appBorder, appMuted, primaryColor;
 import '../../widgets/mobile_navigation.dart';
 import '../../widgets/adaptive_layout.dart';
 import '../help/app_help.dart';
@@ -29,6 +30,7 @@ import 'upcoming_payments_panel.dart';
 import '../reports/export_reports_page.dart';
 import '../debts/debt_installments_page.dart';
 import '../credit_cards/credit_card_statements_page.dart';
+import '../credit_cards/card_payment_sheet_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -436,6 +438,16 @@ class _DashboardPageState extends State<DashboardPage> {
                           ),
                         ),
                         const SizedBox(height: 20),
+                        Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: OutlinedButton.icon(
+                            onPressed: () =>
+                                pushPage(const CardPaymentSheetPage()),
+                            icon: const Icon(Icons.credit_card_outlined),
+                            label: const Text('Hoja de pagos de tarjetas'),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
                         GuideAnchor(
                           id: 'upcoming',
                           child: UpcomingPaymentsPanel(
@@ -461,7 +473,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           decoration: BoxDecoration(
                             color: Theme.of(context).colorScheme.surface,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFFDCE3EB)),
+                            border: Border.all(color: appBorder),
                           ),
                           child: Row(
                             children: [
@@ -482,7 +494,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                           ? 'Configura la tasa para combinar NIO y USD.'
                                           : '1 USD = C\$ ${rate.decimal} · Incluye ambas monedas',
                                       style: const TextStyle(
-                                        color: Color(0xFF596B7D),
+                                        color: appMuted,
                                         fontSize: 12,
                                       ),
                                     ),
@@ -502,7 +514,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                 onPressed: openSettings,
                                 icon: const Icon(
                                   Icons.currency_exchange_rounded,
-                                  color: Color(0xFF3C70AA),
+                                  color: primaryColor,
                                 ),
                               ),
                             ],
@@ -514,6 +526,14 @@ class _DashboardPageState extends State<DashboardPage> {
                           data: presented,
                           currency: currency,
                         ),
+                        if (current != null) ...[
+                          const SizedBox(height: 12),
+                          CreditCardSpendingChart(
+                            spending: current.cardSpending,
+                            currency: currency,
+                            exchangeRate: rate,
+                          ),
+                        ],
                       ],
                       const SizedBox(height: 22),
                       Text(
@@ -557,10 +577,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           '${current.loadedAt.minute.toString().padLeft(2, '0')} · '
                           '${presented.currencies[currency]!.movements} '
                           'movimientos en el rango',
-                          style: const TextStyle(
-                            color: Color(0xFF596B7D),
-                            fontSize: 12,
-                          ),
+                          style: const TextStyle(color: appMuted, fontSize: 12),
                         ),
                       ],
                     ],

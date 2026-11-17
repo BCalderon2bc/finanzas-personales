@@ -1,3 +1,5 @@
+import '../../data/card_spending.dart';
+import '../../utils/total_parts.dart';
 import '../credit_cards/credit_card_balances.dart';
 import 'dashboard_period.dart';
 export 'dashboard_period.dart';
@@ -78,6 +80,10 @@ class DashboardOverview {
 
   final categoryNames = <String, String>{};
   final categoryStyles = <String, Map<String, dynamic>>{};
+  List<CardSpending> cardSpending = const [];
+  final Map<String, List<TotalPart>> totalParts = {};
+
+  String rateNote = '';
   final accounts = <Map<String, dynamic>>[];
   final budgets = <Map<String, dynamic>>[];
   final events = <DashboardEvent>[];

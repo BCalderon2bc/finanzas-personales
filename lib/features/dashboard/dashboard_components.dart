@@ -1,13 +1,24 @@
+import '../../core/app_theme.dart'
+    show
+        appBorder,
+        appMuted,
+        appPrimaryDeep,
+        appSurfaceMuted,
+        appSurfaceSubtle,
+        appText,
+        primaryColor;
+import '../../widgets/total_details.dart';
+import '../../utils/total_parts.dart';
 import 'package:flutter/material.dart';
 import '../../widgets/category_style.dart';
 import '../../widgets/adaptive_layout.dart';
 import 'dashboard_overview.dart';
 
-const _blue = Color(0xFF3C70AA);
+const _blue = primaryColor;
 const _green = Color(0xFF35745C);
 const _red = Color(0xFFA3453D);
-const _muted = Color(0xFF596B7D);
-const _border = Color(0xFFDCE3EB);
+const _muted = appMuted;
+const _border = appBorder;
 
 class DashboardMetrics extends StatelessWidget {
   const DashboardMetrics({
@@ -24,9 +35,34 @@ class DashboardMetrics extends StatelessWidget {
     final compact = compactLayout(context);
     String delta(int amount) =>
         '${amount > 0 ? '+' : ''}${dashboardMoney(amount, currency)} vs período anterior';
+    void details(String kind, String title, int total) {
+      List<TotalPart> parts(String key) => (data.totalParts[key] ?? [])
+          .where((part) => part.currency == currency)
+          .toList();
+      showTotalDetails(
+        context,
+        title: title,
+        currency: currency,
+        total: total,
+        scope:
+            (kind == 'cash'
+                ? 'Cuentas activas · todas las fechas'
+                : '${data.period.start.toIso8601String().split('T').first} a ${data.period.end.toIso8601String().split('T').first}') +
+            data.rateNote,
+        parts: kind == 'net'
+            ? [
+                ...parts('income'),
+                for (final part in parts('expense'))
+                  (label: part.label, cents: -part.cents, currency: currency),
+              ]
+            : parts(kind),
+      );
+    }
+
     final cards = [
       _Metric(
         title: 'Saldo registrado',
+        onDetails: () => details('cash', 'Saldo registrado', c.cash),
         amount: dashboardMoney(c.cash, currency),
         footer: '${c.activeAccounts} cuentas activas',
         icon: Icons.account_balance_wallet_outlined,
@@ -35,6 +71,7 @@ class DashboardMetrics extends StatelessWidget {
       ),
       _Metric(
         title: compact ? 'Ingresos' : 'Ingresos del período',
+        onDetails: () => details('income', 'Ingresos del período', c.income),
         amount: dashboardMoney(c.income, currency),
         footer: delta(c.income - c.previousIncome),
         icon: Icons.south_west,
@@ -44,6 +81,7 @@ class DashboardMetrics extends StatelessWidget {
       ),
       _Metric(
         title: compact ? 'Gastos' : 'Gastos del período',
+        onDetails: () => details('expense', 'Gastos del período', c.expense),
         amount: dashboardMoney(c.expense, currency),
         footer: delta(c.expense - c.previousExpense),
         icon: Icons.north_east,
@@ -53,6 +91,7 @@ class DashboardMetrics extends StatelessWidget {
       ),
       _Metric(
         title: 'Ingresos − gastos',
+        onDetails: () => details('net', 'Ingresos − gastos', c.net),
         amount: dashboardMoney(c.net, currency),
         footer: delta(c.net - c.previousNet),
         icon: Icons.insights_outlined,
@@ -93,11 +132,13 @@ class _Metric extends StatelessWidget {
     required this.icon,
     this.hero = false,
     this.footerColor,
+    required this.onDetails,
     this.iconColor,
     required this.compact,
   });
   final String title, amount, footer;
   final IconData icon;
+  final VoidCallback onDetails;
   final bool hero, compact;
   final Color? footerColor, iconColor;
 
@@ -112,7 +153,7 @@ class _Metric extends StatelessWidget {
         color: hero ? null : Colors.white,
         gradient: hero
             ? const LinearGradient(
-                colors: [Color(0xFF315E91), Color(0xFF3C70AA)],
+                colors: [appPrimaryDeep, primaryColor],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               )
@@ -169,7 +210,7 @@ class _Metric extends StatelessWidget {
                 fontSize: compact && !hero ? 23 : 30,
                 fontWeight: FontWeight.w800,
                 letterSpacing: -0.8,
-                color: hero ? Colors.white : const Color(0xFF243447),
+                color: hero ? Colors.white : appText,
               ),
             ),
           ),
@@ -197,6 +238,13 @@ class _Metric extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+          TextButton(
+            onPressed: onDetails,
+            style: TextButton.styleFrom(
+              foregroundColor: hero ? Colors.white : _blue,
+            ),
+            child: const Text('Ver desglose'),
           ),
         ],
       ),
@@ -238,43 +286,6 @@ class DashboardQuickActions extends StatelessWidget {
             ),
           )
           .toList(),
-    );
-  }
-}
-
-/// Muestra las cinco categorías principales y permite desplegar las demás
-/// sin abandonar el dashboard, igual que la sección Próximos pagos.
-class _ExpandableCategoryRows extends StatefulWidget {
-  const _ExpandableCategoryRows({required this.rows});
-
-  final List<Widget> rows;
-
-  @override
-  State<_ExpandableCategoryRows> createState() => _ExpandableCategoryRowsState();
-}
-
-class _ExpandableCategoryRowsState extends State<_ExpandableCategoryRows> {
-  bool expanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final count = widget.rows.length;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        ...widget.rows.take(expanded ? count : 5),
-        if (count > 5)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () => setState(() => expanded = !expanded),
-              icon: Icon(expanded
-                  ? Icons.keyboard_arrow_up_rounded
-                  : Icons.keyboard_arrow_down_rounded),
-              label: Text(expanded ? 'Mostrar menos' : 'Ver todas ($count)'),
-            ),
-          ),
-      ],
     );
   }
 }
@@ -361,8 +372,7 @@ class DashboardPanels extends StatelessWidget {
                 style: TextStyle(color: _muted),
               ),
             ),
-          _ExpandableCategoryRows(
-            rows: entries.map((entry) {
+          ...entries.take(5).map((entry) {
             final style = data.categoryStyles[entry.key];
             final uncategorized = entry.key == 'none';
             final color = uncategorized
@@ -410,9 +420,7 @@ class DashboardPanels extends StatelessWidget {
                               money(entry.value),
                               style: TextStyle(
                                 fontWeight: FontWeight.w700,
-                                color: entry.value < 0
-                                    ? _green
-                                    : const Color(0xFF243447),
+                                color: entry.value < 0 ? _green : appText,
                               ),
                             ),
                             Text(
@@ -433,7 +441,7 @@ class DashboardPanels extends StatelessWidget {
                             value: ratio.clamp(0.0, 1.0).toDouble(),
                             minHeight: 7,
                             color: color,
-                            backgroundColor: const Color(0xFFF0F3F7),
+                            backgroundColor: appSurfaceMuted,
                           ),
                         ),
                       ],
@@ -442,12 +450,19 @@ class DashboardPanels extends StatelessWidget {
                 ],
               ),
             );
-            }).toList(),
-          ),
+          }),
           if (entries.isNotEmpty)
             const Text(
               'Porcentajes entre categorías con gasto neto positivo.',
               style: TextStyle(color: _muted, fontSize: 11),
+            ),
+          if (entries.length > 5)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                '${entries.length - 5} categorías más en el reporte.',
+                style: const TextStyle(color: _muted, fontSize: 11),
+              ),
             ),
           if (entries.any((entry) => entry.value < 0))
             const Padding(
@@ -548,7 +563,7 @@ class DashboardPanels extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
+                  color: appSurfaceSubtle,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: exceeded ? color.withAlpha(65) : _border,
@@ -665,6 +680,25 @@ class DashboardPanels extends StatelessWidget {
         amountRow('Deuda de tarjetas', c.cardKnown ? c.cardDebt : null),
         const Divider(),
         amountRow('Total registrado', c.liabilities, bold: true),
+        if (c.liabilities != null)
+          Builder(
+            builder: (context) => TextButton(
+              onPressed: () => showTotalDetails(
+                context,
+                title: 'Deuda registrada',
+                currency: currency,
+                total: c.liabilities!,
+                scope:
+                    'Capital pendiente de préstamos y deuda de tarjetas · todas las fechas${data.rateNote}',
+                parts: [
+                  ...?data.totalParts['loans'],
+                  ...?data.totalParts['cardDebt'],
+                ].where((part) => part.currency == currency).toList(),
+              ),
+              child: const Text('Ver desglose de deuda'),
+            ),
+          ),
+
         if (c.cardKnown && c.cardCredit > 0)
           amountRow('Saldo a favor en tarjetas', c.cardCredit, color: _green),
         amountRow(
@@ -716,23 +750,9 @@ class DashboardPanels extends StatelessWidget {
   );
 
   Widget accountsPanel() {
-    // Mostrar cuentas de ambas monedas con su saldo original.
-    // Orden: saldo positivo primero, luego de mayor a menor; en empates USD antes de NIO.
-    final accounts = [...data.accounts]
-      ..sort((a, b) {
-        final aBalance = (a['original_balance_cents'] ?? a['balance_cents']) as int;
-        final bBalance = (b['original_balance_cents'] ?? b['balance_cents']) as int;
-        final aPositive = aBalance > 0;
-        final bPositive = bBalance > 0;
-        if (aPositive != bPositive) return aPositive ? -1 : 1;
-        final byBalance = bBalance.compareTo(aBalance);
-        if (byBalance != 0) return byBalance;
-        final aCurrency = (a['original_currency'] ?? a['currency']).toString();
-        final bCurrency = (b['original_currency'] ?? b['currency']).toString();
-        if (aCurrency != bCurrency) return aCurrency == 'USD' ? -1 : 1;
-        return a['name'].toString().compareTo(b['name'].toString());
-      });
-    final visibleAccounts = accounts.take(5).toList();
+    final accounts = data.accounts
+        .where((a) => a['currency'] == currency)
+        .take(5);
     const types = {
       'cash': 'Efectivo',
       'savings': 'Ahorro',
@@ -749,12 +769,12 @@ class DashboardPanels extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (visibleAccounts.isEmpty)
+          if (accounts.isEmpty)
             const Text(
-              'No hay cuentas activas.',
+              'No hay cuentas activas en esta moneda.',
               style: TextStyle(color: _muted),
             ),
-          ...visibleAccounts.map(
+          ...accounts.map(
             (a) => Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Row(
@@ -794,10 +814,7 @@ class DashboardPanels extends StatelessWidget {
                   const SizedBox(width: 8),
                   Flexible(
                     child: Text(
-                      dashboardMoney(
-                        (a['original_balance_cents'] ?? a['balance_cents']) as int,
-                        (a['original_currency'] ?? a['currency']).toString(),
-                      ),
+                      money(a['balance_cents'] as int),
                       textAlign: TextAlign.right,
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
@@ -812,20 +829,16 @@ class DashboardPanels extends StatelessWidget {
   }
 
   Widget recentPanel() {
-    // Los movimientos recientes son independientes del filtro de moneda.
-    // Mostrar ambas monedas, ordenadas del mas reciente al mas antiguo.
-    final events = [...data.events]
-      ..sort((a, b) {
-        final byDate = b.date.compareTo(a.date);
-        return byDate != 0 ? byDate : a.id.compareTo(b.id);
-      });
-    final recentEvents = events.take(10).toList();
+    final events = data.events
+        .where((e) => e.currency == currency)
+        .take(6)
+        .toList();
     return _Panel(
       title: 'Actividad reciente del período',
       icon: Icons.history_rounded,
       action: 'Ver movimientos',
       onAction: () => onOpen(DashboardTarget.transactions),
-      child: recentEvents.isEmpty
+      child: events.isEmpty
           ? const Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
               child: Column(
@@ -833,7 +846,7 @@ class DashboardPanels extends StatelessWidget {
                   Icon(Icons.receipt_long_outlined, size: 36, color: _muted),
                   SizedBox(height: 10),
                   Text(
-                    'Sin actividad para este período.',
+                    'Sin actividad para este rango y moneda.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: _muted),
                   ),
@@ -841,8 +854,8 @@ class DashboardPanels extends StatelessWidget {
               ),
             )
           : Column(
-              children: List.generate(recentEvents.length, (index) {
-                final e = recentEvents[index];
+              children: List.generate(events.length, (index) {
+                final e = events[index];
                 final color = e.flow > 0
                     ? _green
                     : e.flow < 0
@@ -869,7 +882,7 @@ class DashboardPanels extends StatelessWidget {
                       ? '+'
                       : e.flow < 0
                       ? '−'
-                      : ''}${dashboardMoney(e.cents, e.currency)}',
+                      : ''}${money(e.cents)}',
                   style: TextStyle(color: color, fontWeight: FontWeight.w700),
                 );
 
@@ -968,7 +981,7 @@ class DashboardPanels extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if (index < recentEvents.length - 1)
+                    if (index < events.length - 1)
                       const Divider(height: 1, color: _border),
                   ],
                 );
@@ -1062,7 +1075,7 @@ class _Panel extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(9),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
+                      color: appSurfaceSubtle,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(icon, color: _blue, size: 20),

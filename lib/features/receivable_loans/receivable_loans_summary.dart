@@ -1,3 +1,4 @@
+import '../../widgets/adaptive_layout.dart';
 import 'package:flutter/material.dart';
 import '../../data/exchange_rate.dart';
 import '../../utils/money.dart';
@@ -15,7 +16,9 @@ class ReceivableLoansSummary extends StatelessWidget {
   final String? displayCurrency;
   final ExchangeRate? exchangeRate;
   bool get consolidated => displayCurrency != null && exchangeRate != null;
-  Widget currencyCard(String currency) {
+  Widget currencyCard(BuildContext context, String currency) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     int present(int amount, dynamic from) => consolidated
         ? exchangeRate!.convert(amount, from.toString(), currency)
         : amount;
@@ -46,54 +49,49 @@ class ReceivableLoansSummary extends StatelessWidget {
       }
     }
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF4C1D95), Color(0xFF796A9C)],
-        ),
-        borderRadius: BorderRadius.circular(20),
+        color: colors.surface,
+        border: Border.all(color: colors.outlineVariant),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            currency == 'USD'
-                ? 'POR COBRAR · DÓLARES'
-                : 'POR COBRAR · CÓRDOBAS',
-            style: const TextStyle(
-              color: Color(0xFFEDE9FE),
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-            ),
+            currency == 'USD' ? 'Dólares' : 'Córdobas',
+            style: theme.textTheme.titleSmall,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 4),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
             child: Text(
               receivableMoney(pending, currency),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 29,
-                fontWeight: FontWeight.w800,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                color: colors.primary,
               ),
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 4),
           Text(
-            '$count préstamos pendientes',
-            style: const TextStyle(color: Colors.white),
+            count == 1 ? '1 préstamo pendiente' : '$count préstamos pendientes',
+            style: theme.textTheme.bodySmall,
           ),
-          const SizedBox(height: 6),
-          Text(
-            'Capital vencido: ${receivableMoney(overdue, currency)}',
-            style: const TextStyle(color: Color(0xFFEDE9FE), fontSize: 12),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Intereses cobrados · historial: ${receivableMoney(interests, currency)}',
-            style: const TextStyle(color: Color(0xFFEDE9FE), fontSize: 12),
-          ),
+          if (overdue > 0) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Vencido: ${receivableMoney(overdue, currency)}',
+              style: theme.textTheme.bodySmall?.copyWith(color: colors.error),
+            ),
+          ],
+          if (interests != 0) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Intereses cobrados: ${receivableMoney(interests, currency)}',
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
         ],
       ),
     );
@@ -103,40 +101,37 @@ class ReceivableLoansSummary extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
+      Text(
+        'Capital por cobrar',
+        style: Theme.of(context).textTheme.titleMedium,
+      ),
+      const SizedBox(height: 8),
+      AdaptiveColumns(
+        minColumnWidth: 145,
+        spacing: 8,
+        children: [
+          if (consolidated)
+            currencyCard(context, displayCurrency!)
+          else ...[
+            currencyCard(context, 'NIO'),
+            currencyCard(context, 'USD'),
+          ],
+        ],
+      ),
       if (consolidated)
-        currencyCard(displayCurrency!)
-      else
-        LayoutBuilder(
-          builder: (context, box) => box.maxWidth < 650
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    currencyCard('NIO'),
-                    const SizedBox(height: 12),
-                    currencyCard('USD'),
-                  ],
-                )
-              : Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: currencyCard('NIO')),
-                    const SizedBox(width: 14),
-                    Expanded(child: currencyCard('USD')),
-                  ],
-                ),
-        ),
-      if (consolidated)
-        const Padding(
-          padding: EdgeInsets.only(top: 10),
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
           child: Text(
-            'Total equivalente calculado con la tasa de Configuraciones.',
-            style: TextStyle(color: Color(0xFF596B7D), fontSize: 12),
+            'Total equivalente con la tasa de Configuraciones.',
+            style: Theme.of(context).textTheme.bodySmall,
           ),
         ),
-      const SizedBox(height: 10),
-      const Text(
-        'Es dinero que te deben. No forma parte del efectivo ni del ahorro disponible hasta que lo recibas.',
-        style: TextStyle(color: Color(0xFF596B7D), fontSize: 12),
+      Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Text(
+          'Disponible como efectivo al recibir el pago.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
       ),
     ],
   );

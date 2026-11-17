@@ -1,3 +1,4 @@
+import '../../core/app_theme.dart' show appBorder, appMuted, primaryColor;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../widgets/adaptive_layout.dart';
@@ -39,11 +40,7 @@ class CreditCardWallet extends StatelessWidget {
           color: Theme.of(context).colorScheme.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(22),
-            side: BorderSide(
-              color: selected
-                  ? const Color(0xFF3C70AA)
-                  : const Color(0xFFDCE3EB),
-            ),
+            side: BorderSide(color: selected ? primaryColor : appBorder),
           ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
@@ -71,10 +68,7 @@ class CreditCardWallet extends StatelessWidget {
                     const Divider(height: 18),
                     Text(
                       card['is_active'] == true ? 'Activa' : 'Inactiva',
-                      style: const TextStyle(
-                        color: Color(0xFF596B7D),
-                        fontSize: 13,
-                      ),
+                      style: const TextStyle(color: appMuted, fontSize: 13),
                     ),
                   ],
                 ],

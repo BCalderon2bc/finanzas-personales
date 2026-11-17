@@ -95,13 +95,21 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
       )
       .toList();
 
+  bool get canChangeTransferCurrency =>
+      !editingFx &&
+      (widget.transaction?['transaction_type'] == 'transfer' ||
+          widget.transaction?['transaction_type'] == 'expense');
+
   List<Map<String, dynamic>> get availableDestinations =>
       widget.accounts.where((a) {
         if (a['id'].toString() == accountId) return false;
         if (editingFx) {
           return a['currency'] == widget.transaction?['destination_currency'];
         }
-        return !editing || widget.practice || a['currency'] == selectedCurrency;
+        return !editing ||
+            widget.practice ||
+            canChangeTransferCurrency ||
+            a['currency'] == selectedCurrency;
       }).toList();
 
   String get destinationCurrency =>
@@ -276,7 +284,16 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
                       GuideAnchor(
                         id: 'origin',
                         child: DropdownButtonFormField<String>(
-                          initialValue: accountId,
+                          // Recreate the field when the selected account changes.
+                          // Otherwise FormField can retain the previous USD value
+                          // when editing an expense and switching to a NIO account.
+                          key: ValueKey('origin-$accountId'),
+                          initialValue:
+                              originAccounts.any(
+                                (a) => a['id'].toString() == accountId,
+                              )
+                              ? accountId
+                              : null,
                           isExpanded: true,
                           decoration: const InputDecoration(
                             labelText: 'Cuenta de origen',
@@ -322,7 +339,10 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
                         isExpanded: true,
                         decoration: InputDecoration(
                           labelText: 'Cuenta de destino',
-                          helperText: editing && !widget.practice
+                          helperText:
+                              editing &&
+                                  !widget.practice &&
+                                  !canChangeTransferCurrency
                               ? (editingFx
                                     ? 'Moneda de destino: ${widget.transaction?['destination_currency']}'
                                     : 'Selecciona una cuenta en $selectedCurrency.')
