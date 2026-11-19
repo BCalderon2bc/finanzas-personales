@@ -610,7 +610,7 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                 CollapsibleFilters(
                   children: [
                     const SizedBox(height: 14),
-                    if (kind == 'movements') ...[
+                    if (kind == 'movements' || kind == 'accounts') ...[
                       DropdownButtonFormField<IncomeExpenseSelection>(
                         initialValue: selection,
                         isExpanded: true,

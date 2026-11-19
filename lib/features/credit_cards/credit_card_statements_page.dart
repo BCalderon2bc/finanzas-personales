@@ -142,7 +142,7 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
         if (result == null || !mounted) return;
         sameOwner(userId);
         final folderId = await supabase.rpc(
-          'save_credit_card_statement_with_overdue',
+          'save_credit_card_statement_with_breakdown',
           params: {
             'p_card_id': cardId,
             'p_closing_date': result['closing_date'],
@@ -536,6 +536,14 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
             ),
             if (showDates) ...[const SizedBox(height: 8), dates(s)],
             const SizedBox(height: 8),
+            if (s['charges_interest_due'] != null)
+              Text(
+                'Cargos e intereses · ${cardMoney(moneyCents(s['charges_interest_due']), currency)}',
+              ),
+            if (s['intra_financing_due'] != null)
+              Text(
+                'Intrafinanciamientos · ${cardMoney(moneyCents(s['intra_financing_due']), currency)}',
+              ),
             Text('$balanceCaption · ${cardMoney(p.balance, currency)}'),
             Text(
               'Saldo pendiente · ${cardMoney(p.remaining, currency)}',

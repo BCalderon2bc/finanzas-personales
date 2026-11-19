@@ -138,6 +138,7 @@ ExportReport debitCardsExport({
   String? cardId,
   String? accountId,
   bool allAccounts = false,
+  IncomeExpenseSelection selection = IncomeExpenseSelection.both,
 }) {
   final cardsByAccount = <String, List<Map<String, dynamic>>>{};
   if (!allAccounts) {
@@ -229,6 +230,8 @@ ExportReport debitCardsExport({
       final delta = event['delta'] as int;
       balance += delta;
       if (!inReportRange(date, start, end)) continue;
+      if (selection == IncomeExpenseSelection.income && delta <= 0) continue;
+      if (selection == IncomeExpenseSelection.expenses && delta >= 0) continue;
       detail.add([
         reportDate(date),
         '${account['name']}',
@@ -252,7 +255,11 @@ ExportReport debitCardsExport({
   }
   return ExportReport(
     title: allAccounts
-        ? 'Cuentas y efectivo'
+        ? 'Cuentas y efectivo${switch (selection) {
+            IncomeExpenseSelection.both => '',
+            IncomeExpenseSelection.income => ' · Solo ingresos',
+            IncomeExpenseSelection.expenses => ' · Solo gastos',
+          }}'
         : 'Tarjetas de débito · cuentas vinculadas',
     period: '${reportDate(start)} al ${reportDate(end)}',
     generatedAt: generatedAt,
@@ -282,6 +289,8 @@ ExportReport debitCardsExport({
           ReportTotal(c, 'Saldo bancario al cierre', totals[c]!),
     ],
     notes: [
+      if (allAccounts && selection != IncomeExpenseSelection.both)
+        'El filtro muestra ${selection == IncomeExpenseSelection.income ? 'entradas' : 'salidas'} de dinero de las cuentas, incluidas las transferencias. Los saldos se calculan con todos los movimientos.',
       if (!allAccounts)
         'Incluye todos los movimientos de las cuentas vinculadas a las tarjetas de débito seleccionadas: el registro actual no identifica qué tarjeta física originó cada gasto.',
       'Una cuenta vinculada a varias tarjetas se cuenta una sola vez. Los saldos incorporan el saldo inicial y movimientos anteriores al período. Positivo: dinero disponible; negativo: sobregiro.',

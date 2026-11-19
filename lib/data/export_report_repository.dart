@@ -113,6 +113,9 @@ Future<ExportReport> loadExportReport({
             cardId: cardId,
             accountId: accountId,
             allAccounts: kind == 'accounts',
+            selection: kind == 'accounts'
+                ? selection
+                : IncomeExpenseSelection.both,
           );
   }
   if (kind == 'debts') {

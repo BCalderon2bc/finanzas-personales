@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/supabase_client.dart';
 import '../../data/period_logic.dart';
+import '../../data/financial_settings_repository.dart';
+import '../../data/exchange_rate.dart';
 import '../../data/person_account_repository.dart';
 import '../../utils/money.dart';
 import '../../widgets/adaptive_layout.dart';
@@ -15,16 +17,18 @@ class RecurringExpensesPage extends StatefulWidget {
   State<RecurringExpensesPage> createState() => _RecurringExpensesPageState();
 }
 
-enum _ExpenseAction { edit, delete }
+enum _ExpenseAction { adjustment, edit, delete }
 
 class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
   DateTime month = DateTime(DateTime.now().year, DateTime.now().month);
   List<Map<String, dynamic>> expenses = [], categories = [];
   Set<(String, String)> checkedMonths = {};
+  Map<(String, String), Map<String, dynamic>> monthlyExtras = {};
   Map<(String, String), ({int cents, String currency})> monthlyTotals = {};
   bool loading = true, saving = false, showInactive = false;
   String? error;
   int requestId = 0;
+  FinancialSettings? financialSettings;
 
   @override
   void initState() {
@@ -50,7 +54,9 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
         personRows('recurring_expense_checks', uid),
         personRows('categories', uid),
         personRows('recurring_expense_monthly_totals', uid),
+        personRows('recurring_expense_fixed_extras', uid),
       ]);
+      final settings = await loadFinancialSettings();
       checkPersonSession(uid);
       if (!mounted || request != requestId) return;
       rows[0].sort(
@@ -60,6 +66,7 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
       );
       setState(() {
         expenses = rows[0];
+        financialSettings = settings;
         checkedMonths = {
           for (final row in rows[1])
             ('${row['recurring_expense_id']}', '${row['period']}'),
@@ -71,6 +78,10 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
               cents: moneyCents(row['amount']),
               currency: '${row['currency']}',
             ),
+        };
+        monthlyExtras = {
+          for (final row in rows[4])
+            ('${row['recurring_expense_id']}', '${row['period']}'): row,
         };
         loading = false;
       });
@@ -242,6 +253,17 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
       if (variable) ...{'amount': null, 'category_id': null, 'ends_on': null},
       'notes': values['notes'] ?? '',
     };
+    if (expense != null &&
+        values['currency'] != expense['currency'] &&
+        monthlyExtras.values.any(
+          (extra) =>
+              extra['recurring_expense_id'] == expense['id'] &&
+              moneyCents(extra['amount']) != 0,
+        )) {
+      throw StateError(
+        'Este gasto tiene extras mensuales en su moneda actual. Crea otro gasto para usar otra moneda.',
+      );
+    }
     if (expense == null) {
       await supabase.from('recurring_expenses').insert({
         ...data,
@@ -306,18 +328,29 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
         enabled: !saving,
         onSelected: (action) async {
           switch (action) {
+            case _ExpenseAction.adjustment:
+              await editExtra(expense);
             case _ExpenseAction.edit:
               await edit(expense);
             case _ExpenseAction.delete:
               await deleteExpense(expense);
           }
         },
-        itemBuilder: (_) => const [
-          PopupMenuItem(
+        itemBuilder: (_) => [
+          if (!isVariable(expense) && recurringInMonth(expense, month))
+            PopupMenuItem(
+              value: _ExpenseAction.adjustment,
+              child: Text(
+                extraCents(expense) != 0
+                    ? 'Editar ajuste del mes'
+                    : 'Agregar ajuste del mes',
+              ),
+            ),
+          const PopupMenuItem(
             value: _ExpenseAction.edit,
             child: Text('Editar gasto'),
           ),
-          PopupMenuItem(
+          const PopupMenuItem(
             value: _ExpenseAction.delete,
             child: Text('Eliminar gasto'),
           ),
@@ -415,21 +448,83 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
     );
   }
 
+  Future<void> configureRate() => run((uid) async {
+    final values = await zeroForm(
+      context,
+      'Tasa de cambio del sistema',
+      const [ZeroField('rate', 'Córdobas por un dólar')],
+      initial: {'rate': financialSettings?.rate.decimal ?? ''},
+    );
+    if (values == null || !mounted) return;
+    final rate = ExchangeRate.tryParse('${values['rate']}');
+    if (rate == null)
+      throw StateError('Ingresa una tasa positiva con hasta seis decimales.');
+    await saveFinancialSettings(rate, uid);
+  });
+
   void changeMonth(int offset) {
     setState(() => month = DateTime(month.year, month.month + offset));
   }
 
+  int extraCents(Map<String, dynamic> expense) {
+    final extra = monthlyExtras[('${expense['id']}', isoDay(month))];
+    return extra == null ? 0 : moneyCents(extra['amount']);
+  }
+
+  Future<void> editExtra(Map<String, dynamic> expense) => run((uid) async {
+    final period = isoDay(month);
+    final extra = monthlyExtras[('${expense['id']}', period)];
+    final values = await zeroForm(
+      context,
+      'Ajuste de ${expense['name']}',
+      const [
+        ZeroField(
+          'amount',
+          'Ajuste del mes (+ o −)',
+          type: 'money',
+          zero: true,
+          signed: true,
+        ),
+        ZeroField('reason', 'Motivo (opcional)', required: false),
+      ],
+      initial: {
+        'amount': ((extra == null ? 0 : moneyCents(extra['amount'])) / 100)
+            .toStringAsFixed(2),
+        'reason': extra?['reason'] ?? '',
+      },
+      info:
+          'Un valor positivo aumenta el total y uno negativo lo reduce solo en este mes. Ejemplo: -25 para reducir una cuota de 100 a 75. Usa 0 para quitar el ajuste. Registra el pago real en Movimientos.',
+    );
+    if (values == null || !mounted) return;
+    checkPersonSession(uid);
+    if (moneyCents(expense['amount']) + moneyCents(values['amount']) < 0) {
+      throw StateError(
+        'El ajuste no puede dejar el total del mes por debajo de cero.',
+      );
+    }
+    await supabase.rpc(
+      'set_recurring_fixed_extra',
+      params: {
+        'p_expense': expense['id'],
+        'p_period': period,
+        'p_amount': moneyCents(values['amount']) / 100,
+        'p_currency': expense['currency'],
+        'p_reason': values['reason'] ?? '',
+      },
+    );
+    checkPersonSession(uid);
+  });
+
   Widget serviceCard(Map<String, dynamic> expense, {required bool inMonth}) {
     final checked = isChecked(expense);
     final theme = Theme.of(context);
+    final extra = extraCents(expense);
+    final extraRow = monthlyExtras[('${expense['id']}', isoDay(month))];
     final amount = formatMoneyCents(
-      moneyCents(expense['amount']),
+      moneyCents(expense['amount']) + extra,
       '${expense['currency']}',
     );
     final notes = '${expense['notes'] ?? ''}'.trim();
-    final status = inMonth
-        ? (checked ? 'Pagado' : 'Pendiente')
-        : (expense['is_active'] == true ? 'Fuera del mes' : 'Pausado');
     return Card(
       margin: EdgeInsets.zero,
       color: checked && inMonth
@@ -458,11 +553,26 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(amount, style: theme.textTheme.titleMedium),
+                      if (extra != 0) ...[
+                        Text(
+                          'Base · ${formatMoneyCents(moneyCents(expense['amount']), '${expense['currency']}')}',
+                        ),
+                        Text(
+                          'Ajuste · ${formatMoneyCents(extra, '${expense['currency']}')}',
+                        ),
+                        if ('${extraRow?['reason'] ?? ''}'.trim().isNotEmpty)
+                          Text('${extraRow!['reason']}'),
+                      ],
                       if (inMonth)
                         Text(
                           'Vence el día ${recurringDue(expense, month).day}',
                         ),
-                      Text(status),
+                      if (!inMonth)
+                        Text(
+                          expense['is_active'] == true
+                              ? 'Fuera del mes'
+                              : 'Pausado',
+                        ),
                       if (notes.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(notes),
@@ -473,6 +583,125 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
               ),
             ),
             expenseMenu(expense),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget summaryLine(
+    String label,
+    int cents,
+    String currency, {
+    bool total = false,
+  }) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(
+      children: [
+        Expanded(child: Text(label)),
+        const SizedBox(width: 12),
+        Text(
+          formatMoneyCents(cents, currency),
+          style: total
+              ? Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)
+              : Theme.of(context).textTheme.bodyMedium,
+        ),
+      ],
+    ),
+  );
+
+  Widget monthlySummary(
+    Map<String, int> fixed,
+    Map<String, int> variable,
+    Map<String, int> pending,
+  ) {
+    final theme = Theme.of(context);
+    final totals = {
+      for (final currency in ['USD', 'NIO'])
+        currency: fixed[currency]! + variable[currency]!,
+    };
+    final settings = financialSettings;
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: AdaptiveColumns(
+          minColumnWidth: 300,
+          maxColumns: 3,
+          spacing: 24,
+          children: [
+            for (final currency in ['USD', 'NIO'])
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    currency == 'USD' ? 'Dólares' : 'Córdobas',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  summaryLine('Fijos previstos', fixed[currency]!, currency),
+                  summaryLine(
+                    'Variables registrados',
+                    variable[currency]!,
+                    currency,
+                  ),
+                  summaryLine(
+                    'Pendiente previsto',
+                    pending[currency]!,
+                    currency,
+                  ),
+                  const Divider(height: 16),
+                  summaryLine(
+                    'Total del mes',
+                    totals[currency]!,
+                    currency,
+                    total: true,
+                  ),
+                ],
+              ),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer.withValues(alpha: .4),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Fijos + variables · total combinado',
+                    style: theme.textTheme.titleSmall,
+                  ),
+                  if (settings != null) ...[
+                    const SizedBox(height: 8),
+                    for (final currency in ['USD', 'NIO'])
+                      summaryLine(
+                        currency == 'USD' ? 'En dólares' : 'En córdobas',
+                        settings.rate.convert(totals['USD']!, 'USD', currency) +
+                            settings.rate.convert(
+                              totals['NIO']!,
+                              'NIO',
+                              currency,
+                            ),
+                        currency,
+                        total: true,
+                      ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Tasa: C\$ ${settings.rate.decimal} por \$1',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ] else
+                    TextButton.icon(
+                      onPressed: saving ? null : configureRate,
+                      icon: const Icon(Icons.currency_exchange),
+                      label: const Text('Definir tasa'),
+                    ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -497,7 +726,10 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
           minColumnWidth: 340,
           maxColumns: 3,
           children: [
-            for (final item in items)
+            for (final item in [
+              ...items.where((item) => item['currency'] == 'USD'),
+              ...items.where((item) => item['currency'] != 'USD'),
+            ])
               if (isVariable(item))
                 variableCard(item, inMonth: inMonth)
               else
@@ -520,8 +752,13 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
     final variableAmounts = {'NIO': 0, 'USD': 0};
     final period = isoDay(month);
     var hasVariableTotals = false;
+    final variableIds = {
+      for (final expense in expenses.where(isVariable)) '${expense['id']}',
+    };
     for (final entry in monthlyTotals.entries) {
-      if (entry.key.$2 != period) continue;
+      if (entry.key.$2 != period || !variableIds.contains(entry.key.$1)) {
+        continue;
+      }
       final total = entry.value;
       final subtotal = variableAmounts[total.currency];
       if (subtotal == null) continue;
@@ -538,7 +775,7 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
         continue;
       }
       final currency = '${expense['currency']}';
-      final amount = moneyCents(expense['amount']);
+      final amount = moneyCents(expense['amount']) + extraCents(expense);
       plannedAmounts[currency] = plannedAmounts[currency]! + amount;
       if (isChecked(expense)) {
         paid.add(expense);
@@ -665,48 +902,14 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
                               variables.isNotEmpty ||
                               hasVariableTotals) ...[
                             const SizedBox(height: 14),
-                            AdaptiveColumns(
-                              minColumnWidth: 280,
-                              children: [
-                                for (final currency in ['NIO', 'USD'])
-                                  Card(
-                                    margin: EdgeInsets.zero,
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(16),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            currency == 'NIO'
-                                                ? 'Córdobas'
-                                                : 'Dólares',
-                                            style: theme.textTheme.titleMedium,
-                                          ),
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            'Fijos previstos · ${formatMoneyCents(plannedAmounts[currency]!, currency)}',
-                                          ),
-                                          Text(
-                                            'Variables registrados · ${formatMoneyCents(variableAmounts[currency]!, currency)}',
-                                          ),
-                                          Text(
-                                            'Total del mes · ${formatMoneyCents(plannedAmounts[currency]! + variableAmounts[currency]!, currency)}',
-                                            style: theme.textTheme.titleSmall,
-                                          ),
-                                          Text(
-                                            'Pendiente previsto · ${formatMoneyCents(pendingAmounts[currency]!, currency)}',
-                                            style: theme.textTheme.titleSmall,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                              ],
+                            monthlySummary(
+                              plannedAmounts,
+                              variableAmounts,
+                              pendingAmounts,
                             ),
+                            if (paid.isNotEmpty) section('Pagados', paid),
                             if (pending.isNotEmpty)
                               section('Pendientes', pending),
-                            if (paid.isNotEmpty) section('Pagados', paid),
                           ],
                           if (variables.isNotEmpty)
                             section('Gastos variables', variables),

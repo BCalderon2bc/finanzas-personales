@@ -28,6 +28,8 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
   final balances = {for (final c in currencies) c: TextEditingController()};
   final minimums = {for (final c in currencies) c: TextEditingController()};
   final overdues = {for (final c in currencies) c: TextEditingController()};
+  final charges = {for (final c in currencies) c: TextEditingController()};
+  final financing = {for (final c in currencies) c: TextEditingController()};
   final notes = TextEditingController();
   final existing = <String, Map<String, dynamic>>{};
   DateTime closing = DateTime.now();
@@ -48,6 +50,8 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
     for (final row in widget.statements) {
       final currency = '${row['currency']}';
       existing[currency] = row;
+      charges[currency]!.text = row['charges_interest_due']?.toString() ?? '';
+      financing[currency]!.text = row['intra_financing_due']?.toString() ?? '';
       balances[currency]!.text = '${row['balance_due']}';
       minimums[currency]!.text = row['minimum_due']?.toString() ?? '';
       overdues[currency]!.text = row['overdue_due']?.toString() ?? '';
@@ -67,6 +71,8 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
       ...balances.values,
       ...minimums.values,
       ...overdues.values,
+      ...charges.values,
+      ...financing.values,
       notes,
     ]) {
       controller.dispose();
@@ -99,6 +105,8 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
             'currency': currency,
             'balance': amount(balances[currency]!.text),
             'minimum': amount(minimums[currency]!.text),
+            'charges_interest': amount(charges[currency]!.text),
+            'intra_financing': amount(financing[currency]!.text),
             if (showsOverdue) 'overdue': amount(overdues[currency]!.text),
             if (existing[currency] case final row?) 'id': row['id'],
           },
@@ -168,13 +176,14 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
   Widget amountField(
     String currency,
     Map<String, TextEditingController> controllers,
-    String label, {
-    bool table = false,
-  }) => TextFormField(
+    String label,
+  ) => TextFormField(
     controller: controllers[currency],
     keyboardType: const TextInputType.numberWithOptions(decimal: true),
     decoration: InputDecoration(
-      labelText: table ? '$label · $currency' : label,
+      labelText: label,
+      prefixText: currency == 'NIO' ? 'C\$ ' : '\$ ',
+      errorMaxLines: 3,
     ),
     validator: (value) {
       final invalid = validateAmount(value);
@@ -211,6 +220,10 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
         const SizedBox(height: 8),
         amountField(currency, overdues, 'Pago atrasado (opcional)'),
       ],
+      const SizedBox(height: 8),
+      amountField(currency, charges, 'Cargos e intereses (opcional)'),
+      const SizedBox(height: 8),
+      amountField(currency, financing, 'Intrafinanciamientos (opcional)'),
       if (usesPaymentFields) ...[
         const SizedBox(height: 8),
         amountField(currency, balances, balanceLabel),
@@ -222,7 +235,7 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
     builder: (context, constraints) {
       if (!usesPaymentFields ||
           shownCurrencies.length != 2 ||
-          constraints.maxWidth < 490) {
+          constraints.maxWidth < 680) {
         return AdaptiveColumns(
           minColumnWidth: 240,
           children: [for (final currency in shownCurrencies) amounts(currency)],
@@ -242,6 +255,8 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
           for (final (label, controllers) in [
             ('Pago mínimo', minimums),
             if (showsOverdue) ('Pago atrasado', overdues),
+            ('Cargos e intereses', charges),
+            ('Intrafinanciamientos', financing),
             (balanceLabel, balances),
           ])
             Padding(
@@ -257,14 +272,7 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
                   ),
                   for (final currency in currencies) ...[
                     const SizedBox(width: 8),
-                    Expanded(
-                      child: amountField(
-                        currency,
-                        controllers,
-                        label,
-                        table: true,
-                      ),
-                    ),
+                    Expanded(child: amountField(currency, controllers, label)),
                   ],
                 ],
               ),
@@ -293,7 +301,7 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
       editing ? 'Editar estado de cuenta' : 'Registrar estado de cuenta',
     ),
     content: SizedBox(
-      width: 620,
+      width: 1040,
       child: SingleChildScrollView(
         child: Form(
           key: formKey,
@@ -314,38 +322,60 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
               ],
               amountsLayout(),
               const SizedBox(height: 8),
+              const Text(
+                'Cargos e intereses e intrafinanciamientos detallan el corte. Ingresa en el pago de contado el total informado por el banco.',
+              ),
+
+              const SizedBox(height: 8),
               Text(
                 showsOverdue
                     ? 'Deja vacíos el mínimo y el atraso si el banco no los informa. El atraso se guarda como referencia.'
                     : 'Deja vacío el mínimo si el banco no lo informa.',
               ),
               const SizedBox(height: 16),
-              dateField('Fecha de corte', closing, (value) => closing = value),
-              const SizedBox(height: 6),
-              Row(
+              AdaptiveColumns(
+                minColumnWidth: 250,
+                maxColumns: 3,
                 children: [
-                  Expanded(
-                    child: dateField(
-                      'Fecha de pago para bonificar',
-                      bonus,
-                      (value) => bonus = value,
-                    ),
+                  dateField(
+                    'Fecha de corte',
+                    closing,
+                    (value) => closing = value,
                   ),
-                  if (bonus != null)
-                    IconButton(
-                      tooltip: 'Quitar fecha para bonificar',
-                      icon: const Icon(Icons.clear),
-                      onPressed: () => setState(() {
-                        bonus = null;
-                        error = null;
-                      }),
-                    ),
+                  dateField(
+                    'Fecha máxima de pago',
+                    due,
+                    (value) => due = value,
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: dateField(
+                              'Fecha para bonificar',
+                              bonus,
+                              (value) => bonus = value,
+                            ),
+                          ),
+                          if (bonus != null)
+                            IconButton(
+                              tooltip: 'Quitar fecha para bonificar',
+                              icon: const Icon(Icons.clear),
+                              onPressed: () => setState(() {
+                                bonus = null;
+                                error = null;
+                              }),
+                            ),
+                        ],
+                      ),
+                      if (bonus == null)
+                        const Text('Opcional, según lo que indique el banco.'),
+                    ],
+                  ),
                 ],
               ),
-              if (bonus == null)
-                const Text('Opcional, según lo que indique el banco.'),
-              const SizedBox(height: 6),
-              dateField('Fecha máxima de pago', due, (value) => due = value),
               const SizedBox(height: 12),
               TextFormField(
                 controller: notes,

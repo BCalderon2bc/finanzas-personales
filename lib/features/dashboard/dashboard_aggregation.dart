@@ -1,3 +1,4 @@
+import '../../data/expense_report_categories.dart';
 import '../../data/card_spending.dart';
 import '../../data/payment_agenda_labels.dart' show agendaCardLabel;
 import '../../data/period_logic.dart';
@@ -105,6 +106,7 @@ DashboardOverview buildDashboardOverview(
     }
   }
 
+  data.categoryNames.addAll(expenseReportCategoryLabels);
   for (final category in rows[2]) {
     final id = category['id'].toString();
     data.categoryNames[id] = category['name'].toString();
@@ -237,10 +239,15 @@ DashboardOverview buildDashboardOverview(
 
     final date = _dashboardDate(tx['transaction_date']);
 
+    final category = expenseReportCategoryKey({
+      ...tx,
+      'source': 'credit_card',
+      'card_transaction_type': type,
+    });
     if (effect != null &&
         type != 'payment' &&
         tx['is_receivable_funding'] != true) {
-      expense(effect * amount, date, currency, tx['category_id']);
+      expense(effect * amount, date, currency, category);
     }
 
     final description = tx['description']?.toString().trim() ?? '';
@@ -262,7 +269,7 @@ DashboardOverview buildDashboardOverview(
             : -1,
         DashboardTarget.cards,
         id,
-        tx['category_id']?.toString(),
+        category,
       ),
     );
   }
@@ -320,7 +327,7 @@ DashboardOverview buildDashboardOverview(
           moneyCents(payment['fee_amount']),
       date,
       currency,
-      null,
+      'debt_costs',
     );
 
     event(
@@ -335,6 +342,7 @@ DashboardOverview buildDashboardOverview(
         payment['account_id'] == null ? 0 : -1,
         DashboardTarget.debts,
         id,
+        'debt_costs',
       ),
     );
   }

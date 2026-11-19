@@ -549,7 +549,7 @@ class _ChartPanel extends StatelessWidget {
           const SizedBox(height: 16),
           LayoutBuilder(
             builder: (context, box) {
-              if (box.maxWidth < 260 ||
+              if (box.maxWidth < 440 ||
                   MediaQuery.textScalerOf(context).scale(14) > 17.5) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,

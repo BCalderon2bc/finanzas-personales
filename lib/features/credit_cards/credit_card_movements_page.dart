@@ -5,15 +5,15 @@ import '../../utils/card_cash_advance.dart';
 import '../../data/credit_card_additional_repository.dart';
 import '../../data/payment_agenda_labels.dart'
     show additionalCardLabel, agendaCardLabel;
-import '../../data/period_logic.dart' show includesDay;
+import '../../data/period_logic.dart' show dayOnly, includesDay;
 import '../../widgets/adaptive_layout.dart';
-import '../../widgets/date_period_field.dart';
 import '../person_accounts/receipt_history.dart';
 import '../help/app_help.dart';
 import 'dart:convert';
 import 'dart:math';
 import 'credit_card_payment_edit_dialog.dart';
-import '../../data/card_statement_repository.dart' show statementRows;
+import '../../data/card_statement_repository.dart'
+    show statementDate, statementRows;
 import 'package:flutter/material.dart';
 import '../person_accounts/person_receipts_dialog.dart';
 import '../../core/supabase_client.dart';
@@ -45,7 +45,19 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
   bool get allCards => widget.cardId == null;
   Map<String, String> cardLabels = {};
   String? cardFilter, categoryFilter;
-  DateTimeRange? allDatesFilter;
+  DateTimeRange? customDates;
+  bool useLatestCut = true;
+  Map<String, DateTime> latestCuts = {};
+
+  DateTimeRange? cutRange(String? cardId, DateTime today) {
+    final cut = latestCuts[cardId];
+    if (cut == null && allCards) return null;
+    return DateTimeRange(
+      start: cut ?? DateTime(today.year, today.month),
+      end: today,
+    );
+  }
+
   String search = '';
   String name = '', currencyFilter = 'all', filter = 'all';
   Map<String, Map<String, dynamic>> additionalCards = {};
@@ -161,16 +173,10 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
   };
 
   String statusFilter = 'valid';
-  late DateTimeRange dateFilter;
 
   @override
   void initState() {
     super.initState();
-    final today = DateTime.now();
-    dateFilter = DateTimeRange(
-      start: DateTime(today.year, today.month),
-      end: DateTime(today.year, today.month + 1, 0),
-    );
     loadData();
   }
 
@@ -464,6 +470,22 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
                   .eq('user_id', user.id)
                   .single(),
             ];
+      final cuts = await statementRows(
+        'credit_card_statements',
+        'id,credit_card_id,closing_date,is_voided',
+        user.id,
+      );
+      final today = dayOnly(DateTime.now());
+      final lastCutByCard = <String, DateTime>{};
+      for (final cut in cuts) {
+        if (cut['is_voided'] == true) continue;
+        final date = statementDate(cut['closing_date']);
+        if (date == null || date.isAfter(today)) continue;
+        final id = cut['credit_card_id'].toString();
+        final previous = lastCutByCard[id];
+        if (previous == null || date.isAfter(previous))
+          lastCutByCard[id] = date;
+      }
       final additions = cardId == null
           ? await statementRows(
               'credit_card_additionals',
@@ -508,6 +530,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
       setState(() {
         name = cardId == null ? '' : cards.single['name'].toString();
         cardLabels = labels;
+        latestCuts = lastCutByCard;
         if (!labels.containsKey(cardFilter)) cardFilter = null;
         if (!rows.any(
           (row) =>
@@ -778,6 +801,15 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
   }
 
   Widget filtersPanel(BuildContext context) {
+    final today = dayOnly(DateTime.now());
+    final selectedId = widget.cardId ?? cardFilter;
+    final range = useLatestCut ? cutRange(selectedId, today) : customDates;
+    final localizations = MaterialLocalizations.of(context);
+    final dateLabel = range != null
+        ? '${localizations.formatShortDate(range.start)} – ${localizations.formatShortDate(range.end)}'
+        : useLatestCut && selectedId == null && latestCuts.isNotEmpty
+        ? 'Último corte por tarjeta'
+        : 'Todas las fechas';
     final categories = {
       for (final tx in movements)
         if (tx['category_id'] != null &&
@@ -785,11 +817,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
           tx['category_id'].toString(): relatedName(tx['categories']),
     };
     return CollapsibleFilters(
-      summary: statusFilter == 'valid'
-          ? 'Vigentes'
-          : statusFilter == 'voided'
-          ? 'Anulados'
-          : 'Todos los estados',
+      summary: dateLabel,
       children: [
         if (allCards) ...[
           Padding(
@@ -803,46 +831,52 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
               ),
             ),
           ),
-          Wrap(
-            alignment: WrapAlignment.center,
+        ],
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
               OutlinedButton.icon(
                 onPressed: () async {
+                  final existing = useLatestCut
+                      ? cutRange(widget.cardId ?? cardFilter, today)
+                      : customDates;
                   final range = await showDateRangePicker(
                     context: context,
                     firstDate: DateTime(1900),
                     lastDate: DateTime(2200),
-                    initialDateRange: allDatesFilter,
+                    initialDateRange: existing,
                   );
-                  if (mounted && range != null)
-                    setState(() => allDatesFilter = range);
+                  if (mounted && range != null) {
+                    setState(() {
+                      useLatestCut = false;
+                      customDates = range;
+                    });
+                  }
                 },
                 icon: const Icon(Icons.date_range_outlined),
-                label: Text(
-                  allDatesFilter == null
-                      ? 'Todas las fechas'
-                      : '${MaterialLocalizations.of(context).formatShortDate(allDatesFilter!.start)} – '
-                            '${MaterialLocalizations.of(context).formatShortDate(allDatesFilter!.end)}',
-                ),
+                label: Text(dateLabel),
               ),
-              if (allDatesFilter != null)
-                IconButton(
-                  tooltip: 'Quitar filtro de fechas',
-                  onPressed: () => setState(() => allDatesFilter = null),
-                  icon: const Icon(Icons.clear),
+              if (!useLatestCut)
+                TextButton(
+                  onPressed: () => setState(() => useLatestCut = true),
+                  child: const Text('Usar último corte'),
+                ),
+              if (dateLabel != 'Todas las fechas')
+                TextButton(
+                  onPressed: () => setState(() {
+                    useLatestCut = false;
+                    customDates = null;
+                  }),
+                  child: const Text('Todas las fechas'),
                 ),
             ],
           ),
-        ] else
-          DatePeriodField(
-            start: dateFilter.start,
-            end: dateFilter.end,
-            onChanged: (range) {
-              if (mounted) setState(() => dateFilter = range);
-            },
-          ),
+        ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
           child: GuideAnchor(
             id: 'type',
             child: DropdownButtonFormField<String>(
@@ -878,6 +912,17 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
                   initialValue: cardFilter ?? '',
                   isExpanded: true,
                   itemHeight: null,
+                  selectedItemBuilder: (_) => [
+                    const Text('Todas las tarjetas'),
+                    for (final label in cardLabels.values)
+                      Text(
+                        label.contains(' · ••')
+                            ? label.split(' · ').reversed.join(' · ')
+                            : label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
                   decoration: const InputDecoration(labelText: 'Tarjeta'),
                   items: [
                     const DropdownMenuItem(
@@ -1001,9 +1046,12 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final dateRange = allCards ? allDatesFilter : dateFilter;
+    final today = dayOnly(DateTime.now());
     final term = search.trim().toLowerCase();
     final visible = movements.where((tx) {
+      final dateRange = useLatestCut
+          ? cutRange(tx['credit_card_id']?.toString(), today)
+          : customDates;
       final date = DateTime.tryParse('${tx['transaction_date']}')?.toLocal();
       if (dateRange != null &&
           (date == null ||
@@ -1059,7 +1107,16 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
           title: GuideAnchor(
             id: 'title',
             child: Text(
-              allCards ? 'Movimientos de tarjetas' : 'Movimientos de tarjeta',
+              compactLayout(context)
+                  ? (allCards
+                        ? 'Historial de tarjetas'
+                        : 'Historial de tarjeta')
+                  : (allCards
+                        ? 'Movimientos de tarjetas'
+                        : 'Movimientos de tarjeta'),
+              style: compactLayout(context)
+                  ? const TextStyle(fontSize: 17)
+                  : null,
             ),
           ),
           actions: [
