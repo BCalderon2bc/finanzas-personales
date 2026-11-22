@@ -39,7 +39,7 @@ List<Color> bankGradient(String name) => switch (bankKey(name)) {
   'ficohsa' => const [Color(0xFF00357D), Color(0xFF0058CB)],
   'atlantida' => const [Color(0xFF991B23), Color(0xFFDC242D)],
   'bfp' => const [Color(0xFF005780), Color(0xFF009B96)],
-  _ => const [appPrimaryDeep, primaryColor],
+  _ => [appPrimaryDeep, primaryColor],
 };
 
 class BankLogo extends StatelessWidget {

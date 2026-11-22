@@ -1,3 +1,4 @@
+import '../../core/appearance.dart';
 import '../../core/app_theme.dart'
     show appMuted, appPrimaryTint, appSurfaceSubtle;
 import '../../widgets/collapsible_filters.dart';
@@ -25,7 +26,15 @@ import '../../data/person_account_report_repository.dart';
 import '../../data/person_account_export_report.dart';
 
 class ExportReportsPage extends StatefulWidget {
-  const ExportReportsPage({super.key, this.initialPersonId});
+  const ExportReportsPage({
+    super.key,
+    this.initialPersonId,
+    this.initialKind,
+    this.initialStart,
+    this.initialEnd,
+  });
+  final String? initialKind;
+  final DateTime? initialStart, initialEnd;
   final String? initialPersonId;
   @override
   State<ExportReportsPage> createState() => _ExportReportsPageState();
@@ -54,6 +63,9 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
   @override
   void initState() {
     super.initState();
+    kind = widget.initialKind ?? 'movements';
+    start = widget.initialStart ?? start;
+    end = widget.initialEnd ?? end;
     personId = widget.initialPersonId;
     if (personId != null) kind = 'person';
     loadPeople();
@@ -276,10 +288,10 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
       String? note;
       try {
         final regularFont = await rootBundle.load(
-          'assets/fonts/DejaVuSans.ttf',
+          AppearanceController.instance.regularAsset,
         );
         final boldFont = await rootBundle.load(
-          'assets/fonts/DejaVuSans-Bold.ttf',
+          AppearanceController.instance.boldAsset,
         );
         Uint8List? logo;
         try {
@@ -544,6 +556,10 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                       DropdownMenuItem(
                         value: 'person',
                         child: Text('Cuenta con una persona'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'consolidated_expenses',
+                        child: Text('Gastos consolidados · cuentas y tarjetas'),
                       ),
                       DropdownMenuItem(
                         value: 'movements',
@@ -856,7 +872,8 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                       ),
                       const SizedBox(height: 10),
                     ],
-                    if (kind == 'movements' ||
+                    if (kind == 'consolidated_expenses' ||
+                        kind == 'movements' ||
                         kind == 'credit_cards' ||
                         kind == 'credit_card_expenses' ||
                         kind == 'accounts' ||
@@ -1035,7 +1052,7 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                       children: [fileActions(false), fileActions(true)],
                     ),
                   ),
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.only(top: 10),
                     child: Text(
                       'En la web, el navegador gestiona la descarga. Compartir muestra los destinos disponibles en tu dispositivo.',
@@ -1053,7 +1070,7 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                       padding: const EdgeInsets.only(bottom: 6),
                       child: Text(
                         n,
-                        style: const TextStyle(fontSize: 12, color: appMuted),
+                        style: TextStyle(fontSize: 12, color: appMuted),
                       ),
                     ),
                   ),

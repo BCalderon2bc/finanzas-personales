@@ -1,3 +1,4 @@
+import '../../data/zero_installment_charges.dart';
 import '../../widgets/collapsible_filters.dart';
 import '../person_accounts/receipt_draft_field.dart';
 import '../help/app_help.dart';
@@ -25,7 +26,7 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
       categories = [],
       statements = [],
       availableCards = [],
-      editHistory = [];
+      charges = [];
   bool loading = true, busy = false, showVoided = false;
   String? error;
   int request = 0;
@@ -64,7 +65,7 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
           uid,
         ),
         statementRows('credit_cards', 'id,name,currency,is_active', uid),
-        statementRows('card_zero_plan_edits', '*', uid),
+        loadZeroInstallmentCharges(uid),
       ]);
       zeroSession(uid);
       if (!mounted || req != request) return;
@@ -75,7 +76,7 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
         categories = rows[3] as List<Map<String, dynamic>>;
         statements = rows[4] as List<Map<String, dynamic>>;
         availableCards = rows[5] as List<Map<String, dynamic>>;
-        editHistory = rows[6] as List<Map<String, dynamic>>;
+        charges = rows[6] as List<Map<String, dynamic>>;
         loading = false;
       });
     } catch (e) {
@@ -267,6 +268,11 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
     message('Plan registrado sin duplicar cuotas ni pagos anteriores.');
   });
   Future<void> editPlan(Map<String, dynamic> plan) => run(() async {
+    if (charges.any((c) => c['plan_id'] == plan['id']))
+      throw StateError(
+        'Quita los cargos de cuota registrados antes de editar el plan.',
+      );
+
     final sourceTx = data!.transactions
         .where((t) => t['id'] == plan['source_transaction_id'])
         .firstOrNull;
@@ -562,6 +568,84 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
       existing ? 'Pago vinculado sin otro descuento.' : 'Pago registrado.',
     );
   });
+  Future<void> registerCharge(
+    Map<String, dynamic> p,
+    Map<String, dynamic> i,
+  ) => run(() async {
+    final existing = charges
+        .where((c) => c['installment_id'] == i['id'])
+        .firstOrNull;
+    final values = await zeroForm(
+      context,
+      existing == null ? 'Registrar cargo de cuota' : 'Editar cargo de cuota',
+      const [
+        ZeroField('description', 'Descripción'),
+        ZeroField('amount', 'Monto cobrado por el banco', type: 'money'),
+        ZeroField('date', 'Fecha publicada por el banco', type: 'date'),
+        ZeroField('reference', 'Referencia (opcional)', required: false),
+      ],
+      attachReceipt: true,
+      initial: {
+        'description':
+            existing?['description'] ??
+            'Cuota ${i['number']}/${p['total_installments']} · ${p['description']}',
+        'amount':
+            existing?['amount'] ??
+            (moneyCents(i['amount']) / 100).toStringAsFixed(2),
+        'date': existing?['charge_date'] ?? zeroDate(DateTime.now()),
+        'reference': existing?['reference'] ?? '',
+      },
+      info:
+          '${p['description']} · Cuota ${i['number']} · ${cardMoney(moneyCents(i['amount']), '${p['currency']}')}\nRegistro informativo: la compra completa ya consume el límite. El monto es editable y solo informativo; no modifica la cuota programada. No crea otra compra, no cambia la deuda ni marca la cuota como pagada. Cuando llegue el corte, usa Vincular / quitar corte.',
+    );
+    if (values == null) return;
+    final date = DateTime.parse('${values['date']}');
+    if (date.isAfter(DateUtils.dateOnly(DateTime.now())))
+      throw StateError('La fecha no puede ser futura.');
+    final receipt = values[receiptDraftKey] as PendingReceipt?;
+    final uid = zeroUser();
+    final saved = await commands.run('register_zero_installment_charge', {
+      'p_installment_id': i['id'],
+      'p_date': zeroDate(date),
+      'p_amount': moneyCents(values['amount']) / 100,
+      'p_description': '${values['description']}'.trim(),
+      'p_reference': values['reference'] ?? '',
+    });
+    if (mounted)
+      await attachFinancialReceipt(
+        context,
+        receipt,
+        uid,
+        'card_zero_installment_charges',
+        saved,
+      );
+    message('Cargo de cuota registrado sin duplicar deuda ni gasto.');
+  });
+  Future<void> removeCharge(Map<String, dynamic> i) => run(() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Quitar cargo de cuota'),
+        content: const Text(
+          'Solo quita el registro informativo. Conserva el plan, sus pagos y el vínculo con el corte.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Quitar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true)
+      await commands.run('remove_zero_installment_charge', {
+        'p_installment_id': i['id'],
+      });
+  });
   Future<void> linkStatement(
     Map<String, dynamic> p,
     Map<String, dynamic> i,
@@ -632,6 +716,9 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
     final links = data!.allocations
         .where((a) => a['installment_id'] == i['id'] && a['is_removed'] != true)
         .toList();
+    final charge = charges
+        .where((c) => c['installment_id'] == i['id'])
+        .firstOrNull;
     final statement = statements
         .where((s) => s['id'] == i['statement_id'])
         .firstOrNull;
@@ -656,6 +743,15 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
                   ? 'Cuota cubierta'
                   : 'Pendiente: ${formatMoneyCents(remaining, curr)}',
             ),
+            if (charge != null)
+              Text(
+                'Cargo publicado: ${cardMoney(moneyCents(charge['amount']), curr)} · ${zeroDateLabel(charge['charge_date'])} · Sin efecto adicional en deuda, gasto o límite',
+              ),
+            if (charge != null)
+              MovementReceiptsButton(
+                table: 'card_zero_installment_charges',
+                record: {...charge, 'is_voided': p['is_voided'] == true},
+              ),
             if (i['statement_id'] != null)
               Text(
                 'Incluida en corte ${zeroDateLabel(statement?['closing_date'])}${statement?['is_voided'] == true ? ' · ANULADO: revisar vínculo' : ''}',
@@ -665,6 +761,20 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
                 spacing: 8,
                 runSpacing: 4,
                 children: [
+                  TextButton.icon(
+                    onPressed: busy ? null : () => registerCharge(p, i),
+                    icon: const Icon(Icons.receipt_long_outlined),
+                    label: Text(
+                      charge == null
+                          ? 'Registrar cargo de cuota'
+                          : 'Editar cargo de cuota',
+                    ),
+                  ),
+                  if (charge != null)
+                    TextButton(
+                      onPressed: busy ? null : () => removeCharge(i),
+                      child: const Text('Quitar cargo'),
+                    ),
                   if (remaining > 0) ...[
                     TextButton(
                       onPressed: busy ? null : () => pay(p, i),
@@ -834,26 +944,6 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
                   icon: const Icon(Icons.edit_outlined),
                   label: const Text('Editar plan'),
                 ),
-              ),
-            if (editHistory.any((e) => e['plan_id'] == p['id']))
-              ExpansionTile(
-                title: const Text('Historial de cambios'),
-                children: editHistory.where((e) => e['plan_id'] == p['id']).map((
-                  e,
-                ) {
-                  final before = Map<String, dynamic>.from(
-                        (e['before_data'] as Map)['plan'] as Map,
-                      ),
-                      after = Map<String, dynamic>.from(
-                        (e['after_data'] as Map)['plan'] as Map,
-                      );
-                  return ListTile(
-                    title: Text('Editado: ${zeroDateLabel(e['created_at'])}'),
-                    subtitle: Text(
-                      '${before['description']} → ${after['description']}\n${formatMoneyCents(moneyCents(before['original_amount']), '${before['currency']}')} → ${formatMoneyCents(moneyCents(after['original_amount']), '${after['currency']}')} · ${before['total_installments']} → ${after['total_installments']} cuotas',
-                    ),
-                  );
-                }).toList(),
               ),
             if (p['is_voided'] != true)
               Align(

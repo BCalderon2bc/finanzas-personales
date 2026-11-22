@@ -24,6 +24,7 @@ Future<ExportReport> loadExportReport({
   if (!['all', 'NIO', 'USD'].contains(currency) ||
       ![
         'movements',
+        'consolidated_expenses',
         'debts',
         'budgets',
         'credit_cards',
@@ -143,6 +144,15 @@ Future<ExportReport> loadExportReport({
     includeBudgets: kind == 'budgets',
     userId: uid,
   );
+  if (kind == 'consolidated_expenses') {
+    return consolidatedExpensesReport(
+      data.movements,
+      start,
+      end,
+      currency,
+      DateTime.now(),
+    );
+  }
   return kind == 'movements'
       ? movementsReport(
           data.movements,

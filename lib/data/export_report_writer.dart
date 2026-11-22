@@ -1,3 +1,4 @@
+import '../core/appearance.dart';
 import 'dart:typed_data';
 import 'package:excel/excel.dart' as x;
 import 'package:pdf/pdf.dart';
@@ -26,6 +27,7 @@ Uint8List reportExcel(ExportReport report) {
       x.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row),
     );
     summary.cell(start).cellStyle = x.CellStyle(
+      fontFamily: AppearanceController.instance.fontFamily,
       bold: true,
       textWrapping: x.TextWrapping.WrapText,
     );
@@ -45,11 +47,22 @@ Uint8List reportExcel(ExportReport report) {
       summary
           .cell(x.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row))
           .cellStyle = x.CellStyle(
+        fontFamily: AppearanceController.instance.fontFamily,
         bold: true,
         fontSize: fontSize,
         textWrapping: x.TextWrapping.WrapText,
-        fontColorHex: x.ExcelColor.fromHexString('#304F70'),
-        backgroundColorHex: x.ExcelColor.fromHexString('#EDF3F9'),
+        fontColorHex: x.ExcelColor.fromHexString(
+          AppearanceController.instance.palette.navigation
+              .toARGB32()
+              .toRadixString(16)
+              .substring(2),
+        ),
+        backgroundColorHex: x.ExcelColor.fromHexString(
+          AppearanceController.instance.palette.tint
+              .toARGB32()
+              .toRadixString(16)
+              .substring(2),
+        ),
       );
       summary.setRowHeight(row, height);
     }
@@ -82,6 +95,7 @@ Uint8List reportExcel(ExportReport report) {
         summary
             .cell(x.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row))
             .cellStyle = x.CellStyle(
+          fontFamily: AppearanceController.instance.fontFamily,
           textWrapping: x.TextWrapping.WrapText,
         );
         summary.setRowHeight(row, 34);
@@ -94,6 +108,7 @@ Uint8List reportExcel(ExportReport report) {
             ),
           )
           .cellStyle = x.CellStyle(
+        fontFamily: AppearanceController.instance.fontFamily,
         numberFormat: x.NumFormat.custom(formatCode: '#,##0.00'),
       );
     }
@@ -125,6 +140,7 @@ Uint8List reportExcel(ExportReport report) {
               ),
             )
             .cellStyle = x.CellStyle(
+          fontFamily: AppearanceController.instance.fontFamily,
           numberFormat: x.NumFormat.custom(formatCode: '#,##0.00'),
         );
       }
@@ -141,6 +157,7 @@ Uint8List reportExcel(ExportReport report) {
     summary
         .cell(x.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row))
         .cellStyle = x.CellStyle(
+      fontFamily: AppearanceController.instance.fontFamily,
       textWrapping: x.TextWrapping.WrapText,
       fontSize: 11,
     );
@@ -153,6 +170,7 @@ Uint8List reportExcel(ExportReport report) {
   summary
       .cell(x.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0))
       .cellStyle = x.CellStyle(
+    fontFamily: AppearanceController.instance.fontFamily,
     bold: true,
     fontSize: 18,
   );
@@ -181,9 +199,15 @@ Uint8List reportExcel(ExportReport report) {
       sheet
           .cell(x.CellIndex.indexByColumnRow(columnIndex: col, rowIndex: 0))
           .cellStyle = x.CellStyle(
+        fontFamily: AppearanceController.instance.fontFamily,
         bold: true,
         fontColorHex: x.ExcelColor.white,
-        backgroundColorHex: x.ExcelColor.fromHexString('#3C70AA'),
+        backgroundColorHex: x.ExcelColor.fromHexString(
+          AppearanceController.instance.palette.primary
+              .toARGB32()
+              .toRadixString(16)
+              .substring(2),
+        ),
       );
     }
     for (final row in _exportTableRows(table, person != null)) {
@@ -199,6 +223,18 @@ Uint8List reportExcel(ExportReport report) {
             )
             .toList(),
       );
+      for (var column = 0; column < row.length; column++) {
+        sheet
+            .cell(
+              x.CellIndex.indexByColumnRow(
+                columnIndex: column,
+                rowIndex: sheet.maxRows - 1,
+              ),
+            )
+            .cellStyle = x.CellStyle(
+          fontFamily: AppearanceController.instance.fontFamily,
+        );
+      }
       if (cardColumns.isNotEmpty) {
         var lineCount = 1;
         for (final col in cardColumns) {
@@ -219,6 +255,7 @@ Uint8List reportExcel(ExportReport report) {
                 ),
               )
               .cellStyle = x.CellStyle(
+            fontFamily: AppearanceController.instance.fontFamily,
             textWrapping: x.TextWrapping.WrapText,
           );
         }
@@ -240,6 +277,7 @@ Uint8List reportExcel(ExportReport report) {
                   ),
                 )
                 .cellStyle = x.CellStyle(
+              fontFamily: AppearanceController.instance.fontFamily,
               textWrapping: x.TextWrapping.WrapText,
             );
           }
@@ -280,6 +318,7 @@ Uint8List reportExcel(ExportReport report) {
                 ),
               )
               .cellStyle = x.CellStyle(
+            fontFamily: AppearanceController.instance.fontFamily,
             numberFormat: x.NumFormat.custom(formatCode: '#,##0.00'),
           );
         }
@@ -393,7 +432,9 @@ Future<Uint8List> reportPdf(
             width: double.infinity,
             padding: const pw.EdgeInsets.all(12),
             decoration: pw.BoxDecoration(
-              color: PdfColor.fromInt(0xFFEDF3F9),
+              color: PdfColor.fromInt(
+                AppearanceController.instance.palette.tint.toARGB32(),
+              ),
               borderRadius: pw.BorderRadius.circular(8),
             ),
             child: pw.Column(
@@ -404,7 +445,10 @@ Future<Uint8List> reportPdf(
                   style: pw.TextStyle(
                     fontSize: 10,
                     fontWeight: pw.FontWeight.bold,
-                    color: PdfColor.fromInt(0xFF304F70),
+                    color: PdfColor.fromInt(
+                      AppearanceController.instance.palette.navigation
+                          .toARGB32(),
+                    ),
                   ),
                 ),
                 pw.SizedBox(height: 6),
@@ -421,7 +465,10 @@ Future<Uint8List> reportPdf(
                   style: pw.TextStyle(
                     fontSize: 17,
                     fontWeight: pw.FontWeight.bold,
-                    color: PdfColor.fromInt(0xFF304F70),
+                    color: PdfColor.fromInt(
+                      AppearanceController.instance.palette.navigation
+                          .toARGB32(),
+                    ),
                   ),
                 ),
                 pw.SizedBox(height: 5),
@@ -430,7 +477,10 @@ Future<Uint8List> reportPdf(
                   style: pw.TextStyle(
                     fontSize: 17,
                     fontWeight: pw.FontWeight.bold,
-                    color: PdfColor.fromInt(0xFF304F70),
+                    color: PdfColor.fromInt(
+                      AppearanceController.instance.palette.navigation
+                          .toARGB32(),
+                    ),
                   ),
                 ),
                 pw.SizedBox(height: 5),
@@ -530,8 +580,10 @@ Future<Uint8List> reportPdf(
                 fontWeight: pw.FontWeight.bold,
                 color: PdfColors.white,
               ),
-              headerDecoration: const pw.BoxDecoration(
-                color: PdfColor.fromInt(0xFF426583),
+              headerDecoration: pw.BoxDecoration(
+                color: PdfColor.fromInt(
+                  AppearanceController.instance.palette.primary.toARGB32(),
+                ),
               ),
               cellStyle: pw.TextStyle(
                 fontSize: table.columns.length >= 11

@@ -293,7 +293,7 @@ class _PersonAccountsPageState extends State<PersonAccountsPage> {
                                 'Te deben',
                                 receivable,
                                 Icons.south_west,
-                                const Color(0xFF35745C),
+                                const Color(0xFF397455),
                               ),
                             ],
                           ),
@@ -356,7 +356,7 @@ class _PersonAccountsPageState extends State<PersonAccountsPage> {
                                 final color = b > 0
                                     ? Theme.of(context).colorScheme.error
                                     : b < 0
-                                    ? const Color(0xFF35745C)
+                                    ? const Color(0xFF397455)
                                     : Theme.of(context).colorScheme.primary;
                                 final name = accountName(a);
                                 return Card(

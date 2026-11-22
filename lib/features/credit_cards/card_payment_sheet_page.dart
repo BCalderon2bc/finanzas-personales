@@ -1,3 +1,4 @@
+import '../../core/status_colors.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -123,7 +124,7 @@ class _CardPaymentSheetPageState extends State<CardPaymentSheetPage> {
               ? 'Fecha límite sin registrar'
               : '${overdue ? 'Venció el' : 'Vence el'} ${shortStatementDate(cut.statement['due_date'])}',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: overdue ? Theme.of(context).colorScheme.error : null,
+            color: appDueColor(due, settled: cut.settled),
             fontWeight: FontWeight.w600,
           ),
         ),

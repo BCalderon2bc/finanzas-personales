@@ -23,7 +23,7 @@ class DashboardMonthlyBalance extends StatelessWidget {
       expense.abs(),
     ].reduce((a, b) => a > b ? a : b);
     final positive = net >= 0;
-    final color = positive ? const Color(0xFF35745C) : const Color(0xFFA3453D);
+    final color = positive ? const Color(0xFF397455) : const Color(0xFFB13D32);
 
     Widget bar(String label, int amount, Color color) => Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -33,7 +33,7 @@ class DashboardMonthlyBalance extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(label, style: const TextStyle(color: appMuted)),
+                child: Text(label, style: TextStyle(color: appMuted)),
               ),
               Text(
                 dashboardMoney(amount, currency),
@@ -64,7 +64,7 @@ class DashboardMonthlyBalance extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.bar_chart_rounded, color: primaryColor),
+                Icon(Icons.bar_chart_rounded, color: primaryColor),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -75,9 +75,9 @@ class DashboardMonthlyBalance extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 4),
-            Text(data.period.label, style: const TextStyle(color: appMuted)),
+            Text(data.period.label, style: TextStyle(color: appMuted)),
             const SizedBox(height: 20),
-            bar('Ingresos', income, const Color(0xFF35745C)),
+            bar('Ingresos', income, const Color(0xFF397455)),
             bar(
               expense < 0
                   ? 'Gastos netos · devoluciones superiores'
@@ -116,13 +116,13 @@ class DashboardMonthlyBalance extends StatelessWidget {
                         : '${difference > 0 ? 'Mejoró' : 'Disminuyó'} '
                               '${dashboardMoney(difference.abs(), currency)} '
                               'frente al período anterior.',
-                    style: const TextStyle(color: appMuted),
+                    style: TextStyle(color: appMuted),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Las barras comparan magnitudes. El resultado excluye transferencias y pagos de capital.',
               style: TextStyle(color: appMuted, fontSize: 12),
             ),

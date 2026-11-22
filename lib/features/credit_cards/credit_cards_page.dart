@@ -17,7 +17,6 @@ import 'credit_card_form_dialog.dart';
 import 'credit_card_movement_dialog.dart';
 import 'credit_card_payment_dialog.dart';
 import 'credit_card_movements_page.dart';
-import 'credit_cards_summary.dart';
 import 'credit_card_wallet.dart';
 import 'credit_card_details.dart';
 import 'credit_card_face.dart' show cardBankName;
@@ -891,7 +890,7 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
                               alignment: Alignment.topCenter,
                               child: ConstrainedBox(
                                 constraints: const BoxConstraints(
-                                  maxWidth: 1080,
+                                  maxWidth: 1440,
                                 ),
                                 child: Column(
                                   crossAxisAlignment:
@@ -923,11 +922,15 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
                                         ),
                                       ),
                                     ],
-                                    const SizedBox(height: 24),
-                                    CreditCardsSummary(
-                                      cards: cards,
-                                      balanceFor: balanceFor,
-                                    ),
+                                    const SizedBox(height: 12),
+                                    if (selected != null)
+                                      CreditCardMovementsPage(
+                                        key: ValueKey(
+                                          'cut-history/${selected['id']}',
+                                        ),
+                                        cardId: '${selected['id']}',
+                                        embedded: true,
+                                      ),
                                   ],
                                 ),
                               ),

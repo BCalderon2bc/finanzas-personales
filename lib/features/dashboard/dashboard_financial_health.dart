@@ -7,20 +7,22 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'dashboard_overview.dart';
 
-const _blue = primaryColor;
-const _green = Color(0xFF35745C);
-const _red = Color(0xFFA3453D);
-const _amber = Color(0xFF886128);
-const _muted = appMuted;
-const _border = appBorder;
+Color get _blue => primaryColor;
+const _green = Color(0xFF397455);
+const _red = Color(0xFFB13D32);
+const _amber = Color(0xFF946200);
+Color get _muted => appMuted;
+Color get _border => appBorder;
 
 class DashboardFinancialHealth extends StatelessWidget {
   const DashboardFinancialHealth({
     super.key,
     required this.data,
     required this.currency,
+    this.trailingChart,
   });
 
+  final Widget? trailingChart;
   final DashboardOverview data;
   final String currency;
 
@@ -41,23 +43,12 @@ class DashboardFinancialHealth extends StatelessWidget {
         .fold<int>(0, (sum, a) => sum + (a['balance_cents'] as int));
 
     final savings = math.max(0, savingsBalance);
-    final covered = debt == null ? 0 : math.min(savings, debt);
-    final uncovered = debt == null ? 0 : math.max(0, debt - savings);
-    final coverage = debt != null && debt > 0
-        ? (savings / debt * 100).clamp(0.0, 100.0)
-        : null;
-
-    final income = math.max(0, c.income);
-    final expense = math.max(0, c.expense);
-    final consumed = math.min(income, expense);
-    final remainingIncome = math.max(0, income - expense);
-    final spendingRatio = income > 0 ? expense / income : null;
 
     final positiveCategories =
         c.categories.entries.where((e) => e.value > 0).toList()
           ..sort((a, b) => b.value.compareTo(a.value));
 
-    const palette = [
+    final palette = [
       _blue,
       Color(0xFF796A9C),
       Color(0xFF4F8291),
@@ -98,14 +89,6 @@ class DashboardFinancialHealth extends StatelessWidget {
 
     final hasNegativeCategories = c.categories.values.any((value) => value < 0);
 
-    final monthlyColor = spendingRatio == null
-        ? _blue
-        : spendingRatio > 1
-        ? _red
-        : spendingRatio >= 0.8
-        ? _amber
-        : _green;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -117,7 +100,7 @@ class DashboardFinancialHealth extends StatelessWidget {
                 color: _blue.withAlpha(16),
                 borderRadius: BorderRadius.circular(13),
               ),
-              child: const Icon(Icons.monitor_heart_outlined, color: _blue),
+              child: Icon(Icons.monitor_heart_outlined, color: _blue),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -133,7 +116,7 @@ class DashboardFinancialHealth extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${data.period.label} · $currency',
-                    style: const TextStyle(color: _muted, fontSize: 12),
+                    style: TextStyle(color: _muted, fontSize: 12),
                   ),
                 ],
               ),
@@ -150,94 +133,16 @@ class DashboardFinancialHealth extends StatelessWidget {
         const SizedBox(height: 16),
         LayoutBuilder(
           builder: (context, box) {
-            final columns = box.maxWidth >= 1050
-                ? 3
-                : box.maxWidth >= 680
-                ? 2
-                : 1;
+            final scaledWidth =
+                box.maxWidth /
+                (MediaQuery.textScalerOf(context).scale(14) / 14).clamp(
+                  1.0,
+                  1.8,
+                );
+            final columns = trailingChart != null && scaledWidth >= 780 ? 2 : 1;
             final width = (box.maxWidth - 16 * (columns - 1)) / columns;
 
             final panels = [
-              _ChartPanel(
-                title: 'Tu período en números',
-                subtitle: 'Gastos frente a ingresos registrados',
-                icon: Icons.insights_outlined,
-                center: income == 0
-                    ? '—'
-                    : '${(expense / income * 100).toStringAsFixed(0)}%',
-                centerLabel: 'de tus ingresos',
-                centerColor: monthlyColor,
-                slices: [
-                  _Slice('Ingreso consumido', consumed, monthlyColor),
-                  _Slice('Ingreso restante', remainingIncome, _green),
-                ],
-                emptyText: 'Sin ingresos positivos para comparar.',
-                legend: [
-                  _Legend('Ingresos', money(c.income), _blue),
-                  _Legend('Gasto neto', money(c.expense), monthlyColor),
-                  _Legend(
-                    c.net < 0 ? 'Déficit del período' : 'Resultado del período',
-                    money(c.net.abs()),
-                    c.net < 0 ? _red : _green,
-                  ),
-                ],
-                footer: c.expense < 0
-                    ? 'Las devoluciones superan los gastos registrados.'
-                    : spendingRatio == null
-                    ? 'Registra ingresos para comparar el gasto del período.'
-                    : spendingRatio > 1
-                    ? 'Gastaste ${money(c.expense - c.income)} más de lo que ingresó.'
-                    : 'El resultado del período no equivale al saldo disponible de tus cuentas.',
-              ),
-              _ChartPanel(
-                title: 'Ahorros frente a deudas',
-                subtitle: 'Cobertura con tus cuentas de ahorro activas',
-                icon: Icons.savings_outlined,
-                center: debt == null
-                    ? '—'
-                    : debt == 0
-                    ? 'Sin deuda'
-                    : '${coverage!.toStringAsFixed(0)}%',
-                centerLabel: debt == null
-                    ? 'requiere revisión'
-                    : debt == 0
-                    ? 'registrada'
-                    : 'deuda cubierta',
-                centerColor: debt == null
-                    ? _muted
-                    : debt == 0 || savings >= debt
-                    ? _green
-                    : _amber,
-                slices: debt == null || debt == 0
-                    ? const []
-                    : [
-                        _Slice('Cubierta con ahorro', covered, _green),
-                        _Slice('Sin cubrir con ahorro', uncovered, _amber),
-                      ],
-                emptyText: debt == null
-                    ? 'Revisa los ajustes de tus tarjetas.'
-                    : 'No tienes deuda registrada en esta moneda.',
-                legend: [
-                  _Legend('Ahorro disponible', money(savings), _green),
-                  _Legend(
-                    'Deuda total',
-                    debt == null ? 'Por revisar' : money(debt),
-                    _amber,
-                  ),
-                  if (debt != null)
-                    _Legend(
-                      savings >= debt
-                          ? 'Ahorro sobre la deuda'
-                          : 'Falta para cubrirla',
-                      money((savings - debt).abs()),
-                      savings >= debt ? _green : _amber,
-                    ),
-                ],
-                footer:
-                    'Compara saldos actuales. Incluye capital de préstamos '
-                    'y deuda de tarjetas; excluye intereses futuros. '
-                    'Es una comparación, no una indicación de pagar todo hoy.',
-              ),
               _ChartPanel(
                 title: '¿Dónde se va tu dinero?',
                 subtitle: 'Distribución del gasto neto positivo',
@@ -263,14 +168,24 @@ class DashboardFinancialHealth extends StatelessWidget {
                     : 'Incluye categorías con gasto neto positivo. '
                           'Los porcentajes corresponden a su suma.',
               ),
+              if (trailingChart != null) trailingChart!,
             ];
 
             return Wrap(
               spacing: 16,
               runSpacing: 16,
-              children: panels
-                  .map((panel) => SizedBox(width: width, child: panel))
-                  .toList(),
+              children: [
+                for (final (index, panel) in panels.indexed)
+                  SizedBox(
+                    width:
+                        columns == 2 &&
+                            panels.length.isOdd &&
+                            index == panels.length - 1
+                        ? box.maxWidth
+                        : width,
+                    child: panel,
+                  ),
+              ],
             );
           },
         ),
@@ -464,7 +379,7 @@ class _ChartPanel extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: _muted, fontSize: 10),
+                        style: TextStyle(color: _muted, fontSize: 10),
                       ),
                     ],
                   ),
@@ -500,7 +415,7 @@ class _ChartPanel extends StatelessWidget {
                       children: [
                         Text(
                           item.label,
-                          style: const TextStyle(fontSize: 13, color: _muted),
+                          style: TextStyle(fontSize: 13, color: _muted),
                         ),
                         const SizedBox(height: 3),
                         Text(
@@ -545,12 +460,16 @@ class _ChartPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          Text(subtitle, style: const TextStyle(color: _muted, fontSize: 13)),
+          Text(subtitle, style: TextStyle(color: _muted, fontSize: 13)),
           const SizedBox(height: 16),
           LayoutBuilder(
             builder: (context, box) {
-              if (box.maxWidth < 440 ||
-                  MediaQuery.textScalerOf(context).scale(14) > 17.5) {
+              if (box.maxWidth /
+                      (MediaQuery.textScalerOf(context).scale(14) / 14).clamp(
+                        1.0,
+                        1.8,
+                      ) <
+                  510) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -575,12 +494,12 @@ class _ChartPanel extends StatelessWidget {
               padding: const EdgeInsets.only(top: 12),
               child: Text(
                 emptyText,
-                style: const TextStyle(color: _muted, fontSize: 12),
+                style: TextStyle(color: _muted, fontSize: 12),
               ),
             ),
           ExpansionTile(
             tilePadding: EdgeInsets.zero,
-            title: const Text(
+            title: Text(
               'Cómo se calcula',
               style: TextStyle(fontSize: 13, color: _muted),
             ),
@@ -589,11 +508,7 @@ class _ChartPanel extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Text(
                   footer,
-                  style: const TextStyle(
-                    color: _muted,
-                    fontSize: 13,
-                    height: 1.5,
-                  ),
+                  style: TextStyle(color: _muted, fontSize: 13, height: 1.5),
                 ),
               ),
             ],
@@ -639,7 +554,7 @@ class _ChartPanel extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             subtitle,
-            style: const TextStyle(color: _muted, fontSize: 12, height: 1.4),
+            style: TextStyle(color: _muted, fontSize: 12, height: 1.4),
           ),
           const SizedBox(height: 24),
           Center(
@@ -671,7 +586,7 @@ class _ChartPanel extends StatelessWidget {
                           Text(
                             centerLabel,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(color: _muted, fontSize: 11),
+                            style: TextStyle(color: _muted, fontSize: 11),
                           ),
                         ],
                       ),
@@ -686,7 +601,7 @@ class _ChartPanel extends StatelessWidget {
             Text(
               emptyText,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: _muted, fontSize: 12),
+              style: TextStyle(color: _muted, fontSize: 12),
             ),
           ],
           const SizedBox(height: 22),
@@ -731,7 +646,7 @@ class _ChartPanel extends StatelessWidget {
           const Divider(height: 26),
           Text(
             footer,
-            style: const TextStyle(color: _muted, fontSize: 11, height: 1.5),
+            style: TextStyle(color: _muted, fontSize: 11, height: 1.5),
           ),
         ],
       ),

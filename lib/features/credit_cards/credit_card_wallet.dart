@@ -68,7 +68,7 @@ class CreditCardWallet extends StatelessWidget {
                     const Divider(height: 18),
                     Text(
                       card['is_active'] == true ? 'Activa' : 'Inactiva',
-                      style: const TextStyle(color: appMuted, fontSize: 13),
+                      style: TextStyle(color: appMuted, fontSize: 13),
                     ),
                   ],
                 ],

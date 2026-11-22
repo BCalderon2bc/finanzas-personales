@@ -40,7 +40,7 @@ class TransactionTile extends StatelessWidget {
       'receivable_loan',
     ].contains(transaction['source']);
     final color = income
-        ? const Color(0xFF35745C)
+        ? const Color(0xFF397455)
         : expense
         ? colors.error
         : colors.primary;

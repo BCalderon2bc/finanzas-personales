@@ -14,11 +14,11 @@ import '../../widgets/category_style.dart';
 import '../../widgets/adaptive_layout.dart';
 import 'dashboard_overview.dart';
 
-const _blue = primaryColor;
-const _green = Color(0xFF35745C);
-const _red = Color(0xFFA3453D);
-const _muted = appMuted;
-const _border = appBorder;
+Color get _blue => primaryColor;
+const _green = Color(0xFF397455);
+const _red = Color(0xFFB13D32);
+Color get _muted => appMuted;
+Color get _border => appBorder;
 
 class DashboardMetrics extends StatelessWidget {
   const DashboardMetrics({
@@ -147,12 +147,12 @@ class _Metric extends StatelessWidget {
     final accent = iconColor ?? _blue;
     final comparisonColor = footerColor ?? _blue;
     return Container(
-      constraints: BoxConstraints(minHeight: compact ? 0 : 166),
+      constraints: BoxConstraints(minHeight: compact ? 0 : 150),
       padding: EdgeInsets.all(compact ? 12 : 16),
       decoration: BoxDecoration(
         color: hero ? null : Colors.white,
         gradient: hero
-            ? const LinearGradient(
+            ? LinearGradient(
                 colors: [appPrimaryDeep, primaryColor],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -200,7 +200,7 @@ class _Metric extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: compact ? 6 : 18),
+          SizedBox(height: compact ? 6 : 12),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
@@ -214,7 +214,7 @@ class _Metric extends StatelessWidget {
               ),
             ),
           ),
-          SizedBox(height: compact ? 6 : 16),
+          SizedBox(height: compact ? 6 : 10),
           Align(
             alignment: Alignment.centerLeft,
             child: Container(
@@ -280,7 +280,7 @@ class DashboardQuickActions extends StatelessWidget {
               avatar: Icon(item.$2, color: _blue, size: 19),
               label: Text(item.$3),
               backgroundColor: Colors.white,
-              side: const BorderSide(color: _border),
+              side: BorderSide(color: _border),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
               onPressed: () => onOpen(item.$1),
             ),
@@ -297,7 +297,9 @@ class DashboardPanels extends StatelessWidget {
     required this.currency,
     required this.onOpen,
     required this.onEvent,
+    this.receivablesPanel,
   });
+  final Widget? receivablesPanel;
   final DashboardOverview data;
   final String currency;
   final ValueChanged<DashboardTarget> onOpen;
@@ -364,7 +366,7 @@ class DashboardPanels extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (entries.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(vertical: 18),
               child: Text(
                 'Todavía no hay gastos en este rango y moneda.',
@@ -452,7 +454,7 @@ class DashboardPanels extends StatelessWidget {
             );
           }),
           if (entries.isNotEmpty)
-            const Text(
+            Text(
               'Porcentajes entre categorías con gasto neto positivo.',
               style: TextStyle(color: _muted, fontSize: 11),
             ),
@@ -461,7 +463,7 @@ class DashboardPanels extends StatelessWidget {
               padding: const EdgeInsets.only(top: 6),
               child: Text(
                 '${entries.length - 5} categorías más en el reporte.',
-                style: const TextStyle(color: _muted, fontSize: 11),
+                style: TextStyle(color: _muted, fontSize: 11),
               ),
             ),
           if (entries.any((entry) => entry.value < 0))
@@ -494,7 +496,7 @@ class DashboardPanels extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(bottom: 12),
             child: Text(
               'Límites mensuales completos, sin prorratear. El gasto incluye solo las fechas seleccionadas.',
@@ -502,7 +504,7 @@ class DashboardPanels extends StatelessWidget {
             ),
           ),
           if (budgets.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(vertical: 20),
               child: Column(
                 children: [
@@ -536,7 +538,7 @@ class DashboardPanels extends StatelessWidget {
             final color = exceeded
                 ? _red
                 : nearLimit
-                ? const Color(0xFF886128)
+                ? const Color(0xFF946200)
                 : _green;
             final style = data.categoryStyles[b['category_id'].toString()];
             final categoryAccent = categoryColor(style?['color']);
@@ -607,7 +609,7 @@ class DashboardPanels extends StatelessWidget {
                     const SizedBox(height: 8),
                     Text(
                       '${money(spent)} de ${money(limit)}',
-                      style: const TextStyle(color: _muted, fontSize: 12),
+                      style: TextStyle(color: _muted, fontSize: 12),
                     ),
                     const SizedBox(height: 12),
                     ClipRRect(
@@ -661,7 +663,7 @@ class DashboardPanels extends StatelessWidget {
           if (budgets.length > 4)
             Text(
               '${budgets.length - 4} presupuestos más en Administrar.',
-              style: const TextStyle(color: _muted, fontSize: 12),
+              style: TextStyle(color: _muted, fontSize: 12),
             ),
         ],
       ),
@@ -712,7 +714,7 @@ class DashboardPanels extends StatelessWidget {
           ),
         const Divider(height: 24),
         amountRow('Saldo menos deuda registrada', c.position, bold: true),
-        const Text(
+        Text(
           'Considera cuentas activas y saldos a favor de tarjetas. '
           'No incluye bienes ni intereses futuros.',
           style: TextStyle(color: _muted, fontSize: 12),
@@ -770,7 +772,7 @@ class DashboardPanels extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (accounts.isEmpty)
-            const Text(
+            Text(
               'No hay cuentas activas en esta moneda.',
               style: TextStyle(color: _muted),
             ),
@@ -806,7 +808,7 @@ class DashboardPanels extends StatelessWidget {
                         ),
                         Text(
                           types[a['account_type']] ?? 'Cuenta',
-                          style: const TextStyle(color: _muted, fontSize: 12),
+                          style: TextStyle(color: _muted, fontSize: 12),
                         ),
                       ],
                     ),
@@ -839,7 +841,7 @@ class DashboardPanels extends StatelessWidget {
       action: 'Ver movimientos',
       onAction: () => onOpen(DashboardTarget.transactions),
       child: events.isEmpty
-          ? const Padding(
+          ? Padding(
               padding: EdgeInsets.symmetric(vertical: 24),
               child: Column(
                 children: [
@@ -934,7 +936,7 @@ class DashboardPanels extends StatelessWidget {
                                         '${e.date.month.toString().padLeft(2, '0')} · ${e.detail}',
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           color: _muted,
                                           fontSize: 12,
                                         ),
@@ -970,7 +972,7 @@ class DashboardPanels extends StatelessWidget {
                                   ),
                                 ],
                                 const SizedBox(width: 6),
-                                const Icon(
+                                Icon(
                                   Icons.chevron_right_rounded,
                                   color: _muted,
                                   size: 18,
@@ -982,7 +984,7 @@ class DashboardPanels extends StatelessWidget {
                       ),
                     ),
                     if (index < events.length - 1)
-                      const Divider(height: 1, color: _border),
+                      Divider(height: 1, color: _border),
                   ],
                 );
               }),
@@ -992,52 +994,25 @@ class DashboardPanels extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      LayoutBuilder(
-        builder: (context, box) {
-          if (box.maxWidth < 900) {
-            return Column(
-              children: [
-                categoriesPanel(),
-                const SizedBox(height: 16),
-                budgetsPanel(),
-                const SizedBox(height: 16),
-                debtsPanel(),
-                const SizedBox(height: 16),
-                accountsPanel(),
-              ],
-            );
-          }
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 7,
-                child: Column(
-                  children: [
-                    categoriesPanel(),
-                    const SizedBox(height: 16),
-                    accountsPanel(),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                flex: 5,
-                child: Column(
-                  children: [
-                    debtsPanel(),
-                    const SizedBox(height: 16),
-                    budgetsPanel(),
-                  ],
-                ),
-              ),
-            ],
-          );
-        },
+      AdaptiveColumns(
+        minColumnWidth: 380,
+        maxColumns: 3,
+        spacing: 16,
+        children: [
+          accountsPanel(),
+          debtsPanel(),
+          if (receivablesPanel != null) receivablesPanel!,
+        ],
       ),
       const SizedBox(height: 16),
-      recentPanel(),
+      AdaptiveColumns(
+        minColumnWidth: 480,
+        maxColumns: 2,
+        spacing: 16,
+        children: [categoriesPanel(), recentPanel()],
+      ),
     ],
   );
 }
@@ -1061,7 +1036,7 @@ class _Panel extends StatelessWidget {
     elevation: 0,
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(22),
-      side: const BorderSide(color: _border),
+      side: BorderSide(color: _border),
     ),
     child: Padding(
       padding: const EdgeInsets.all(16),
@@ -1108,7 +1083,7 @@ class _Panel extends StatelessWidget {
               );
             },
           ),
-          const Divider(height: 22, color: _border),
+          Divider(height: 22, color: _border),
           child,
         ],
       ),

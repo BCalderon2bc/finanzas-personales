@@ -22,7 +22,7 @@ class CategoryTile extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: const BorderSide(color: appBorder),
+        side: BorderSide(color: appBorder),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -59,7 +59,7 @@ class CategoryTile extends StatelessWidget {
                     const SizedBox(height: 5),
                     Text(
                       '${income ? 'Ingreso' : 'Gasto'} · ${active ? 'Activa' : 'Inactiva'}',
-                      style: const TextStyle(color: appMuted, fontSize: 12),
+                      style: TextStyle(color: appMuted, fontSize: 12),
                     ),
                   ],
                 ),

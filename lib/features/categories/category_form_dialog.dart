@@ -156,7 +156,7 @@ class _CategoryFormDialogState extends State<CategoryFormDialog> {
                         },
                 ),
                 if (editing)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.only(top: 8),
                     child: Text(
                       'El tipo se conserva para mantener la clasificación del historial.',

@@ -167,7 +167,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
   @override
   Widget build(BuildContext context) {
-    const blue = primaryColor, green = Color(0xFF35745C), muted = appMuted;
+    final blue = primaryColor, green = Color(0xFF397455), muted = appMuted;
     return PopScope(
       canPop: !saving,
       child: Scaffold(
@@ -187,7 +187,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.check_circle_outline_rounded,
                                 color: green,
                                 size: 58,
@@ -202,7 +202,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                                 ),
                               ),
                               const SizedBox(height: 12),
-                              const Text(
+                              Text(
                                 'Usa tu nueva contraseña la próxima vez que inicies sesión.',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(color: muted, height: 1.5),
@@ -221,7 +221,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                                 mainAxisSize: MainAxisSize.min,
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  const Icon(
+                                  Icon(
                                     Icons.lock_reset_rounded,
                                     color: blue,
                                     size: 48,
@@ -237,10 +237,10 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                                   const SizedBox(height: 8),
                                   Text(
                                     supabase.auth.currentUser?.email ?? '',
-                                    style: const TextStyle(color: muted),
+                                    style: TextStyle(color: muted),
                                   ),
                                   const SizedBox(height: 8),
-                                  const Text(
+                                  Text(
                                     'Ingresa tu contraseña actual y confirma la nueva.',
                                     style: TextStyle(color: muted, height: 1.5),
                                   ),

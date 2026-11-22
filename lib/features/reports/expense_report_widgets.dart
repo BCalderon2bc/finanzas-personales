@@ -65,7 +65,7 @@ class ExpenseReportSummary extends StatelessWidget {
         gradient: LinearGradient(
           colors: total < 0
               ? const [Color(0xFF3E6D66), Color(0xFF4B7B72)]
-              : const [appPrimaryDeep, primaryColor],
+              : [appPrimaryDeep, primaryColor],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -154,7 +154,7 @@ class ExpenseCategoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final refund = amountCents < 0;
-    final accent = refund ? const Color(0xFF35745C) : color;
+    final accent = refund ? const Color(0xFF397455) : color;
     final ratio = amountCents > 0 && positiveTotalCents > 0
         ? amountCents / positiveTotalCents
         : 0.0;
@@ -164,7 +164,7 @@ class ExpenseCategoryCard extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: const BorderSide(color: appBorder),
+        side: BorderSide(color: appBorder),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -192,7 +192,7 @@ class ExpenseCategoryCard extends StatelessWidget {
                       children: [
                         Text(
                           name,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: appText,
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
@@ -201,16 +201,12 @@ class ExpenseCategoryCard extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           '$count movimientos',
-                          style: const TextStyle(color: appMuted, fontSize: 12),
+                          style: TextStyle(color: appMuted, fontSize: 12),
                         ),
                       ],
                     ),
                   ),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: appMuted,
-                    size: 20,
-                  ),
+                  Icon(Icons.chevron_right_rounded, color: appMuted, size: 20),
                 ],
               ),
               const SizedBox(height: 16),
@@ -306,7 +302,7 @@ class ExpenseDetailTile extends StatelessWidget {
       exchangeRate?.convert(cents, originalCurrency, currency) ?? cents,
       currency,
     );
-    final color = refund ? const Color(0xFF35745C) : primaryColor;
+    final color = refund ? const Color(0xFF397455) : primaryColor;
     final description = tx['description']?.toString().trim() ?? '';
     final reference = tx['reference']?.toString().trim() ?? '';
     final cardLabel = tx['card_label']?.toString().trim() ?? '';
@@ -366,12 +362,12 @@ class ExpenseDetailTile extends StatelessWidget {
                 const SizedBox(height: 5),
                 Text(
                   '$dateText · $label',
-                  style: const TextStyle(color: appMuted, fontSize: 12),
+                  style: TextStyle(color: appMuted, fontSize: 12),
                 ),
                 if (card && cardLabel.isNotEmpty)
                   Text(
                     cardLabel,
-                    style: const TextStyle(color: appMuted, fontSize: 12),
+                    style: TextStyle(color: appMuted, fontSize: 12),
                   ),
                 const SizedBox(height: 9),
                 Text(
@@ -412,7 +408,7 @@ class ExpenseDetailTile extends StatelessWidget {
                   const SizedBox(height: 7),
                   SelectableText(
                     'Referencia: $reference',
-                    style: const TextStyle(color: appMuted, fontSize: 12),
+                    style: TextStyle(color: appMuted, fontSize: 12),
                   ),
                 ],
               ],

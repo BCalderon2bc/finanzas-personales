@@ -24,7 +24,7 @@ class BudgetSummary extends StatelessWidget {
     final remaining = limit - used;
     final colors = remaining < 0
         ? const [Color(0xFF881337), Color(0xFFBE123C)]
-        : const [appPrimaryDeep, primaryColor];
+        : [appPrimaryDeep, primaryColor];
 
     Widget detail(String label, int amount) => Expanded(
       child: Column(
@@ -166,7 +166,7 @@ class BudgetSummary extends StatelessWidget {
             );
           },
         ),
-        const Padding(
+        Padding(
           padding: EdgeInsets.symmetric(vertical: 14),
           child: Text(
             'Incluye los presupuestos visibles y el gasto de cada uno en su período. '

@@ -1,3 +1,4 @@
+import '../transactions/transactions_page.dart';
 import '../../core/app_theme.dart' show primaryColor;
 import '../../widgets/mobile_navigation.dart';
 import '../../widgets/page_intro.dart';
@@ -331,7 +332,7 @@ class _AccountsPageState extends State<AccountsPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
+              Icon(
                 Icons.account_balance_wallet_outlined,
                 size: 64,
                 color: primaryColor,
@@ -402,6 +403,18 @@ class _AccountsPageState extends State<AccountsPage> {
                     account: selected,
                     balanceCents:
                         currentBalances[selected['id'].toString()] ?? 0,
+                    onMovements: saving
+                        ? null
+                        : () async {
+                            await Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => TransactionsPage(
+                                  initialAccountId: selected['id'].toString(),
+                                ),
+                              ),
+                            );
+                            if (mounted) await loadAccounts();
+                          },
                     onEdit: saving ? null : () => addAccount(selected),
                     onToggle: saving ? null : () => toggleAccount(selected),
                   ),

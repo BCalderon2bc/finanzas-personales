@@ -309,10 +309,7 @@ class _CategoriesPageState extends State<CategoriesPage> {
                               ),
                               Text(
                                 '${visible.where((c) => c['category_type'] == type).length}',
-                                style: const TextStyle(
-                                  color: appMuted,
-                                  fontSize: 12,
-                                ),
+                                style: TextStyle(color: appMuted, fontSize: 12),
                               ),
                             ],
                           ),

@@ -1,3 +1,4 @@
+import '../../core/status_colors.dart';
 import '../../widgets/collapsible_filters.dart';
 import '../help/app_help.dart';
 import 'package:flutter/material.dart';
@@ -517,6 +518,11 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
 
   Widget serviceCard(Map<String, dynamic> expense, {required bool inMonth}) {
     final checked = isChecked(expense);
+    final stateColor = appDueColor(
+      recurringDue(expense, month),
+      settled: checked,
+      inactive: !inMonth,
+    );
     final theme = Theme.of(context);
     final extra = extraCents(expense);
     final extraRow = monthlyExtras[('${expense['id']}', isoDay(month))];
@@ -527,58 +533,75 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
     final notes = '${expense['notes'] ?? ''}'.trim();
     return Card(
       margin: EdgeInsets.zero,
-      color: checked && inMonth
-          ? theme.colorScheme.primaryContainer.withValues(alpha: .45)
-          : null,
+      color: inMonth ? stateColor.withValues(alpha: .07) : null,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: stateColor.withValues(alpha: .3)),
+      ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: CheckboxListTile(
-                contentPadding: const EdgeInsets.only(right: 4),
-                controlAffinity: ListTileControlAffinity.leading,
+            Semantics(
+              label: '${checked ? 'Desmarcar' : 'Marcar'} ${expense['name']} como pagado',
+              child: Checkbox(
                 value: checked,
                 onChanged: inMonth && !saving
                     ? (value) => setChecked(expense, value == true)
                     : null,
-                title: Text(
-                  '${expense['name']}',
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-                subtitle: Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(amount, style: theme.textTheme.titleMedium),
-                      if (extra != 0) ...[
-                        Text(
-                          'Base · ${formatMoneyCents(moneyCents(expense['amount']), '${expense['currency']}')}',
-                        ),
-                        Text(
-                          'Ajuste · ${formatMoneyCents(extra, '${expense['currency']}')}',
-                        ),
-                        if ('${extraRow?['reason'] ?? ''}'.trim().isNotEmpty)
-                          Text('${extraRow!['reason']}'),
-                      ],
-                      if (inMonth)
-                        Text(
-                          'Vence el día ${recurringDue(expense, month).day}',
-                        ),
-                      if (!inMonth)
-                        Text(
-                          expense['is_active'] == true
-                              ? 'Fuera del mes'
-                              : 'Pausado',
-                        ),
-                      if (notes.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(notes),
-                      ],
-                    ],
-                  ),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${expense['name']}',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(amount, style: theme.textTheme.titleMedium),
+                          if (extra != 0) ...[
+                            Text(
+                              'Base · ${formatMoneyCents(moneyCents(expense['amount']), '${expense['currency']}')}',
+                            ),
+                            Text(
+                              'Ajuste · ${formatMoneyCents(extra, '${expense['currency']}')}',
+                            ),
+                            if ('${extraRow?['reason'] ?? ''}'
+                                .trim()
+                                .isNotEmpty)
+                              Text('${extraRow!['reason']}'),
+                          ],
+                          if (inMonth)
+                            Text(
+                              'Vence el día ${recurringDue(expense, month).day}',
+                              style: TextStyle(
+                                color: stateColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          if (!inMonth)
+                            Text(
+                              expense['is_active'] == true
+                                  ? 'Fuera del mes'
+                                  : 'Pausado',
+                            ),
+                          if (notes.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(notes),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

@@ -236,9 +236,30 @@ class _ZeroFormState extends State<ZeroForm> {
       decoration: InputDecoration(
         labelText: f.label,
         helperText: f.type == 'money' ? 'Sin separadores de miles' : null,
+        suffixIcon: f.type == 'money' && f.signed
+            ? IconButton(
+                tooltip: 'Cambiar signo (+/−)',
+                onPressed: f.readOnly
+                    ? null
+                    : () {
+                        final controller = controllers[f.key]!;
+                        final current = controller.text.trim();
+                        final next = current.startsWith('-')
+                            ? current.substring(1)
+                            : '-$current';
+                        controller.value = TextEditingValue(
+                          text: next,
+                          selection: TextSelection.collapsed(
+                            offset: next.length,
+                          ),
+                        );
+                      },
+                icon: const Text('+ / −'),
+              )
+            : null,
       ),
       keyboardType: f.type == 'money'
-          ? TextInputType.numberWithOptions(decimal: true, signed: f.signed)
+          ? const TextInputType.numberWithOptions(decimal: true)
           : TextInputType.text,
       validator: (v) {
         final s = (v ?? '').trim();

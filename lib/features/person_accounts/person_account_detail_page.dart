@@ -475,7 +475,7 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
         ? Theme.of(context).colorScheme.onSurfaceVariant
         : plus
         ? Theme.of(context).colorScheme.error
-        : const Color(0xFF35745C);
+        : const Color(0xFF397455);
     return Card(
       key: ValueKey(row['id']),
       margin: const EdgeInsets.only(bottom: 10),
@@ -826,7 +826,7 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
     final color = balance > 0
         ? Theme.of(context).colorScheme.error
         : balance < 0
-        ? const Color(0xFF35745C)
+        ? const Color(0xFF397455)
         : Theme.of(context).colorScheme.primary;
     return GuideScope(
       topic: 'person_detail',

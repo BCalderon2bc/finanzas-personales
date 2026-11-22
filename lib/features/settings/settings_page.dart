@@ -1,3 +1,4 @@
+import 'appearance_page.dart';
 import '../../core/app_theme.dart' show appMuted, primaryColor;
 import '../help/app_help.dart';
 import 'package:flutter/material.dart';
@@ -135,6 +136,18 @@ class _SettingsPageState extends State<SettingsPage> {
             child: ListView(
               padding: const EdgeInsets.all(20),
               children: [
+                Card(
+                  child: accountAction(
+                    'Colores y fuente',
+                    Icons.palette_outlined,
+                    () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const AppearancePage(),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 Text('Cuenta', style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 8),
                 Card(
@@ -192,7 +205,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.currency_exchange_rounded,
                               color: primaryColor,
                               size: 36,
@@ -245,7 +258,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                 ),
                               ),
                             const SizedBox(height: 16),
-                            const Text(
+                            Text(
                               'No cambia las monedas ni los importes de tus cuentas, '
                               'tarjetas o movimientos. Tampoco registra ganancias o pérdidas cambiarias. '
                               'Se aplica la misma tasa al mes seleccionado y al mes anterior.',
@@ -255,10 +268,7 @@ class _SettingsPageState extends State<SettingsPage> {
                               const SizedBox(height: 12),
                               Text(
                                 'Última actualización: ${date.day}/${date.month}/${date.year}',
-                                style: const TextStyle(
-                                  color: appMuted,
-                                  fontSize: 12,
-                                ),
+                                style: TextStyle(color: appMuted, fontSize: 12),
                               ),
                             ],
                             const SizedBox(height: 22),

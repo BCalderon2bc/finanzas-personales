@@ -389,7 +389,7 @@ class _AccountFormDialogState extends State<AccountFormDialog> {
                   ),
                 ),
                 if (editing)
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.only(top: 8),
                     child: Text(
                       'El tipo y la moneda se conservan al editar.',

@@ -1,3 +1,4 @@
+import '../../core/status_colors.dart';
 import '../../core/app_theme.dart'
     show appMuted, appNegative, appPositive, primaryColor;
 import '../../widgets/collapsible_filters.dart';
@@ -522,7 +523,7 @@ class _ReceivableLoansPageState extends State<ReceivableLoansPage> {
         ? appNegative
         : pending == 0
         ? appPositive
-        : primaryColor;
+        : appDueColor(DateTime.tryParse('${loan['due_date']}'));
     final due = DateTime.tryParse('${loan['due_date']}');
     final hasPayments = payments.any(
       (p) =>
@@ -590,7 +591,7 @@ class _ReceivableLoansPageState extends State<ReceivableLoansPage> {
             const SizedBox(height: 16),
             Text(
               voided ? 'Registro sin efecto en saldos' : 'Capital que te deben',
-              style: const TextStyle(color: appMuted, fontSize: 12),
+              style: TextStyle(color: appMuted, fontSize: 12),
             ),
             Text(
               receivableMoney(voided ? 0 : pending, currency),
@@ -627,7 +628,7 @@ class _ReceivableLoansPageState extends State<ReceivableLoansPage> {
                   : loan['credit_card_id'] != null
                   ? 'Origen: crédito · ${creditCardName(loan['credit_card_id'])}'
                   : 'Origen: cuenta / débito · ${accountName(loan['account_id'])}',
-              style: const TextStyle(color: appMuted, fontSize: 12),
+              style: TextStyle(color: appMuted, fontSize: 12),
             ),
             if ((loan['reference']?.toString() ?? '').isNotEmpty)
               SelectableText('Referencia: ${loan['reference']}'),

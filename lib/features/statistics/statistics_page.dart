@@ -1,3 +1,4 @@
+import '../reports/consolidated_expenses_panel.dart';
 import '../../data/card_spending.dart';
 import '../dashboard/dashboard_financial_health.dart'
     show CreditCardSpendingChart;
@@ -164,6 +165,12 @@ class _StatisticsPageState extends State<StatisticsPage> {
                 ...statistics(rate!),
             ],
             if (!loading && !failed && view != _StatisticsView.debts) ...[
+              ConsolidatedExpensesPanel(
+                movements: movements,
+                exchangeRate: rate,
+                start: range.start,
+                end: range.end,
+              ),
               const SizedBox(height: 12),
               if (obligations case final data?)
                 CreditCardSpendingChart(

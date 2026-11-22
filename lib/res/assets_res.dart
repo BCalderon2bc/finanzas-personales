@@ -4,7 +4,7 @@
 // ignore_for_file: lines_longer_than_80_chars
 class AssetsRes {
   static const String PLUGIN_NAME = 'finanzas_personales';
-  static const String PLUGIN_VERSION = '1.1.2+13';
+  static const String PLUGIN_VERSION = '1.1.1+11';
   static const String ATLANTIDA = 'assets/banks/atlantida.png';
   static const String AVANZ = 'assets/banks/avanz.svg';
   static const String BAC = 'assets/banks/bac.svg';
@@ -78,6 +78,8 @@ class AssetsRes {
   static const String PHYSICAL_LAFISE_VISA_INFINITE = 'assets/cards/physical_lafise_visa_infinite.webp';
   static const String PHYSICAL_LAFISE_VISA_PLATINUM = 'assets/cards/physical_lafise_visa_platinum.webp';
   static const String PHYSICAL_LAFISE_VISA_SIGNATURE = 'assets/cards/physical_lafise_visa_signature.webp';
+  static const String DEJAVU_LICENSE = 'assets/fonts/DejaVu-LICENSE.txt';
+  static const String OPENSANS_LICENSE = 'assets/fonts/OpenSans-LICENSE.txt';
   static const String MASTERCARD = 'assets/networks/mastercard.png';
   static const String VISA = 'assets/networks/visa.png';
 }

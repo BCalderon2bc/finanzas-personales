@@ -1,4 +1,7 @@
-import '../../core/app_theme.dart' show appBorder, appMuted, primaryColor;
+import '../../data/export_report_models.dart';
+import '../../data/export_report_repository.dart';
+import '../reports/consolidated_expenses_panel.dart';
+import '../../core/app_theme.dart' show appMuted;
 import '../../widgets/mobile_navigation.dart';
 import '../../widgets/adaptive_layout.dart';
 import '../help/app_help.dart';
@@ -23,7 +26,6 @@ import '../receivable_loans/receivable_loans_page.dart';
 import '../receivable_loans/receivable_loans_dashboard.dart';
 import 'dashboard_overview.dart';
 import 'dashboard_components.dart';
-import 'dashboard_monthly_balance.dart';
 import 'dashboard_navigation.dart';
 import 'dashboard_financial_health.dart';
 import 'upcoming_payments_panel.dart';
@@ -41,6 +43,7 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   DashboardOverview? data;
+  List<ExportMovement>? consolidatedMovements;
   DashboardPeriod period = DashboardPeriod.forMonth(DateTime.now());
   String currency = 'NIO';
   FinancialSettings? financialSettings;
@@ -88,6 +91,10 @@ class _DashboardPageState extends State<DashboardPage> {
       final results = await Future.wait<Object?>([
         loadDashboardOverview(selectedPeriod.start, until: selectedPeriod.end),
         readSettings(),
+        loadIncomeExpenseData().then<List<ExportMovement>?>(
+          (value) => value.movements,
+          onError: (Object _) => null,
+        ),
       ]);
       final result = results[0] as DashboardOverview;
       final settingsResult = results[1] as (FinancialSettings?, String?);
@@ -101,6 +108,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
       setState(() {
         data = result;
+        consolidatedMovements = results[2] as List<ExportMovement>?;
         financialSettings = settingsResult.$1;
         settingsError = settingsResult.$2;
         loading = false;
@@ -437,7 +445,30 @@ class _DashboardPageState extends State<DashboardPage> {
                             currency: currency,
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 16),
+                        if (consolidatedMovements case final movements?) ...[
+                          ConsolidatedExpensesPanel(
+                            movements: movements,
+                            exchangeRate: rate,
+                            start: period.start,
+                            end: period.end,
+                          ),
+                          const SizedBox(height: 12),
+                        ] else ...[
+                          Card(
+                            child: ListTile(
+                              title: const Text(
+                                'No se pudieron cargar los gastos consolidados',
+                              ),
+                              trailing: TextButton(
+                                onPressed: loadData,
+                                child: const Text('Reintentar'),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        const SizedBox(height: 4),
                         Align(
                           alignment: AlignmentDirectional.centerStart,
                           child: OutlinedButton.icon(
@@ -464,111 +495,39 @@ class _DashboardPageState extends State<DashboardPage> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 12),
                       ],
-                      const SizedBox(height: 12),
-                      if (!loading)
-                        Container(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 4, 8),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surface,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: appBorder),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Totales en ${currency == 'USD' ? 'dólares' : 'córdobas'}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 5),
-                                    Text(
-                                      rate == null
-                                          ? 'Configura la tasa para combinar NIO y USD.'
-                                          : '1 USD = C\$ ${rate.decimal} · Incluye ambas monedas',
-                                      style: const TextStyle(
-                                        color: appMuted,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                    if (settingsError != null)
-                                      const Text(
-                                        'No se pudo cargar la tasa.',
-                                        style: TextStyle(
-                                          color: Color(0xFFA3453D),
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              IconButton(
-                                tooltip: 'Configurar tasa de cambio',
-                                onPressed: openSettings,
-                                icon: const Icon(
-                                  Icons.currency_exchange_rounded,
-                                  color: primaryColor,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       if (!loading && error == null && presented != null) ...[
-                        const SizedBox(height: 16),
                         DashboardFinancialHealth(
                           data: presented,
                           currency: currency,
+                          trailingChart: current == null
+                              ? null
+                              : CreditCardSpendingChart(
+                                  spending: current.cardSpending,
+                                  currency: currency,
+                                  exchangeRate: rate,
+                                ),
                         ),
-                        if (current != null) ...[
-                          const SizedBox(height: 12),
-                          CreditCardSpendingChart(
-                            spending: current.cardSpending,
-                            currency: currency,
-                            exchangeRate: rate,
-                          ),
-                        ],
                       ],
-                      const SizedBox(height: 22),
-                      Text(
-                        'Accesos rápidos',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 10),
-                      GuideAnchor(
-                        id: 'quick',
-                        child: DashboardQuickActions(onOpen: openTarget),
-                      ),
                       if (!loading &&
                           error == null &&
                           current != null &&
                           presented != null) ...[
-                        const SizedBox(height: 20),
-                        ReceivableLoansDashboard(
-                          refreshToken: current.loadedAt,
-                          displayCurrency: rate == null ? null : currency,
-                          exchangeRate: rate,
-                          onChanged: () {
-                            loadData();
-                          },
-                        ),
-                        const SizedBox(height: 24),
-                        DashboardMonthlyBalance(
-                          data: presented,
-                          currency: currency,
-                        ),
                         const SizedBox(height: 20),
                         DashboardPanels(
                           data: presented,
                           currency: currency,
                           onOpen: openTarget,
                           onEvent: openEvent,
+                          receivablesPanel: ReceivableLoansDashboard(
+                            refreshToken: current.loadedAt,
+                            displayCurrency: rate == null ? null : currency,
+                            exchangeRate: rate,
+                            onChanged: () {
+                              loadData();
+                            },
+                          ),
                         ),
                         const SizedBox(height: 14),
                         Text(
@@ -577,7 +536,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           '${current.loadedAt.minute.toString().padLeft(2, '0')} · '
                           '${presented.currencies[currency]!.movements} '
                           'movimientos en el rango',
-                          style: const TextStyle(color: appMuted, fontSize: 12),
+                          style: TextStyle(color: appMuted, fontSize: 12),
                         ),
                       ],
                     ],

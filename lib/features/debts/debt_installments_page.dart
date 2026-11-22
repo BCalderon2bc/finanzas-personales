@@ -1,3 +1,4 @@
+import '../../core/status_colors.dart';
 import '../../core/app_theme.dart' show appMuted;
 import '../../widgets/collapsible_filters.dart';
 import '../../data/transaction_repository.dart';
@@ -344,7 +345,17 @@ class _DebtInstallmentsPageState extends State<DebtInstallmentsPage> {
     final links = data!.links.where(
       (l) => '${l['installment_id']}' == '${i['id']}',
     );
+    final stateColor = appDueColor(
+      DateTime.tryParse('${i['due_date']}'),
+      settled: p.settled,
+      inactive: !current || !active,
+    );
     return Card(
+      color: stateColor.withValues(alpha: .06),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: stateColor.withValues(alpha: .3)),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
@@ -359,7 +370,10 @@ class _DebtInstallmentsPageState extends State<DebtInstallmentsPage> {
               style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
             ),
             const SizedBox(height: 6),
-            Text('Vence: ${shortStatementDate(i['due_date'])}'),
+            Text(
+              'Vence: ${shortStatementDate(i['due_date'])}',
+              style: TextStyle(color: stateColor, fontWeight: FontWeight.w600),
+            ),
             Text('Programado: ${money(moneyCents(i['amount']))}'),
             Text('Abonos vinculados: ${money(p.paid)}'),
             Text(
@@ -526,7 +540,7 @@ class _DebtInstallmentsPageState extends State<DebtInstallmentsPage> {
                           onPressed: saving ? null : archive,
                           child: const Text('Archivar calendario vigente'),
                         ),
-                        const Text(
+                        Text(
                           'Un abono se vincula completo a una cuota. Vincularlo no descuenta dinero otra vez. Si se anula, deja de cubrirla. '
                           'Si liquidaste el préstamo anticipadamente, revisa y archiva las cuotas futuras que ya no correspondan.',
                           style: TextStyle(fontSize: 12, color: appMuted),

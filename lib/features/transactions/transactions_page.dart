@@ -22,7 +22,8 @@ import 'transaction_details_dialog.dart';
 import 'transaction_tile.dart';
 
 class TransactionsPage extends StatefulWidget {
-  const TransactionsPage({super.key});
+  const TransactionsPage({super.key, this.initialAccountId});
+  final String? initialAccountId;
   @override
   State<TransactionsPage> createState() => _TransactionsPageState();
 }
@@ -38,6 +39,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
   @override
   void initState() {
     super.initState();
+    filter = TransactionFilter(accountId: widget.initialAccountId);
     loadData();
   }
 
@@ -606,10 +608,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
                           padding: const EdgeInsets.only(top: 14),
                           child: Text(
                             '${visibleTransactions.length} de ${movements.length} movimientos',
-                            style: const TextStyle(
-                              color: appMuted,
-                              fontSize: 12,
-                            ),
+                            style: TextStyle(color: appMuted, fontSize: 12),
                           ),
                         ),
                         const SizedBox(height: 12),

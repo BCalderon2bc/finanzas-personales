@@ -114,9 +114,9 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
         ? primaryColor
         : days < 0 &&
               (loan || (!coveredMinimum && item.minimumRemaining != null))
-        ? const Color(0xFFA3453D)
+        ? const Color(0xFFB13D32)
         : days <= 0
-        ? const Color(0xFF886128)
+        ? const Color(0xFF946200)
         : primaryColor;
     final when = days < 0
         ? '${isCut ? 'Pasó' : 'Venció'} hace ${-days} ${days == -1 ? 'día' : 'días'}'
@@ -237,7 +237,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
                   ),
                 ),
                 const SizedBox(width: 4),
-                const Tooltip(
+                Tooltip(
                   message: 'Ver detalle',
                   child: Icon(
                     Icons.chevron_right_rounded,
@@ -263,10 +263,17 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
             padding: const EdgeInsets.only(top: 12),
             child: Text(title, style: Theme.of(context).textTheme.titleSmall),
           ),
-          for (final item in visible.where(
-            (item) => agendaUrgency(item, today) == group,
-          ))
-            agendaRow(item, today),
+          AdaptiveColumns(
+            minColumnWidth: 380,
+            maxColumns: 2,
+            spacing: 12,
+            children: [
+              for (final item in visible.where(
+                (item) => agendaUrgency(item, today) == group,
+              ))
+                agendaRow(item, today),
+            ],
+          ),
         ],
     ];
   }
@@ -281,7 +288,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
         children: [
           Row(
             children: [
-              const Icon(Icons.event_available_outlined, color: primaryColor),
+              Icon(Icons.event_available_outlined, color: primaryColor),
               const SizedBox(width: 9),
               const Expanded(
                 child: Text(
@@ -296,7 +303,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
               ),
             ],
           ),
-          const Text(
+          Text(
             'Fechas pasadas, hoy y próximos 7 días. Importes en la moneda del pago.',
             style: TextStyle(color: appMuted, fontSize: 12),
           ),
@@ -337,7 +344,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
               'Qué incluye esta agenda',
               style: TextStyle(fontSize: 13),
             ),
-            children: const [
+            children: [
               Padding(
                 padding: EdgeInsets.only(bottom: 12),
                 child: Text(

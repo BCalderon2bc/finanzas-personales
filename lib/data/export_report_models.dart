@@ -335,6 +335,85 @@ ExportReport movementsReport(
   );
 }
 
+/// Uses the same normalized source as movements, excluding linked account
+/// entries in the repository so a loan payment appears only once.
+ExportReport consolidatedExpensesReport(
+  List<ExportMovement> all,
+  DateTime start,
+  DateTime end,
+  String currency,
+  DateTime generatedAt,
+) {
+  final expenses = movementsReport(
+    all,
+    start,
+    end,
+    currency,
+    generatedAt,
+    selection: IncomeExpenseSelection.expenses,
+  );
+  final capital = all
+      .where(
+        (m) =>
+            m.values[1] == 'Abono de préstamo' &&
+            (currency == 'all' || m.currency == currency) &&
+            inReportRange(m.date, start, end),
+      )
+      .toList();
+  int principal(ExportMovement m) =>
+      (m.values[6] as MoneyCell).cents - m.expense;
+  return ExportReport(
+    title: 'Gastos consolidados',
+    period: expenses.period,
+    generatedAt: generatedAt,
+    tables: [
+      ...expenses.tables,
+      if (capital.isNotEmpty)
+        ReportTable(
+          'Capital de cuotas y préstamos',
+          const ['Fecha', 'Cuenta', 'Detalle', 'Moneda', 'Capital pagado'],
+          [
+            for (final m in capital)
+              [
+                m.values[0],
+                m.values[2],
+                m.values[4],
+                m.currency,
+                MoneyCell(principal(m)),
+              ],
+          ],
+        ),
+    ],
+    totals: [
+      for (final c in ['USD', 'NIO'])
+        if (currency == 'all' || currency == c) ...[
+          ReportTotal(
+            c,
+            'Gasto neto total',
+            expenses.totals
+                .where((t) => t.currency == c)
+                .fold(0, (n, t) => n + t.cents),
+          ),
+          ReportTotal(
+            c,
+            'Capital de cuotas y préstamos (separado)',
+            capital
+                .where((m) => m.currency == c)
+                .fold(0, (n, m) => n + principal(m)),
+          ),
+        ],
+    ],
+    notes: [
+      ...expenses.notes,
+      'Incluye gastos de cuentas y efectivo, compras de todas las tarjetas, cargos, seguros e intereses; las devoluciones restan. Los movimientos anulados se excluyen.',
+      'Los pagos de tarjeta no se suman: la compra ya se contó en su fecha. Las compras financiadas se cuentan al registrarlas; sus pagos no vuelven a sumarse.',
+      'El capital pagado de cuotas y préstamos se muestra separado del gasto. Sus intereses y cargos sí forman parte del gasto neto.',
+      'Los gastos fijos previstos y ajustes del mes no son movimientos reales y no se suman. Registra su pago una sola vez en Movimientos.',
+      'No se detectan duplicados ingresados manualmente como registros independientes: usa los pagos y vínculos de la aplicación.',
+    ],
+  );
+}
+
 ExportReport debtsReport({
   required List<Map<String, dynamic>> debts,
   required List<Map<String, dynamic>> payments,

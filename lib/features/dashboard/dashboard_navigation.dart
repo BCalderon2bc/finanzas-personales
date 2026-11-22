@@ -270,13 +270,13 @@ class DashboardNavigation extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
           ),
         ),
-        expansionTileTheme: const ExpansionTileThemeData(
+        expansionTileTheme: ExpansionTileThemeData(
           textColor: Colors.white,
           iconColor: Colors.white,
           collapsedTextColor: appNavigationText,
           collapsedIconColor: appNavigationText,
         ),
-        iconTheme: const IconThemeData(color: appNavigationText),
+        iconTheme: IconThemeData(color: appNavigationText),
       ),
       child: drawer,
     );

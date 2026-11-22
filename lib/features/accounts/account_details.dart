@@ -12,18 +12,19 @@ class AccountDetails extends StatelessWidget {
     required this.balanceCents,
     this.onEdit,
     this.onToggle,
+    this.onMovements,
   });
   final Map<String, dynamic> account;
   final int balanceCents;
-  final VoidCallback? onEdit, onToggle;
+  final VoidCallback? onEdit, onToggle, onMovements;
 
   String money(int cents) =>
       formatMoneyCents(cents, account['currency']?.toString() ?? 'NIO');
 
   @override
   Widget build(BuildContext context) {
-    const muted = appMuted;
-    const border = appBorder;
+    final muted = appMuted;
+    final border = appBorder;
     final active = account['is_active'] != false;
     final type = account['account_type']?.toString() ?? '';
     final institution = account['financial_institutions'];
@@ -41,9 +42,9 @@ class AccountDetails extends StatelessWidget {
     final opening = moneyCents(account['opening_balance'] ?? 0);
     final difference = balanceCents - opening;
     final color = balanceCents < 0
-        ? const Color(0xFFA3453D)
+        ? const Color(0xFFB13D32)
         : type == 'cash'
-        ? const Color(0xFF35745C)
+        ? const Color(0xFF397455)
         : bankGradient(bank).first;
     const types = {
       'savings': 'Cuenta de ahorro',
@@ -70,7 +71,7 @@ class AccountDetails extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(color: muted, fontSize: 12)),
+                Text(label, style: TextStyle(color: muted, fontSize: 12)),
                 const SizedBox(height: 5),
                 Text(
                   value,
@@ -88,14 +89,14 @@ class AccountDetails extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(24),
-        side: const BorderSide(color: border),
+        side: BorderSide(color: border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
+            Text(
               'CUENTA SELECCIONADA',
               style: TextStyle(color: muted, fontSize: 10, letterSpacing: 1.3),
             ),
@@ -104,6 +105,17 @@ class AccountDetails extends StatelessWidget {
               account['name']?.toString() ?? 'Mi cuenta',
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
             ),
+            if (onMovements != null) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: OutlinedButton.icon(
+                  onPressed: onMovements,
+                  icon: const Icon(Icons.receipt_long_outlined),
+                  label: const Text('Ver movimientos'),
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             Wrap(
               spacing: 12,
@@ -113,10 +125,7 @@ class AccountDetails extends StatelessWidget {
                 if (bank.isNotEmpty)
                   BankLogo(name: bank, width: 105, height: 30),
                 if (bank.isNotEmpty)
-                  Text(
-                    bank,
-                    style: const TextStyle(color: muted, fontSize: 12),
-                  ),
+                  Text(bank, style: TextStyle(color: muted, fontSize: 12)),
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
@@ -129,7 +138,7 @@ class AccountDetails extends StatelessWidget {
                   child: Text(
                     active ? 'Activa' : 'Inactiva',
                     style: TextStyle(
-                      color: active ? const Color(0xFF35745C) : muted,
+                      color: active ? const Color(0xFF397455) : muted,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
@@ -170,7 +179,7 @@ class AccountDetails extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     'Incluye los movimientos y pagos vinculados a esta cuenta.',
                     style: TextStyle(color: muted, fontSize: 12, height: 1.5),
                   ),
@@ -237,28 +246,25 @@ class AccountDetails extends StatelessWidget {
             AccountShareSection(account: account),
             if (reference.isNotEmpty) ...[
               const SizedBox(height: 12),
-              const Text(
-                'Referencia',
-                style: TextStyle(color: muted, fontSize: 12),
-              ),
+              Text('Referencia', style: TextStyle(color: muted, fontSize: 12)),
               const SizedBox(height: 5),
               SelectableText(reference),
             ],
             if (notes.isNotEmpty) ...[
               const SizedBox(height: 12),
-              const Text('Notas', style: TextStyle(color: muted, fontSize: 12)),
+              Text('Notas', style: TextStyle(color: muted, fontSize: 12)),
               const SizedBox(height: 5),
               Text(notes),
             ],
             if (!active)
-              const Padding(
+              Padding(
                 padding: EdgeInsets.only(top: 16),
                 child: Text(
                   'Esta cuenta conserva su historial y no se ofrece para nuevos movimientos.',
                   style: TextStyle(color: muted, fontSize: 12, height: 1.5),
                 ),
               ),
-            const Divider(height: 22, color: border),
+            Divider(height: 22, color: border),
             Wrap(
               alignment: WrapAlignment.end,
               spacing: 8,

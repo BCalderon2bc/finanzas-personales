@@ -1,3 +1,6 @@
+import 'zero_plan_form.dart';
+import '../person_accounts/receipt_draft_field.dart';
+import '../../data/zero_installment_charges.dart';
 import '../../data/card_spending.dart';
 import '../../utils/entry_order.dart';
 import '../../widgets/collapsible_filters.dart';
@@ -28,11 +31,13 @@ class CreditCardMovementsPage extends StatefulWidget {
     super.key,
     required String this.cardId,
     this.initialAdditionalId,
+    this.embedded = false,
   });
-  const CreditCardMovementsPage.all({super.key})
+  const CreditCardMovementsPage.all({super.key, this.embedded = false})
     : cardId = null,
       initialAdditionalId = null;
 
+  final bool embedded;
   final String? cardId;
   final String? initialAdditionalId;
   @override
@@ -48,13 +53,38 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
   DateTimeRange? customDates;
   bool useLatestCut = true;
   Map<String, DateTime> latestCuts = {};
+  Map<String, int> closingDays = {};
 
-  DateTimeRange? cutRange(String? cardId, DateTime today) {
-    final cut = latestCuts[cardId];
-    if (cut == null && allCards) return null;
+  DateTimeRange cutRange(String? cardId, DateTime today) {
+    if (cardId == null && allCards && cardLabels.isNotEmpty) {
+      final starts =
+          cardLabels.keys.map((id) => cutRange(id, today).start).toList()
+            ..sort();
+      return DateTimeRange(
+        start: starts.first,
+        end: starts.first.isAfter(today) ? starts.first : today,
+      );
+    }
+    var cut = latestCuts[cardId];
+    final closingDay = closingDays[cardId];
+    if (closingDay != null && closingDay >= 1 && closingDay <= 31) {
+      DateTime inMonth(int year, int month) {
+        final last = DateTime(year, month + 1, 0).day;
+        return DateTime(year, month, closingDay > last ? last : closingDay);
+      }
+
+      var scheduled = inMonth(today.year, today.month);
+      if (scheduled.isAfter(today)) {
+        scheduled = inMonth(today.year, today.month - 1);
+      }
+      if (cut == null || scheduled.isAfter(cut)) cut = scheduled;
+    }
+    final start = cut == null
+        ? DateTime(today.year, today.month)
+        : DateTime(cut.year, cut.month, cut.day + 1);
     return DateTimeRange(
-      start: cut ?? DateTime(today.year, today.month),
-      end: today,
+      start: start,
+      end: start.isAfter(today) ? start : today,
     );
   }
 
@@ -162,6 +192,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
   }
 
   static const types = {
+    zeroInstallmentChargeType: 'Cargo de cuota del plan',
     'purchase': 'Compra',
     'payment': 'Pago',
     'interest': 'Intereses',
@@ -426,7 +457,8 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
   int receiptRequest = 0;
 
   int countFor(Map<String, dynamic> row) =>
-      receiptCounts?['credit_card_transactions/${row['id']}'] ?? 0;
+      receiptCounts?['${row['transaction_type'] == zeroInstallmentChargeType ? 'card_zero_installment_charges' : 'credit_card_transactions'}/${row['charge_id'] ?? row['id']}'] ??
+      0;
 
   Future<void> refreshReceiptCounts() async {
     final request = ++receiptRequest;
@@ -436,8 +468,31 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
       final counts = await loadReceiptCounts(
         uid,
         'movement-receipts',
-        movements.map((row) => 'credit_card_transactions/${row['id']}'),
+        movements
+            .where(
+              (row) => row['transaction_type'] != zeroInstallmentChargeType,
+            )
+            .map((row) => 'credit_card_transactions/${row['id']}'),
       );
+      for (final row in movements.where(
+        (row) => row['transaction_type'] == zeroInstallmentChargeType,
+      )) {
+        final folder = 'card_zero_installment_charges/${row['charge_id']}';
+        var total = 0;
+        for (var offset = 0; ; offset += 100) {
+          final files = await supabase.storage
+              .from('movement-receipts')
+              .list(
+                path: folder,
+                searchOptions: SearchOptions(limit: 100, offset: offset),
+              );
+          if (supabase.auth.currentUser?.id != uid)
+            throw StateError('La sesión cambió.');
+          total += files.length;
+          if (files.length < 100) break;
+        }
+        counts[folder] = total;
+      }
       if (mounted && request == receiptRequest)
         setState(() => receiptCounts = counts);
     } catch (_) {
@@ -459,13 +514,13 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
       final cards = cardId == null
           ? await statementRows(
               'credit_cards',
-              'id, name, card_reference, financial_institutions(name)',
+              'id, name, card_reference, closing_day, financial_institutions(name)',
               user.id,
             )
           : [
               await supabase
                   .from('credit_cards')
-                  .select('name')
+                  .select('id,name,closing_day')
                   .eq('id', cardId)
                   .eq('user_id', user.id)
                   .single(),
@@ -522,15 +577,33 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
         rows.addAll(page);
         if (page.length < 500) break;
       }
+      final charges = await loadZeroInstallmentCharges(user.id);
+      rows.addAll(
+        charges
+            .where(
+              (c) => cardId == null || c['credit_card_id'].toString() == cardId,
+            )
+            .map(zeroInstallmentHistoryRow),
+      );
       if (!mounted || request != requestId) return;
       if (supabase.auth.currentUser?.id != user.id) {
         throw StateError('La sesión cambió. Actualiza la pantalla.');
       }
-      if (allCards) rows.sort(compareNewestMovement);
+      rows.sort(
+        allCards || widget.embedded
+            ? compareNewestMovement
+            : compareNewestEntry,
+      );
       setState(() {
         name = cardId == null ? '' : cards.single['name'].toString();
         cardLabels = labels;
         latestCuts = lastCutByCard;
+        closingDays = {
+          for (final card in cards)
+            if (card['closing_day'] != null)
+              card['id'].toString():
+                  int.tryParse('${card['closing_day']}') ?? 0,
+        };
         if (!labels.containsKey(cardFilter)) cardFilter = null;
         if (!rows.any(
           (row) =>
@@ -606,6 +679,63 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
   String relatedName(dynamic value) =>
       value is Map ? value['name']?.toString() ?? '' : '';
 
+  Future<void> editInstallmentCharge(Map<String, dynamic> tx) async {
+    if (saving || loading || tx['is_voided'] == true) return;
+    final uid = supabase.auth.currentUser?.id;
+    if (uid == null) return;
+    final values = await zeroForm(
+      context,
+      'Editar cargo de cuota',
+      const [
+        ZeroField('description', 'Descripción'),
+        ZeroField('amount', 'Monto cobrado por el banco', type: 'money'),
+        ZeroField('date', 'Fecha publicada por el banco', type: 'date'),
+        ZeroField('reference', 'Referencia (opcional)', required: false),
+      ],
+      initial: {
+        'description': tx['description'] ?? '',
+        'amount': tx['amount'],
+        'date': tx['charge_date'],
+        'reference': tx['reference'] ?? '',
+      },
+      attachReceipt: true,
+      info:
+          '${tx['description']}\nSolo modifica el cargo informativo. No cambia la cuota programada, la deuda, el gasto ni el disponible.',
+    );
+    if (values == null || !mounted || saving) return;
+    setState(() => saving = true);
+    try {
+      if (supabase.auth.currentUser?.id != uid)
+        throw StateError('La sesión cambió.');
+      final saved = await supabase.rpc(
+        'register_zero_installment_charge',
+        params: {
+          'p_installment_id': tx['installment_id'],
+          'p_date': values['date'],
+          'p_description': '${values['description']}'.trim(),
+          'p_reference': values['reference'] ?? '',
+          'p_amount': moneyCents(values['amount']) / 100,
+        },
+      );
+      if (!mounted) return;
+      await attachFinancialReceipt(
+        context,
+        values[receiptDraftKey] as PendingReceipt?,
+        uid,
+        'card_zero_installment_charges',
+        saved,
+      );
+      if (mounted) await loadData();
+    } catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No se pudo editar el cargo: $e')),
+        );
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
   Widget movementCard(Map<String, dynamic> tx) {
     final type = tx['transaction_type'].toString();
     final advance = isCardCashAdvance(tx);
@@ -647,26 +777,24 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    '${voided
-                        ? ''
+                Text(
+                  '${voided
+                      ? ''
+                      : increases
+                      ? '+'
+                      : decreases
+                      ? '−'
+                      : ''}$amount',
+                  textAlign: TextAlign.end,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: voided
+                        ? theme.colorScheme.onSurfaceVariant
                         : increases
-                        ? '+'
+                        ? theme.colorScheme.error
                         : decreases
-                        ? '−'
-                        : ''}$amount',
-                    textAlign: TextAlign.end,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: voided
-                          ? theme.colorScheme.onSurfaceVariant
-                          : increases
-                          ? theme.colorScheme.error
-                          : decreases
-                          ? theme.colorScheme.primary
-                          : null,
-                    ),
+                        ? theme.colorScheme.primary
+                        : null,
                   ),
                 ),
               ],
@@ -722,80 +850,256 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
                 '${voidedAt.hour.toString().padLeft(2, '0')}:'
                 '${voidedAt.minute.toString().padLeft(2, '0')}',
               ),
-            MovementReceiptsButton(
-              table: 'credit_card_transactions',
-              record: tx,
-              count: countFor(tx),
-              onClosed: refreshReceiptCounts,
-            ),
+            if (type == zeroInstallmentChargeType)
+              const Text(
+                'Cargo informativo de una compra ya registrada. No suma deuda ni gasto ni consume límite otra vez. Adminístralo desde Planes tasa cero.',
+              ),
             if (tx['excludes_from_limit'] == true)
               Text(
                 advance ? 'La comisión no consume límite' : 'No consume límite',
               ),
-            if (advance && !voided)
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: saving ? null : () => editMovement(tx),
-                  child: const Text('Editar retiro'),
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 12,
+              children: [
+                MovementReceiptsButton(
+                  table: type == zeroInstallmentChargeType
+                      ? 'card_zero_installment_charges'
+                      : 'credit_card_transactions',
+                  record: type == zeroInstallmentChargeType
+                      ? {...tx, 'id': tx['charge_id']}
+                      : tx,
+                  count: countFor(tx),
+                  onClosed: refreshReceiptCounts,
                 ),
-              ),
-            if (!advance &&
-                tx['is_receivable_funding'] != true &&
-                ['purchase', 'interest', 'fee', 'refund'].contains(type))
-              Wrap(
-                alignment: WrapAlignment.end,
-                spacing: 8,
-                children: [
-                  TextButton.icon(
-                    onPressed: saving ? null : () => editMovement(tx),
-                    icon: const Icon(Icons.edit_outlined),
-                    label: const Text('Editar'),
-                  ),
-                  TextButton.icon(
-                    onPressed: saving ? null : () => deleteMovement(tx),
-                    icon: const Icon(Icons.delete_outline),
-                    label: const Text('Eliminar'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ],
-              ),
-            if (type == 'payment' && voided)
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: saving ? null : () => deleteMovement(tx),
-                  icon: const Icon(Icons.delete_forever_outlined),
-                  label: const Text('Eliminar definitivamente'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: theme.colorScheme.error,
-                  ),
+                Wrap(
+                  spacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (type == zeroInstallmentChargeType && !voided)
+                      TextButton.icon(
+                        onPressed: saving
+                            ? null
+                            : () => editInstallmentCharge(tx),
+                        icon: const Icon(Icons.edit_outlined),
+                        label: const Text('Editar cargo'),
+                      ),
+                    if (advance && !voided)
+                      Align(
+                        widthFactor: 1,
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: saving ? null : () => editMovement(tx),
+                          child: const Text('Editar retiro'),
+                        ),
+                      ),
+                    if (!advance &&
+                        tx['is_receivable_funding'] != true &&
+                        [
+                          'purchase',
+                          'interest',
+                          'fee',
+                          'refund',
+                        ].contains(type))
+                      Wrap(
+                        alignment: WrapAlignment.end,
+                        spacing: 8,
+                        children: [
+                          TextButton.icon(
+                            onPressed: saving ? null : () => editMovement(tx),
+                            icon: const Icon(Icons.edit_outlined),
+                            label: const Text('Editar'),
+                          ),
+                          TextButton.icon(
+                            onPressed: saving ? null : () => deleteMovement(tx),
+                            icon: const Icon(Icons.delete_outline),
+                            label: const Text('Eliminar'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Theme.of(
+                                context,
+                              ).colorScheme.error,
+                            ),
+                          ),
+                        ],
+                      ),
+                    if (type == 'payment' && voided)
+                      Align(
+                        widthFactor: 1,
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: saving ? null : () => deleteMovement(tx),
+                          icon: const Icon(Icons.delete_forever_outlined),
+                          label: const Text('Eliminar definitivamente'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: theme.colorScheme.error,
+                          ),
+                        ),
+                      ),
+                    if (type == 'payment' && !voided)
+                      Wrap(
+                        alignment: WrapAlignment.end,
+                        spacing: 8,
+                        children: [
+                          TextButton.icon(
+                            onPressed: saving ? null : () => editPayment(tx),
+                            icon: const Icon(Icons.edit_outlined),
+                            label: const Text('Editar pago'),
+                          ),
+                          TextButton.icon(
+                            onPressed: saving ? null : () => voidPayment(tx),
+                            icon: const Icon(Icons.delete_outline),
+                            label: const Text('Eliminar pago'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: theme.colorScheme.error,
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
                 ),
-              ),
-            if (type == 'payment' && !voided)
-              Wrap(
-                alignment: WrapAlignment.end,
-                spacing: 8,
-                children: [
-                  TextButton.icon(
-                    onPressed: saving ? null : () => editPayment(tx),
-                    icon: const Icon(Icons.edit_outlined),
-                    label: const Text('Editar pago'),
-                  ),
-                  TextButton.icon(
-                    onPressed: saving ? null : () => voidPayment(tx),
-                    icon: const Icon(Icons.delete_outline),
-                    label: const Text('Eliminar pago'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: theme.colorScheme.error,
-                    ),
-                  ),
-                ],
-              ),
+              ],
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  String movementDateLabel(DateTime date) {
+    const weekdays = [
+      'Lunes',
+      'Martes',
+      'Miércoles',
+      'Jueves',
+      'Viernes',
+      'Sábado',
+      'Domingo',
+    ];
+    const months = [
+      'enero',
+      'febrero',
+      'marzo',
+      'abril',
+      'mayo',
+      'junio',
+      'julio',
+      'agosto',
+      'septiembre',
+      'octubre',
+      'noviembre',
+      'diciembre',
+    ];
+    final year = date.year == DateTime.now().year ? '' : ' de ${date.year}';
+    return '${weekdays[date.weekday - 1]} ${date.day} de ${months[date.month - 1]}$year';
+  }
+
+  Widget compactMovement(Map<String, dynamic> tx) {
+    final type = tx['transaction_type']?.toString() ?? '';
+    final decreases = type == 'payment' || type == 'refund';
+    final increases = ['purchase', 'interest', 'fee'].contains(type);
+    final voided = tx['is_voided'] == true;
+    final theme = Theme.of(context);
+    final date = DateTime.tryParse('${tx['transaction_date']}')?.toLocal();
+    final dateText = date == null ? '' : movementDateLabel(date);
+    final amount = cardMoney(moneyCents(tx['amount']), '${tx['currency']}');
+    final description = tx['description']?.toString().trim() ?? '';
+    return ExpansionTile(
+      key: PageStorageKey('cut-movement/${tx['id']}'),
+      tilePadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      title: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        spacing: 12,
+        runSpacing: 4,
+        children: [
+          Text(
+            description.isEmpty ? types[type] ?? 'Movimiento' : description,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Text(
+            '${increases
+                ? '+'
+                : decreases
+                ? '−'
+                : ''}$amount',
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: voided
+                  ? theme.disabledColor
+                  : decreases
+                  ? theme.colorScheme.primary
+                  : increases
+                  ? theme.colorScheme.error
+                  : theme.colorScheme.onSurface,
+              decoration: voided ? TextDecoration.lineThrough : null,
+            ),
+          ),
+        ],
+      ),
+      subtitle: Text(
+        [
+          dateText,
+          if (type == zeroInstallmentChargeType) 'Cuota informativa',
+          if (voided) 'Anulado',
+        ].where((text) => text.isNotEmpty).join(' · '),
+      ),
+      children: [movementCard(tx)],
+    );
+  }
+
+  Widget dateSelector(BuildContext context) {
+    final today = dayOnly(DateTime.now());
+    final range = useLatestCut
+        ? cutRange(widget.cardId ?? cardFilter, today)
+        : customDates;
+    final loc = MaterialLocalizations.of(context);
+    final dateLabel = range == null
+        ? 'Todas las fechas'
+        : useLatestCut && range.start.isAfter(today)
+        ? 'Desde ${loc.formatShortDate(range.start)}'
+        : '${loc.formatShortDate(range.start)} – ${loc.formatShortDate(range.end)}';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          OutlinedButton.icon(
+            onPressed: () async {
+              final existing = useLatestCut
+                  ? cutRange(widget.cardId ?? cardFilter, today)
+                  : customDates;
+              final range = await showDateRangePicker(
+                context: context,
+                firstDate: DateTime(1900),
+                lastDate: DateTime(2200),
+                initialDateRange: existing,
+              );
+              if (mounted && range != null) {
+                setState(() {
+                  useLatestCut = false;
+                  customDates = range;
+                });
+              }
+            },
+            icon: const Icon(Icons.date_range_outlined),
+            label: Text(dateLabel),
+          ),
+          if (!useLatestCut)
+            TextButton(
+              onPressed: () => setState(() => useLatestCut = true),
+              child: const Text('Corte actual'),
+            ),
+          if (dateLabel != 'Todas las fechas')
+            TextButton(
+              onPressed: () => setState(() {
+                useLatestCut = false;
+                customDates = null;
+              }),
+              child: const Text('Todas las fechas'),
+            ),
+        ],
       ),
     );
   }
@@ -832,49 +1136,6 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
             ),
           ),
         ],
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              OutlinedButton.icon(
-                onPressed: () async {
-                  final existing = useLatestCut
-                      ? cutRange(widget.cardId ?? cardFilter, today)
-                      : customDates;
-                  final range = await showDateRangePicker(
-                    context: context,
-                    firstDate: DateTime(1900),
-                    lastDate: DateTime(2200),
-                    initialDateRange: existing,
-                  );
-                  if (mounted && range != null) {
-                    setState(() {
-                      useLatestCut = false;
-                      customDates = range;
-                    });
-                  }
-                },
-                icon: const Icon(Icons.date_range_outlined),
-                label: Text(dateLabel),
-              ),
-              if (!useLatestCut)
-                TextButton(
-                  onPressed: () => setState(() => useLatestCut = true),
-                  child: const Text('Usar último corte'),
-                ),
-              if (dateLabel != 'Todas las fechas')
-                TextButton(
-                  onPressed: () => setState(() {
-                    useLatestCut = false;
-                    customDates = null;
-                  }),
-                  child: const Text('Todas las fechas'),
-                ),
-            ],
-          ),
-        ),
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
           child: GuideAnchor(
@@ -1053,6 +1314,8 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
           ? cutRange(tx['credit_card_id']?.toString(), today)
           : customDates;
       final date = DateTime.tryParse('${tx['transaction_date']}')?.toLocal();
+      if (useLatestCut && date != null && dayOnly(date).isAfter(today))
+        return false;
       if (dateRange != null &&
           (date == null ||
               !includesDay(date, dateRange.start, dateRange.end))) {
@@ -1090,175 +1353,211 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
     }).toList();
 
     final spending = <String, int>{'USD': 0, 'NIO': 0};
-    if (allCards) {
-      for (final tx in visible) {
-        final currency = tx['currency'].toString();
-        if (spending.containsKey(currency)) {
-          spending[currency] = spending[currency]! + cardSpendingCents(tx);
-        }
+    for (final tx in visible) {
+      final currency = tx['currency'].toString();
+      if (spending.containsKey(currency)) {
+        final installmentCharge =
+            widget.embedded &&
+            tx['transaction_type'] == zeroInstallmentChargeType &&
+            tx['is_voided'] != true;
+        spending[currency] =
+            spending[currency]! +
+            (installmentCharge
+                ? moneyCents(tx['amount'])
+                : cardSpendingCents(tx));
       }
     }
 
+    final content = PageFrame(
+      maxWidth: 1440,
+      child: loading
+          ? const SizedBox(
+              height: 100,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          : error != null
+          ? Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('No se pudo cargar el historial.'),
+                    SelectableText(error!),
+                    TextButton(
+                      onPressed: loadData,
+                      child: const Text('Reintentar'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: loadData,
+              child: CustomScrollView(
+                shrinkWrap: widget.embedded,
+                primary: !widget.embedded,
+                physics: widget.embedded
+                    ? const NeverScrollableScrollPhysics()
+                    : const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(
+                      pageGutter(context),
+                      16,
+                      pageGutter(context),
+                      0,
+                    ),
+                    sliver: SliverList.list(
+                      children: [
+                        if (!allCards && !widget.embedded) ...[
+                          Text(
+                            name,
+                            style: Theme.of(context).textTheme.headlineSmall,
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                        ...[
+                          Text(
+                            widget.embedded
+                                ? 'Cargos del período'
+                                : 'Gasto neto en tarjetas',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          AdaptiveColumns(
+                            minColumnWidth: 140,
+                            spacing: 8,
+                            children: [
+                              for (final entry in spending.entries)
+                                Card(
+                                  margin: EdgeInsets.zero,
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        Text(
+                                          entry.key == 'USD'
+                                              ? 'Dólares'
+                                              : 'Córdobas',
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          cardMoney(entry.value, entry.key),
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.titleLarge,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            widget.embedded
+                                ? 'Incluye cuotas publicadas y cargos, menos devoluciones. Los pagos se muestran en la lista.'
+                                : 'Cargos menos devoluciones según los filtros.',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        dateSelector(context),
+                        if (!widget.embedded) filtersPanel(context),
+                        const SizedBox(height: 8),
+                        if (visible.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Text(
+                              'No hay movimientos para este filtro.',
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(
+                      pageGutter(context),
+                      0,
+                      pageGutter(context),
+                      24,
+                    ),
+                    sliver: SliverList.builder(
+                      itemCount: visible.length,
+                      itemBuilder: (_, index) => widget.embedded
+                          ? compactMovement(visible[index])
+                          : movementCard(visible[index]),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+    );
     return GuideScope(
       topic: 'card_history',
       ready: !loading && error == null,
-      child: Scaffold(
-        appBar: AppBar(
-          title: GuideAnchor(
-            id: 'title',
-            child: Text(
-              compactLayout(context)
-                  ? (allCards
-                        ? 'Historial de tarjetas'
-                        : 'Historial de tarjeta')
-                  : (allCards
-                        ? 'Movimientos de tarjetas'
-                        : 'Movimientos de tarjeta'),
-              style: compactLayout(context)
-                  ? const TextStyle(fontSize: 17)
-                  : null,
-            ),
-          ),
-          actions: [
-            const AppHelpButton(topic: 'cards'),
-            IconButton(
-              tooltip: 'Actualizar',
-              onPressed: loading || saving ? null : loadData,
-              icon: const Icon(Icons.refresh),
-            ),
-          ],
-        ),
-        body: PageFrame(
-          maxWidth: allCards ? 1440 : 1000,
-          child: loading
-              ? const Center(child: CircularProgressIndicator())
-              : error != null
-              ? Center(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+      child: widget.embedded
+          ? Card(
+              margin: EdgeInsets.zero,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
+                    child: Row(
                       children: [
-                        const Text('No se pudo cargar el historial.'),
-                        SelectableText(error!),
-                        TextButton(
-                          onPressed: loadData,
-                          child: const Text('Reintentar'),
+                        Expanded(
+                          child: Text(
+                            useLatestCut
+                                ? 'Movimientos del corte actual'
+                                : 'Movimientos de tarjetas',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Actualizar movimientos',
+                          onPressed: loading || saving ? null : loadData,
+                          icon: const Icon(Icons.refresh),
                         ),
                       ],
                     ),
                   ),
-                )
-              : RefreshIndicator(
-                  onRefresh: loadData,
-                  child: CustomScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    slivers: [
-                      SliverPadding(
-                        padding: EdgeInsets.fromLTRB(
-                          pageGutter(context),
-                          16,
-                          pageGutter(context),
-                          0,
-                        ),
-                        sliver: SliverList.list(
-                          children: [
-                            if (!allCards) ...[
-                              Text(
-                                name,
-                                style: Theme.of(
-                                  context,
-                                ).textTheme.headlineSmall,
-                              ),
-                              const SizedBox(height: 16),
-                            ],
-                            if (allCards) ...[
-                              Text(
-                                'Gasto neto en tarjetas',
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: 8),
-                              AdaptiveColumns(
-                                minColumnWidth: 140,
-                                spacing: 8,
-                                children: [
-                                  for (final entry in spending.entries)
-                                    Card(
-                                      margin: EdgeInsets.zero,
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(12),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.stretch,
-                                          children: [
-                                            Text(
-                                              entry.key == 'USD'
-                                                  ? 'Dólares'
-                                                  : 'Córdobas',
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              cardMoney(entry.value, entry.key),
-                                              style: Theme.of(
-                                                context,
-                                              ).textTheme.titleLarge,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                'Cargos menos devoluciones según los filtros.',
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                              const SizedBox(height: 12),
-                            ],
-                            filtersPanel(context),
-                            const SizedBox(height: 20),
-                            Text(
-                              '${visible.length} de ${movements.length} movimientos',
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              allCards
-                                  ? 'Más recientes primero · + aumenta la deuda · − reduce la deuda'
-                                  : 'Últimos ingresados primero · + aumenta la deuda · − reduce la deuda',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                            const SizedBox(height: 8),
-                            if (visible.isEmpty)
-                              const Padding(
-                                padding: EdgeInsets.all(24),
-                                child: Text(
-                                  'No hay movimientos para este filtro.',
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      SliverPadding(
-                        padding: EdgeInsets.fromLTRB(
-                          pageGutter(context),
-                          0,
-                          pageGutter(context),
-                          24,
-                        ),
-                        sliver: SliverList.builder(
-                          itemCount: visible.length,
-                          itemBuilder: (_, index) =>
-                              movementCard(visible[index]),
-                        ),
-                      ),
-                    ],
+                  content,
+                ],
+              ),
+            )
+          : Scaffold(
+              appBar: AppBar(
+                title: GuideAnchor(
+                  id: 'title',
+                  child: Text(
+                    compactLayout(context)
+                        ? (allCards
+                              ? 'Historial de tarjetas'
+                              : 'Historial de tarjeta')
+                        : (allCards
+                              ? 'Movimientos de tarjetas'
+                              : 'Movimientos de tarjeta'),
+                    style: compactLayout(context)
+                        ? const TextStyle(fontSize: 17)
+                        : null,
                   ),
                 ),
-        ),
-      ),
+                actions: [
+                  const AppHelpButton(topic: 'cards'),
+                  IconButton(
+                    tooltip: 'Actualizar',
+                    onPressed: loading || saving ? null : loadData,
+                    icon: const Icon(Icons.refresh),
+                  ),
+                ],
+              ),
+              body: content,
+            ),
     );
   }
 }

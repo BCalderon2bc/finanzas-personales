@@ -449,7 +449,7 @@ class _GuideOverlayState extends State<_GuideOverlay>
                             children: [
                               Row(
                                 children: [
-                                  const Icon(
+                                  Icon(
                                     Icons.explore_outlined,
                                     color: primaryColor,
                                   ),
@@ -495,7 +495,7 @@ class _GuideOverlayState extends State<_GuideOverlay>
                                       child: LinearProgressIndicator(),
                                     ),
                                   if (!_moving && highlight == null)
-                                    const Padding(
+                                    Padding(
                                       padding: EdgeInsets.only(top: 8),
                                       child: Text(
                                         'Este control aparece cuando hay datos o al elegir esa opción. Puedes continuar.',

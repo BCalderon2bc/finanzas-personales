@@ -332,7 +332,7 @@ class _CreditCardFormDialogState extends State<CreditCardFormDialog> {
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Las compras y pagos se registran en su moneda. El límite corresponde a toda la tarjeta.',
                   style: TextStyle(color: appMuted, fontSize: 12),
                 ),
@@ -402,7 +402,7 @@ class _CreditCardFormDialogState extends State<CreditCardFormDialog> {
                 const SizedBox(height: 12),
                 amountField('Deuda inicial en dólares (\$)', usd),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Ingresa lo que debías antes del historial registrado. Los movimientos existentes se suman a estos importes.',
                   style: TextStyle(color: appMuted, fontSize: 12),
                 ),

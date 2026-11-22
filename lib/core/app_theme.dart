@@ -1,29 +1,40 @@
+import 'appearance.dart';
 import 'package:flutter/material.dart';
 
-const appNavy = Color(0xFF304B64);
-const appNavigationText = Color(0xFFDCE7F1);
-const appNavigationSelection = Color(0xFF4E6D88);
-const primaryColor = Color(0xFF426583);
-const appBackground = Color(0xFFF1F5F9);
-const appText = Color(0xFF203449);
-const appPrimaryDeep = Color(0xFF36536D);
-const appSurfaceSubtle = Color(0xFFF7FAFC);
-const appSurfaceMuted = Color(0xFFE9EFF5);
-const appPrimaryTint = Color(0xFFDFE9F2);
-const appMuted = Color(0xFF526579);
-const appBorder = Color(0xFFDCE5EE);
-const appPositive = Color(0xFF35745C);
-const appWarning = Color(0xFF886128);
-const appNegative = Color(0xFFA3453D);
+Color get appNavy => AppearanceController.instance.palette.navigation;
+Color get appNavigationText => const Color(0xFFE4ECF1);
+Color get appNavigationSelection =>
+    AppearanceController.instance.palette.selection;
+Color get primaryColor => AppearanceController.instance.palette.primary;
+Color get appBackground => AppearanceController.instance.palette.background;
+Color get appText => const Color(0xFF253543);
+Color get appPrimaryDeep => AppearanceController.instance.palette.navigation;
+Color get appSurfaceSubtle => Color.lerp(
+  Colors.white,
+  AppearanceController.instance.palette.background,
+  .5,
+)!;
+Color get appSurfaceMuted => AppearanceController.instance.palette.tint;
+Color get appPrimaryTint => AppearanceController.instance.palette.tint;
+Color get appMuted => const Color(0xFF5D6C73);
+Color get appBorder => Color.lerp(
+  AppearanceController.instance.palette.primary,
+  Colors.white,
+  .82,
+)!;
+const appPositive = Color(0xFF397455);
+const appDueToday = Color(0xFFA65322);
+const appWarning = Color(0xFF946200);
+const appNegative = Color(0xFFB13D32);
 
 ThemeData createAppTheme() {
   final scheme = ColorScheme.fromSeed(seedColor: primaryColor).copyWith(
     primary: primaryColor,
     onPrimary: Colors.white,
     primaryContainer: appPrimaryTint,
-    onPrimaryContainer: const Color(0xFF2F4B65),
-    secondary: const Color(0xFF5C7184),
-    secondaryContainer: const Color(0xFFE8EEF4),
+    onPrimaryContainer: appNavy,
+    secondary: appMuted,
+    secondaryContainer: appSurfaceMuted,
     onSecondaryContainer: appText,
     tertiary: appWarning,
     tertiaryContainer: const Color(0xFFF7EEDC),
@@ -32,11 +43,11 @@ ThemeData createAppTheme() {
     surfaceContainerLowest: Colors.white,
     surfaceContainerLow: appSurfaceSubtle,
     surfaceContainer: appSurfaceMuted,
-    surfaceContainerHigh: const Color(0xFFE6EDF4),
-    surfaceContainerHighest: const Color(0xFFDFE8F0),
+    surfaceContainerHigh: appSurfaceMuted,
+    surfaceContainerHighest: appPrimaryTint,
     onSurface: appText,
     onSurfaceVariant: appMuted,
-    outline: const Color(0xFF708499),
+    outline: appMuted,
     outlineVariant: appBorder,
     error: appNegative,
     errorContainer: const Color(0xFFF9EBE8),
@@ -45,18 +56,21 @@ ThemeData createAppTheme() {
   final base = ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
-    fontFamily: 'Noto Sans',
+    fontFamily: AppearanceController.instance.fontFamily,
+    visualDensity: AppearanceController.instance.compact
+        ? VisualDensity.compact
+        : VisualDensity.standard,
   );
   final controlShape = RoundedRectangleBorder(
     borderRadius: BorderRadius.circular(12),
   );
   final surfaceShape = RoundedRectangleBorder(
     borderRadius: BorderRadius.circular(14),
-    side: const BorderSide(color: appBorder),
+    side: BorderSide(color: appBorder),
   );
   final inputBorder = OutlineInputBorder(
     borderRadius: BorderRadius.circular(12),
-    borderSide: const BorderSide(color: appBorder),
+    borderSide: BorderSide(color: appBorder),
   );
   final type = base.textTheme.copyWith(
     headlineMedium: base.textTheme.headlineMedium?.copyWith(
@@ -88,7 +102,7 @@ ThemeData createAppTheme() {
     textTheme: type,
     scaffoldBackgroundColor: appBackground,
     appBarTheme: AppBarTheme(
-      backgroundColor: primaryColor,
+      backgroundColor: appNavy,
       foregroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
@@ -121,7 +135,7 @@ ThemeData createAppTheme() {
       enabledBorder: inputBorder,
       disabledBorder: inputBorder,
       focusedBorder: inputBorder.copyWith(
-        borderSide: const BorderSide(color: primaryColor, width: 1.6),
+        borderSide: BorderSide(color: primaryColor, width: 1.6),
       ),
       errorBorder: inputBorder.copyWith(
         borderSide: BorderSide(color: scheme.error),
@@ -129,8 +143,8 @@ ThemeData createAppTheme() {
       focusedErrorBorder: inputBorder.copyWith(
         borderSide: BorderSide(color: scheme.error, width: 1.6),
       ),
-      labelStyle: const TextStyle(color: appMuted),
-      hintStyle: const TextStyle(color: appMuted),
+      labelStyle: TextStyle(color: appMuted),
+      hintStyle: TextStyle(color: appMuted),
       helperMaxLines: 3,
       errorMaxLines: 3,
       prefixIconColor: appMuted,
@@ -147,7 +161,7 @@ ThemeData createAppTheme() {
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         minimumSize: const Size(0, 48),
-        side: const BorderSide(color: appBorder),
+        side: BorderSide(color: appBorder),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         shape: controlShape,
         textStyle: type.labelLarge,
@@ -216,7 +230,7 @@ ThemeData createAppTheme() {
     chipTheme: base.chipTheme.copyWith(
       backgroundColor: scheme.surfaceContainerLow,
       selectedColor: scheme.primaryContainer,
-      side: const BorderSide(color: appBorder),
+      side: BorderSide(color: appBorder),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
     ),
     snackBarTheme: SnackBarThemeData(
@@ -225,8 +239,8 @@ ThemeData createAppTheme() {
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
-    dividerTheme: const DividerThemeData(color: appBorder, thickness: 1),
-    listTileTheme: const ListTileThemeData(
+    dividerTheme: DividerThemeData(color: appBorder, thickness: 1),
+    listTileTheme: ListTileThemeData(
       iconColor: primaryColor,
       textColor: appText,
       contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),

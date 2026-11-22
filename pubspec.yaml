@@ -3,7 +3,7 @@ description: "A new Flutter project."
 
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
-version: 1.1.2+14
+version: 1.1.1+12
 
 environment:
   sdk: ^3.10.4
@@ -39,14 +39,25 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   fonts:
-    - family: Noto Sans
+    - family: DejaVuSerif
+      fonts:
+        - asset: assets/fonts/DejaVuSerif.ttf
+    - family: DejaVuSerif-Bold
+      fonts:
+        - asset: assets/fonts/DejaVuSerif-Bold.ttf
+    - family: NotoSans-Bold
+      fonts:
+        - asset: assets/fonts/NotoSans-Bold.ttf
+    - family: NotoSans-Regular
       fonts:
         - asset: assets/fonts/NotoSans-Regular.ttf
-          weight: 400
-        - asset: assets/fonts/NotoSans-Bold.ttf
-          weight: 700
+    - family: OpenSans-Bold
+      fonts:
+        - asset: assets/fonts/OpenSans-Bold.ttf
+    - family: OpenSans-Regular
+      fonts:
+        - asset: assets/fonts/OpenSans-Regular.ttf
   assets:
-    - assets/fonts/
     - assets/banks/
     - assets/banks/atlantida.png
     - assets/banks/avanz.svg
@@ -123,6 +134,9 @@ flutter:
     - assets/cards/physical_lafise_visa_infinite.webp
     - assets/cards/physical_lafise_visa_platinum.webp
     - assets/cards/physical_lafise_visa_signature.webp
+    - assets/fonts/
+    - assets/fonts/DejaVu-LICENSE.txt
+    - assets/fonts/OpenSans-LICENSE.txt
     - assets/networks/
     - assets/networks/mastercard.png
     - assets/networks/visa.png

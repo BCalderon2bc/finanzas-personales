@@ -28,7 +28,12 @@ class CurrencySummaryCard extends StatelessWidget {
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const Divider(height: 24),
-          _row(context, 'Ingresos del mes', summary.income, const Color(0xFF35745C)),
+          _row(
+            context,
+            'Ingresos del mes',
+            summary.income,
+            const Color(0xFF397455),
+          ),
           _row(
             context,
             'Gastos del mes',
@@ -126,7 +131,7 @@ class RecentTransactionCard extends StatelessWidget {
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 color: income
-                    ? const Color(0xFF35745C)
+                    ? const Color(0xFF397455)
                     : expense
                     ? Theme.of(context).colorScheme.error
                     : null,

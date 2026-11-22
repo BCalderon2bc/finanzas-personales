@@ -72,7 +72,7 @@ class _CreditCardDetailsState extends State<CreditCardDetails> {
   Widget build(BuildContext context) {
     final card = widget.card;
     final balances = widget.balances;
-    const blue = primaryColor, green = Color(0xFF35745C), muted = appMuted;
+    final blue = primaryColor, green = Color(0xFF397455), muted = appMuted;
     final active = card['is_active'] == true;
     final base = card['currency'].toString();
     final limit = moneyCents(card['credit_limit']);
@@ -105,7 +105,7 @@ class _CreditCardDetailsState extends State<CreditCardDetails> {
             const SizedBox(height: 8),
             Text(
               credit ? 'Saldo a favor' : 'Deuda registrada',
-              style: const TextStyle(color: muted, fontSize: 12),
+              style: TextStyle(color: muted, fontSize: 12),
             ),
             const SizedBox(height: 8),
             FittedBox(
@@ -151,7 +151,7 @@ class _CreditCardDetailsState extends State<CreditCardDetails> {
                       : Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
+                            Text(
                               'TARJETA TITULAR',
                               style: TextStyle(
                                 color: muted,
@@ -257,45 +257,6 @@ class _CreditCardDetailsState extends State<CreditCardDetails> {
                   style: TextStyle(color: color),
                 ),
             ],
-            ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              title: const Text(
-                'Datos iniciales, tasa y condiciones',
-                style: TextStyle(fontSize: 14),
-              ),
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const SizedBox(height: 10),
-                      Text(
-                        'Deuda inicial en córdobas: ${cardMoney(cardOpening(card, 'NIO'), 'NIO')}',
-                        style: const TextStyle(color: muted, fontSize: 12),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Deuda inicial en dólares: ${cardMoney(cardOpening(card, 'USD'), 'USD')}',
-                        style: const TextStyle(color: muted, fontSize: 12),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        rate == null
-                            ? 'Edita la tarjeta para indicar la tasa de tu banco si necesitas estimar el disponible entre ambas monedas.'
-                            : 'Tasa registrada: C\$ $rate por \$ 1. El banco puede aplicar otra tasa al procesar los movimientos.',
-                        style: const TextStyle(color: muted, fontSize: 12),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Las deudas permanecen en su moneda. El saldo a favor de una moneda no reduce la deuda de la otra.',
-                        style: TextStyle(color: muted, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
             const Divider(height: 20),
             Wrap(
               spacing: 20,
@@ -306,102 +267,168 @@ class _CreditCardDetailsState extends State<CreditCardDetails> {
               ],
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Los intereses no se generan automáticamente.',
               style: TextStyle(color: muted, fontSize: 12),
             ),
             const Divider(height: 20),
-            OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
-              onPressed: widget.onPlans,
-              icon: const Icon(Icons.calendar_month_outlined),
-              label: const Text('Planes tasa cero · cuotas y pagos'),
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              title: Text(
+                'Tarjetas adicionales',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              children: [
+                FutureBuilder<List<Map<String, dynamic>>>(
+                  future: additionals,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState != ConnectionState.done) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: LinearProgressIndicator(),
+                      );
+                    }
+                    if (snapshot.hasError) {
+                      return TextButton(
+                        onPressed: refreshAdditionals,
+                        child: const Text('Reintentar carga de adicionales'),
+                      );
+                    }
+                    final cards = snapshot.data!;
+                    if (cards.isEmpty) {
+                      return const Text('Todavía no hay tarjetas adicionales.');
+                    }
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (final additional in cards)
+                          ListTile(
+                            dense: true,
+                            visualDensity: VisualDensity.compact,
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.credit_card_outlined),
+                            title: Text(additionalCardLabel(additional)),
+                            subtitle: Text(
+                              [
+                                additional['is_active'] == true
+                                    ? 'Activa'
+                                    : 'Archivada',
+                                if (additional['credit_limit'] != null)
+                                  'Tope por corte: ${cardMoney(moneyCents(additional['credit_limit']), base)}',
+                              ].join(' · '),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Tarjetas adicionales',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            FutureBuilder<List<Map<String, dynamic>>>(
-              future: additionals,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState != ConnectionState.done) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
-                    child: LinearProgressIndicator(),
-                  );
-                }
-                if (snapshot.hasError) {
-                  return TextButton(
-                    onPressed: refreshAdditionals,
-                    child: const Text('Reintentar carga de adicionales'),
-                  );
-                }
-                final cards = snapshot.data!;
-                if (cards.isEmpty) {
-                  return const Text('Todavía no hay tarjetas adicionales.');
-                }
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+            const SizedBox(height: 4),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final mobile = constraints.maxWidth < 600;
+                final singleColumn =
+                    constraints.maxWidth < 280 ||
+                    MediaQuery.textScalerOf(context).scale(14) > 20;
+                final width = mobile
+                    ? (singleColumn
+                          ? constraints.maxWidth
+                          : (constraints.maxWidth - 8) / 2)
+                    : null;
+                final style = OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 48),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 10,
+                  ),
+                );
+                Widget slot(Widget child, {bool full = false}) => SizedBox(
+                  width: mobile ? (full ? constraints.maxWidth : width) : null,
+                  child: child,
+                );
+                return Wrap(
+                  alignment: mobile ? WrapAlignment.start : WrapAlignment.end,
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
-                    for (final additional in cards)
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.credit_card_outlined),
-                        title: Text(additionalCardLabel(additional)),
-                        subtitle: Text(
-                          [
-                            additional['is_active'] == true
-                                ? 'Activa'
-                                : 'Archivada',
-                            if (additional['credit_limit'] != null)
-                              'Tope por corte: ${cardMoney(moneyCents(additional['credit_limit']), base)}',
-                          ].join(' · '),
+                    if (active)
+                      slot(
+                        OutlinedButton.icon(
+                          style: style,
+                          onPressed: widget.onMovement,
+                          icon: const Icon(Icons.add_card_outlined, size: 18),
+                          label: const Text(
+                            'Movimiento',
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ),
+                    slot(
+                      FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(0, 48),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 10,
+                          ),
+                        ),
+                        onPressed: widget.onPayment,
+                        icon: const Icon(Icons.payments_outlined, size: 18),
+                        label: const Text(
+                          'Pagar tarjeta',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      full: !active,
+                    ),
+                    slot(
+                      OutlinedButton.icon(
+                        style: style,
+                        onPressed: widget.onPlans,
+                        icon: const Icon(
+                          Icons.calendar_month_outlined,
+                          size: 18,
+                        ),
+                        label: const Text(
+                          'Planes tasa cero',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                    slot(
+                      OutlinedButton.icon(
+                        style: style,
+                        onPressed: widget.onHistory,
+                        icon: const Icon(Icons.history, size: 18),
+                        label: const Text(
+                          'Historial',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                    slot(
+                      TextButton.icon(
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(0, 48),
+                        ),
+                        onPressed: widget.onAdditionals == null
+                            ? null
+                            : () async {
+                                await widget.onAdditionals!();
+                                if (mounted) refreshAdditionals();
+                              },
+                        icon: const Icon(Icons.group_outlined, size: 18),
+                        label: const Text(
+                          'Administrar adicionales',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      full: true,
+                    ),
                   ],
                 );
               },
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: widget.onAdditionals == null
-                  ? null
-                  : () async {
-                      await widget.onAdditionals!();
-                      if (mounted) refreshAdditionals();
-                    },
-              icon: const Icon(Icons.group_outlined),
-              label: const Text('Administrar adicionales'),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              alignment: WrapAlignment.end,
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                TextButton.icon(
-                  style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
-                  onPressed: widget.onHistory,
-                  icon: const Icon(Icons.history),
-                  label: const Text('Historial'),
-                ),
-                if (active)
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(0, 48),
-                    ),
-                    onPressed: widget.onMovement,
-                    icon: const Icon(Icons.add_card_outlined),
-                    label: const Text('Movimiento'),
-                  ),
-                FilledButton.icon(
-                  style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
-                  onPressed: widget.onPayment,
-                  icon: const Icon(Icons.payments_outlined),
-                  label: const Text('Pagar tarjeta'),
-                ),
-              ],
             ),
           ],
         ),

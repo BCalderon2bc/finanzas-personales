@@ -1,5 +1,6 @@
+import '../../core/status_colors.dart';
 import '../../core/app_theme.dart'
-    show appBorder, appMuted, appSurfaceSubtle, appText, primaryColor;
+    show appBorder, appMuted, appSurfaceSubtle, appText;
 import 'package:flutter/material.dart';
 import '../../utils/money.dart';
 import 'debt_due_status.dart';
@@ -52,14 +53,14 @@ class DebtCard extends StatelessWidget {
   Widget amountDetail(String label, int amount) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Text(label, style: const TextStyle(color: appMuted, fontSize: 12)),
+      Text(label, style: TextStyle(color: appMuted, fontSize: 12)),
       const SizedBox(height: 6),
       FittedBox(
         fit: BoxFit.scaleDown,
         alignment: Alignment.centerLeft,
         child: Text(
           money(amount),
-          style: const TextStyle(
+          style: TextStyle(
             color: appText,
             fontSize: 17,
             fontWeight: FontWeight.w700,
@@ -71,12 +72,11 @@ class DebtCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const blue = primaryColor;
-    const green = Color(0xFF35745C);
-    const red = Color(0xFFA3453D);
-    const amber = Color(0xFF886128);
-    const muted = appMuted;
-    const border = appBorder;
+    const green = Color(0xFF397455);
+    const red = Color(0xFFB13D32);
+    const amber = Color(0xFF946200);
+    final muted = appMuted;
+    final border = appBorder;
     final original = moneyCents(debt['original_amount']);
     final pending = debt['status'] == 'paid' ? 0 : original - paidCents;
     final status = debt['status']?.toString() ?? '';
@@ -103,7 +103,7 @@ class DebtCard extends StatelessWidget {
         ? red
         : due == DebtDueStatus.today
         ? amber
-        : blue;
+        : appDueColor(date);
     final icon = status == 'paid'
         ? Icons.task_alt_rounded
         : status == 'paused'
@@ -161,7 +161,7 @@ class DebtCard extends StatelessWidget {
                         children: [
                           Text(
                             debt['description']?.toString() ?? 'Deuda',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w700,
                               color: appText,
@@ -171,10 +171,7 @@ class DebtCard extends StatelessWidget {
                             const SizedBox(height: 4),
                             Text(
                               creditor,
-                              style: const TextStyle(
-                                color: muted,
-                                fontSize: 13,
-                              ),
+                              style: TextStyle(color: muted, fontSize: 13),
                             ),
                           ],
                         ],
@@ -183,7 +180,7 @@ class DebtCard extends StatelessWidget {
                     IconButton(
                       tooltip: 'Editar deuda',
                       onPressed: onEdit,
-                      icon: const Icon(Icons.more_horiz_rounded, color: muted),
+                      icon: Icon(Icons.more_horiz_rounded, color: muted),
                     ),
                   ],
                 ),
@@ -203,7 +200,7 @@ class DebtCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 22),
-                const Text(
+                Text(
                   'CAPITAL PENDIENTE',
                   style: TextStyle(
                     color: muted,
@@ -227,7 +224,7 @@ class DebtCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 6),
-                const Text(
+                Text(
                   'No incluye intereses ni comisiones.',
                   style: TextStyle(color: muted, fontSize: 11),
                 ),
@@ -273,7 +270,7 @@ class DebtCard extends StatelessWidget {
                         alignment: Alignment.centerLeft,
                         child: Text(
                           '${(progress * 100).toStringAsFixed(0)}% del capital abonado',
-                          style: const TextStyle(color: muted, fontSize: 11),
+                          style: TextStyle(color: muted, fontSize: 11),
                         ),
                       ),
                     ],
@@ -300,7 +297,7 @@ class DebtCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                const Divider(height: 30, color: border),
+                Divider(height: 30, color: border),
                 Wrap(
                   alignment: WrapAlignment.end,
                   spacing: 8,

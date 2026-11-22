@@ -16,7 +16,7 @@ class TransactionBalances extends StatelessWidget {
     final usd = currency == 'USD';
     final colors = usd
         ? const [Color(0xFF3E6D66), Color(0xFF4B7B72)]
-        : const [appPrimaryDeep, primaryColor];
+        : [appPrimaryDeep, primaryColor];
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -113,7 +113,7 @@ class TransactionBalances extends StatelessWidget {
         },
       ),
       const SizedBox(height: 10),
-      const Text(
+      Text(
         'Los saldos incluyen todos los registros y no cambian con los filtros.',
         style: TextStyle(color: appMuted, fontSize: 12),
       ),

@@ -1,3 +1,4 @@
+import '../../core/status_colors.dart';
 import '../../core/app_theme.dart' show appMuted;
 import '../../widgets/collapsible_filters.dart';
 import 'zero_plans_page.dart';
@@ -470,13 +471,18 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
       (l) => '${l['statement_id']}' == '${s['id']}',
     );
     final theme = Theme.of(context);
+    final stateColor = appDueColor(
+      DateTime.tryParse('${s['due_date']}'),
+      settled: p.settled,
+      inactive: !current,
+    );
     final name = currencyName(s);
     return DecoratedBox(
       key: ValueKey(s['id']),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
+        color: stateColor.withValues(alpha: .06),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
+        border: Border.all(color: stateColor.withValues(alpha: .3)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -493,7 +499,13 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
                         '${name[0].toUpperCase()}${name.substring(1)} · $currency',
                         style: theme.textTheme.titleMedium,
                       ),
-                      Text(status, style: theme.textTheme.bodySmall),
+                      Text(
+                        status,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: stateColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -826,7 +838,7 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
                             ),
                           for (final (:group, :visible) in visibleGroups)
                             statementCard(group, visible),
-                          const Padding(
+                          Padding(
                             padding: EdgeInsets.symmetric(vertical: 16),
                             child: Text(
                               'Las compras nuevas y las devoluciones actualizan la deuda total. Los pagos y las reversiones aplicadas reducen el pendiente de este corte. '

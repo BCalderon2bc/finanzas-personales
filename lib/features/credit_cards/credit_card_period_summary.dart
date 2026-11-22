@@ -1,3 +1,4 @@
+import '../../core/status_colors.dart';
 import 'package:flutter/material.dart';
 
 import '../../data/card_statement_logic.dart';
@@ -34,7 +35,7 @@ class CreditCardPeriodSummary extends StatelessWidget {
     return Card(
       margin: EdgeInsets.zero,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -48,24 +49,24 @@ class CreditCardPeriodSummary extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'Cortes de esta tarjeta',
-                    style: theme.textTheme.titleLarge,
+                    style: theme.textTheme.titleMedium,
                   ),
+                ),
+                TextButton(
+                  onPressed: onManage,
+                  child: const Text('Ver cortes y pagos'),
                 ),
               ],
             ),
             const SizedBox(height: 6),
-            Text(
-              first == null
-                  ? 'Esta tarjeta no tiene cortes vigentes.'
-                  : 'Consulta cuánto falta por pagar en cada moneda.',
-              style: theme.textTheme.bodyMedium,
-            ),
+            if (first == null)
+              const Text('Esta tarjeta no tiene cortes vigentes.'),
             if (first != null && sharedDates) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 6),
               _StatementDates(statement: first),
             ],
             if (current.isNotEmpty) ...[
-              const SizedBox(height: 14),
+              const SizedBox(height: 8),
               AdaptiveColumns(
                 minColumnWidth: 280,
                 children: [
@@ -78,24 +79,7 @@ class CreditCardPeriodSummary extends StatelessWidget {
                     ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Text(
-                'El importe del corte ya forma parte de la deuda de esta tarjeta.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
             ],
-            const SizedBox(height: 12),
-            Align(
-              alignment: AlignmentDirectional.centerEnd,
-              child: OutlinedButton.icon(
-                onPressed: onManage,
-                icon: const Icon(Icons.arrow_forward),
-                iconAlignment: IconAlignment.end,
-                label: const Text('Ver cortes y pagos'),
-              ),
-            ),
           ],
         ),
       ),
@@ -143,7 +127,6 @@ class _CurrencyPeriod extends StatelessWidget {
     final statement = progress.statement;
     final currency = '${statement['currency']}';
     final theme = Theme.of(context);
-    final colors = theme.colorScheme;
     final due = statementDate(statement['due_date']);
     final past = due != null && daysUntil(due, now) < 0;
     final late = past && (progress.minimumRemaining ?? 0) > 0;
@@ -158,11 +141,12 @@ class _CurrencyPeriod extends StatelessWidget {
         : past
         ? 'Fecha de pago pasada'
         : 'Vigente';
+    final stateColor = appDueColor(due, settled: progress.settled, now: now);
     return Material(
-      color: colors.surfaceContainerLow,
+      color: stateColor.withValues(alpha: .06),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: colors.outlineVariant),
+        side: BorderSide(color: stateColor.withValues(alpha: .3)),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
@@ -181,9 +165,7 @@ class _CurrencyPeriod extends StatelessWidget {
                 ),
                 DecoratedBox(
                   decoration: BoxDecoration(
-                    color: late
-                        ? colors.errorContainer
-                        : colors.secondaryContainer,
+                    color: stateColor.withValues(alpha: .12),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Padding(
@@ -194,24 +176,45 @@ class _CurrencyPeriod extends StatelessWidget {
                     child: Text(
                       status,
                       style: theme.textTheme.labelMedium?.copyWith(
-                        color: late
-                            ? colors.onErrorContainer
-                            : colors.onSecondaryContainer,
+                        color: stateColor,
                       ),
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Text('Mínimo pendiente', style: theme.textTheme.bodyMedium),
-            Text(
-              statement['minimum_due'] == null
-                  ? 'Sin registrar'
-                  : cardMoney(progress.minimumRemaining, currency),
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+            const SizedBox(height: 6),
+            AdaptiveColumns(
+              minColumnWidth: 130,
+              spacing: 8,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Mínimo pendiente', style: theme.textTheme.bodySmall),
+                    Text(
+                      statement['minimum_due'] == null
+                          ? 'Sin registrar'
+                          : cardMoney(progress.minimumRemaining, currency),
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Saldo pendiente', style: theme.textTheme.bodySmall),
+                    Text(
+                      cardMoney(progress.remaining, currency),
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
             if (showDates) ...[
               const SizedBox(height: 8),
@@ -219,11 +222,12 @@ class _CurrencyPeriod extends StatelessWidget {
             ],
             const SizedBox(height: 8),
             Text('Saldo al corte · ${cardMoney(progress.balance, currency)}'),
-            Text(
-              'Saldo pendiente · ${cardMoney(progress.remaining, currency)}',
-              style: theme.textTheme.bodySmall,
-            ),
             ExpansionTile(
+              initiallyExpanded: false,
+              dense: true,
+              visualDensity: VisualDensity.compact,
+              shape: const Border(),
+              collapsedShape: const Border(),
               tilePadding: EdgeInsets.zero,
               childrenPadding: const EdgeInsets.only(bottom: 10),
               expandedCrossAxisAlignment: CrossAxisAlignment.start,

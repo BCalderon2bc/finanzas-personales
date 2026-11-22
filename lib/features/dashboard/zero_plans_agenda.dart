@@ -1,3 +1,5 @@
+import '../../core/status_colors.dart';
+import '../../widgets/adaptive_layout.dart';
 import 'package:flutter/material.dart';
 import '../../data/payment_agenda_labels.dart';
 import '../../data/zero_plan_repository.dart';
@@ -125,35 +127,48 @@ class _ZeroPlansAgendaState extends State<ZeroPlansAgenda> {
           'Vencidas o próximas 7 días, sin corte vigente vinculado. Si ya están en el estado de cuenta, vincúlalas para que no aparezcan también aquí.',
           style: TextStyle(fontSize: 12),
         ),
-        ...rows.take(expanded ? rows.length : 4).map((i) {
-          final p = plans['${i['plan_id']}']!,
-              card = cards
-                  .where((c) => c['id'] == p['credit_card_id'])
-                  .firstOrNull;
-          return Card(
-            child: ListTile(
-              leading: const Icon(Icons.calendar_month_outlined),
-              title: Text(
-                '${p['description']} · cuota ${i['number']}/${p['total_installments']}',
+        AdaptiveColumns(
+          minColumnWidth: 380,
+          maxColumns: 3,
+          spacing: 12,
+          children: rows.take(expanded ? rows.length : 4).map((i) {
+            final p = plans['${i['plan_id']}']!,
+                card = cards
+                    .where((c) => c['id'] == p['credit_card_id'])
+                    .firstOrNull;
+            final stateColor = appDueColor(
+              DateTime.tryParse('${i['due_date']}'),
+            );
+            return Card(
+              color: stateColor.withValues(alpha: .06),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(color: stateColor.withValues(alpha: .3)),
               ),
-              subtitle: Text(
-                '${agendaCardLabel(card, includeName: false)} · ${zeroDateLabel(i['due_date'])}\nPendiente: ${formatMoneyCents(data!.remaining(i), '${p['currency']}')}',
+              child: ListTile(
+                leading: const Icon(Icons.calendar_month_outlined),
+                title: Text(
+                  '${p['description']} · cuota ${i['number']}/${p['total_installments']}',
+                ),
+                subtitle: Text(
+                  '${agendaCardLabel(card, includeName: false)} · ${zeroDateLabel(i['due_date'])}\nPendiente: ${formatMoneyCents(data!.remaining(i), '${p['currency']}')}',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: card == null
+                    ? null
+                    : () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute<void>(
+                            builder: (_) => ZeroPlansPage(card: card),
+                          ),
+                        );
+                        if (mounted) widget.onChanged();
+                      },
               ),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: card == null
-                  ? null
-                  : () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) => ZeroPlansPage(card: card),
-                        ),
-                      );
-                      if (mounted) widget.onChanged();
-                    },
-            ),
-          );
-        }),
+            );
+          }).toList(),
+        ),
         if (rows.length > 4)
           TextButton(
             onPressed: () => setState(() => expanded = !expanded),

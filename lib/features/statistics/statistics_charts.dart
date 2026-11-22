@@ -5,7 +5,7 @@ import '../../core/app_theme.dart' show primaryColor;
 
 const incomeColor = Color(0xFF277354);
 const expenseColor = Color(0xFFB14838);
-const categoryColors = [
+List<Color> get categoryColors => [
   primaryColor,
   Color(0xFFB14838),
   Color(0xFF277354),
