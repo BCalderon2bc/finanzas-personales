@@ -1,6 +1,11 @@
 import '../utils/card_cash_advance.dart';
 import '../features/credit_cards/credit_card_balances.dart'
-    show cardMovementType, cardPointsRedemption, cardPointsRedemptionLabel;
+    show
+        cardMovementType,
+        cardPointsRedemption,
+        cardPointsRedemptionLabel,
+        cardRebate,
+        cardRebateLabel;
 import 'period_logic.dart';
 import '../utils/money.dart';
 import 'card_statement_logic.dart';
@@ -182,6 +187,7 @@ List<ExportMovement> normalizeExportMovements({
     'refund': 'Devolución de tarjeta',
     'insurance': 'Seguro de tarjeta',
     cardPointsRedemption: cardPointsRedemptionLabel,
+    cardRebate: cardRebateLabel,
     'interest': 'Intereses de tarjeta',
     'fee': 'Comisión de tarjeta',
     'payment': 'Pago de tarjeta',

@@ -29,6 +29,7 @@ ExportReport creditCardsExport({
     'refund': 'Reembolso',
     'insurance': 'Seguro de tarjeta',
     cardPointsRedemption: cardPointsRedemptionLabel,
+    cardRebate: cardRebateLabel,
     'fee': 'Comisión',
     'interest': 'Intereses',
   };
@@ -384,6 +385,7 @@ ExportReport creditCardExpensesExport({
       'fee' => 'Comisión',
       'insurance' => 'Seguro de tarjeta',
       cardPointsRedemption => cardPointsRedemptionLabel,
+      cardRebate => cardRebateLabel,
       _ => 'Reembolso',
     };
     rows.add([

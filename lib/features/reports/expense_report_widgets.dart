@@ -9,7 +9,11 @@ import '../../core/app_theme.dart'
         primaryColor;
 import '../../data/exchange_rate.dart';
 import '../credit_cards/credit_card_balances.dart'
-    show cardPointsRedemption, cardPointsRedemptionLabel;
+    show
+        cardPointsRedemption,
+        cardPointsRedemptionLabel,
+        cardRebate,
+        cardRebateLabel;
 import 'package:flutter/material.dart';
 import '../../utils/money.dart';
 import '../../data/expense_report_categories.dart';
@@ -323,6 +327,8 @@ class ExpenseDetailTile extends StatelessWidget {
         ? 'Abono de deuda'
         : isCardInsuranceExpense(tx)
         ? 'Seguro de tarjeta'
+        : card && tx['charge_kind'] == cardRebate
+        ? cardRebateLabel
         : card && tx['charge_kind'] == cardPointsRedemption
         ? cardPointsRedemptionLabel
         : card

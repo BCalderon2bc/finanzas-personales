@@ -1,3 +1,4 @@
+import 'credit_card_pending_panel.dart';
 import '../../data/credit_card_additional_repository.dart';
 import 'credit_card_additionals_page.dart';
 import '../person_accounts/receipt_draft_field.dart';
@@ -30,6 +31,8 @@ class CreditCardsPage extends StatefulWidget {
 class _CreditCardsPageState extends State<CreditCardsPage> {
   List<Map<String, dynamic>> cards = [], transactions = [];
   bool loading = true, saving = false;
+  bool showPending = false;
+  List<Map<String, dynamic>> holds = [];
   bool hasLoaded = false;
   final scrollController = ScrollController(keepScrollOffset: false);
 
@@ -118,6 +121,7 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
             'charge_kind, cash_advance_fee, excludes_from_limit',
         user.id,
       );
+      final pending = await readRows('credit_card_holds', '*', user.id);
       final periods = await loadCardStatements(user.id);
       checkSession(user.id);
       if (!mounted || request != requestId) {
@@ -126,7 +130,19 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
       setState(() {
         hasLoaded = true;
         cards = cardRows;
-        transactions = txRows;
+        transactions = [
+          ...txRows,
+          ...cardBonifiableReservations(periods.statements),
+        ];
+        holds = pending
+            .where((h) => h['status'] == 'active')
+            .map(
+              (h) => <String, dynamic>{
+                ...h,
+                'transaction_type': 'pending_purchase',
+              },
+            )
+            .toList();
         statementData = periods;
         if (!cards.any((c) => c['id'].toString() == selectedCardId)) {
           final visibleCards = orderedCards;
@@ -840,7 +856,10 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
                                 id: 'details',
                                 child: CreditCardDetails(
                                   card: selected,
-                                  usedLimit: cardUsed(selected, transactions),
+                                  usedLimit: cardUsed(selected, [
+                                    ...transactions,
+                                    ...holds,
+                                  ]),
                                   balances: {
                                     for (final c in cardCurrencies)
                                       c: balanceFor(selected, c),
@@ -923,14 +942,51 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
                                       ),
                                     ],
                                     const SizedBox(height: 12),
-                                    if (selected != null)
-                                      CreditCardMovementsPage(
-                                        key: ValueKey(
-                                          'cut-history/${selected['id']}',
+                                    if (selected != null) ...[
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 8,
                                         ),
-                                        cardId: '${selected['id']}',
-                                        embedded: true,
+                                        child: SegmentedButton<bool>(
+                                          segments: const [
+                                            ButtonSegment(
+                                              value: false,
+                                              label: Text('Procesados'),
+                                              icon: Icon(
+                                                Icons.receipt_long_outlined,
+                                              ),
+                                            ),
+                                            ButtonSegment(
+                                              value: true,
+                                              label: Text('Flotantes'),
+                                              icon: Icon(Icons.hourglass_empty),
+                                            ),
+                                          ],
+                                          selected: {showPending},
+                                          onSelectionChanged: (value) =>
+                                              setState(
+                                                () =>
+                                                    showPending = value.single,
+                                              ),
+                                        ),
                                       ),
+                                      if (showPending)
+                                        CreditCardPendingPanel(
+                                          key: ValueKey(
+                                            'holds/${selected['id']}',
+                                          ),
+                                          card: selected,
+                                          onChanged: loadData,
+                                        )
+                                      else
+                                        CreditCardMovementsPage(
+                                          key: ValueKey(
+                                            'cut-history/${selected['id']}',
+                                          ),
+                                          cardId: '${selected['id']}',
+                                          embedded: true,
+                                        ),
+                                    ],
                                   ],
                                 ),
                               ),

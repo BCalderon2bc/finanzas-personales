@@ -1,7 +1,12 @@
 import '../../utils/money.dart';
 import '../../utils/card_cash_advance.dart';
 import 'credit_card_balances.dart'
-    show cardMovementType, cardPointsRedemption, cardPointsRedemptionLabel;
+    show
+        cardMovementType,
+        cardPointsRedemption,
+        cardPointsRedemptionLabel,
+        cardRebate,
+        cardRebateLabel;
 import '../../data/payment_agenda_labels.dart' show additionalCardLabel;
 import '../person_accounts/receipt_draft_field.dart';
 import 'package:flutter/material.dart';
@@ -55,6 +60,7 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
     'refund',
     'insurance',
     cardPointsRedemption,
+    cardRebate,
     cardCashAdvance,
   ].contains(type);
   static const types = {
@@ -65,6 +71,7 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
     'insurance': 'Seguro de tarjeta',
     'refund': 'Devolución de compra',
     cardPointsRedemption: cardPointsRedemptionLabel,
+    cardRebate: cardRebateLabel,
   };
   @override
   void initState() {
@@ -110,11 +117,14 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
       'transaction_type': switch (type) {
         'insurance' => 'fee',
         cardCashAdvance => 'purchase',
-        cardPointsRedemption => 'refund',
+        cardPointsRedemption || cardRebate => 'refund',
         _ => type,
       },
       'charge_kind': switch (type) {
-        'insurance' || cardPointsRedemption || cardCashAdvance => type,
+        'insurance' ||
+        cardPointsRedemption ||
+        cardRebate ||
+        cardCashAdvance => type,
         _ => null,
       },
       'currency': currency,
@@ -211,10 +221,7 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
                       value: 'NIO',
                       child: Text('Córdobas (C\$)'),
                     ),
-                    DropdownMenuItem(
-                      value: 'USD',
-                      child: Text('Dólares (\$)'),
-                    ),
+                    DropdownMenuItem(value: 'USD', child: Text('Dólares (\$)')),
                   ],
                   onChanged: (value) {
                     if (value != null) {
@@ -266,7 +273,9 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
                   decoration: InputDecoration(
                     labelText:
                         '${cashAdvance ? 'Efectivo recibido' : 'Monto'} (${currency == 'USD' ? '\$' : 'C\$'})',
-                    helperText: type == cardPointsRedemption
+                    helperText: type == cardRebate
+                        ? 'Ingresa solo el descuento abonado al corte. Ejemplo: consumo 1,000 al 6% = abono de 60.'
+                        : type == cardPointsRedemption
                         ? 'Ingresa el importe abonado por el banco.'
                         : null,
                     helperMaxLines: 2,

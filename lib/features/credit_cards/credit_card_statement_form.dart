@@ -30,6 +30,10 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
   final overdues = {for (final c in currencies) c: TextEditingController()};
   final charges = {for (final c in currencies) c: TextEditingController()};
   final financing = {for (final c in currencies) c: TextEditingController()};
+  final bonusInterest = {
+    for (final c in currencies) c: TextEditingController(),
+  };
+  final bonusStates = {for (final c in currencies) c: 'pending'};
   final notes = TextEditingController();
   final existing = <String, Map<String, dynamic>>{};
   DateTime closing = DateTime.now();
@@ -50,6 +54,10 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
     for (final row in widget.statements) {
       final currency = '${row['currency']}';
       existing[currency] = row;
+      bonusInterest[currency]!.text =
+          row['bonifiable_interest_due']?.toString() ?? '';
+      bonusStates[currency] =
+          row['bonifiable_interest_status']?.toString() ?? 'pending';
       charges[currency]!.text = row['charges_interest_due']?.toString() ?? '';
       financing[currency]!.text = row['intra_financing_due']?.toString() ?? '';
       balances[currency]!.text = '${row['balance_due']}';
@@ -73,6 +81,7 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
       ...overdues.values,
       ...charges.values,
       ...financing.values,
+      ...bonusInterest.values,
       notes,
     ]) {
       controller.dispose();
@@ -105,6 +114,8 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
             'currency': currency,
             'balance': amount(balances[currency]!.text),
             'minimum': amount(minimums[currency]!.text),
+            'bonifiable_interest': amount(bonusInterest[currency]!.text) ?? 0,
+            'bonifiable_status': bonusStates[currency],
             'charges_interest': amount(charges[currency]!.text),
             'intra_financing': amount(financing[currency]!.text),
             if (showsOverdue) 'overdue': amount(overdues[currency]!.text),
@@ -224,6 +235,8 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
       amountField(currency, charges, 'Cargos e intereses (opcional)'),
       const SizedBox(height: 8),
       amountField(currency, financing, 'Intrafinanciamientos (opcional)'),
+      const SizedBox(height: 8),
+      amountField(currency, bonusInterest, 'Intereses bonificables'),
       if (usesPaymentFields) ...[
         const SizedBox(height: 8),
         amountField(currency, balances, balanceLabel),
@@ -257,6 +270,7 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
             if (showsOverdue) ('Pago atrasado', overdues),
             ('Cargos e intereses', charges),
             ('Intrafinanciamientos', financing),
+            ('Intereses bonificables', bonusInterest),
             (balanceLabel, balances),
           ])
             Padding(
@@ -321,6 +335,43 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
                 const SizedBox(height: 16),
               ],
               amountsLayout(),
+              const SizedBox(height: 12),
+              AdaptiveColumns(
+                minColumnWidth: 240,
+                children: [
+                  for (final currency in shownCurrencies)
+                    DropdownButtonFormField<String>(
+                      initialValue: bonusStates[currency],
+                      decoration: InputDecoration(
+                        labelText: 'Bonificables · ${currencyLabel(currency)}',
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'pending',
+                          child: Text('Pendientes de bonificar'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'bonified',
+                          child: Text('Bonificados por el banco'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'recorded',
+                          child: Text(
+                            'Cobrados: ya registrados en movimientos',
+                          ),
+                        ),
+                      ],
+                      isExpanded: true,
+                      onChanged: (value) =>
+                          setState(() => bonusStates[currency] = value!),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Los bonificables pendientes se suman a la deuda y al uso del límite, separados del pago de contado. Cambia el estado cuando el banco confirme la bonificación o hayas registrado el cobro en movimientos.',
+              ),
+
               const SizedBox(height: 8),
               const Text(
                 'Cargos e intereses e intrafinanciamientos detallan el corte. Ingresa en el pago de contado el total informado por el banco.',

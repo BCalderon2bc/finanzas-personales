@@ -239,13 +239,6 @@ class _Metric extends StatelessWidget {
               ),
             ),
           ),
-          TextButton(
-            onPressed: onDetails,
-            style: TextButton.styleFrom(
-              foregroundColor: hero ? Colors.white : _blue,
-            ),
-            child: const Text('Ver desglose'),
-          ),
         ],
       ),
     );

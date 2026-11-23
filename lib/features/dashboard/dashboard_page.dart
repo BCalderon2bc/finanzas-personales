@@ -310,54 +310,11 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
           title: GuideAnchor(id: 'title', child: const Text('Mi Billete')),
           actions: [
-            const AppHelpButton(topic: 'dashboard'),
             IconButton(
-              tooltip: 'Configuraciones',
-              onPressed: openSettings,
-              icon: const Icon(Icons.settings_outlined),
+              tooltip: 'Cerrar sesión',
+              onPressed: signingOut ? null : logout,
+              icon: const Icon(Icons.logout_rounded),
             ),
-            if (compact)
-              PopupMenuButton<String>(
-                tooltip: 'Más opciones',
-                onSelected: (value) {
-                  if (value == 'refresh') {
-                    loadData();
-                  } else if (value == 'top') {
-                    backToTop();
-                  } else {
-                    logout();
-                  }
-                },
-                itemBuilder: (_) => [
-                  if (showBackToTop)
-                    const PopupMenuItem(
-                      value: 'top',
-                      child: Text('Volver arriba'),
-                    ),
-                  PopupMenuItem(
-                    value: 'refresh',
-                    enabled: !loading,
-                    child: const Text('Actualizar'),
-                  ),
-                  PopupMenuItem(
-                    value: 'logout',
-                    enabled: !signingOut,
-                    child: const Text('Cerrar sesión'),
-                  ),
-                ],
-              )
-            else ...[
-              IconButton(
-                tooltip: 'Actualizar',
-                onPressed: loading ? null : loadData,
-                icon: const Icon(Icons.refresh_rounded),
-              ),
-              IconButton(
-                tooltip: 'Cerrar sesión',
-                onPressed: signingOut ? null : logout,
-                icon: const Icon(Icons.logout_rounded),
-              ),
-            ],
           ],
         ),
         floatingActionButton: showBackToTop && !compact

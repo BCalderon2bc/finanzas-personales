@@ -200,6 +200,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
     'insurance': 'Seguro de tarjeta',
     'refund': 'Devolución',
     cardPointsRedemption: cardPointsRedemptionLabel,
+    cardRebate: cardRebateLabel,
     'adjustment': 'Ajuste',
   };
 

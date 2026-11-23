@@ -10,6 +10,9 @@ const cardEffects = {
   'refund': -1,
 };
 
+const cardRebate = 'rebate';
+const cardRebateLabel = 'Rebate / descuento de tarjeta';
+
 const cardPointsRedemption = 'points_redemption';
 const cardPointsRedemptionLabel = 'Redención de puntos';
 
@@ -17,6 +20,7 @@ String cardMovementType(Object? transactionType, Object? chargeKind) =>
     switch (chargeKind) {
       'insurance' => 'insurance',
       cardPointsRedemption => cardPointsRedemption,
+      cardRebate => cardRebate,
       _ => transactionType.toString(),
     };
 
@@ -51,6 +55,14 @@ int? cardBalance(
     if (tx['currency'] != currency) {
       continue;
     }
+    if (tx['transaction_type'] == 'bonifiable_interest') {
+      balance += moneyCents(tx['amount']);
+      continue;
+    }
+    if (tx['transaction_type'] == 'pending_purchase') {
+      if (forLimit) balance += moneyCents(tx['amount']);
+      continue;
+    }
     final effect = cardEffects[tx['transaction_type']];
     if (effect == null) {
       return null;
@@ -69,13 +81,14 @@ int? cardBalance(
   return balance;
 }
 
-// Estimación del uso del único límite. Los saldos a favor no compensan otra moneda.
+// Uso neto del límite compartido: incluye saldos a favor en ambas monedas.
+// Esta conversión solo estima el disponible; no altera las deudas por moneda.
 int? cardLimitUsed(Map<String, dynamic> card, int? nio, int? usd) {
   if (nio == null || usd == null) {
     return null;
   }
-  final n = nio > 0 ? nio : 0;
-  final u = usd > 0 ? usd : 0;
+  final n = nio;
+  final u = usd;
   final base = card['currency'].toString();
   final foreign = base == 'USD' ? n : u;
   if (foreign == 0) {
@@ -106,5 +119,22 @@ int? cardAvailable(Map<String, dynamic> card, int? used) {
     return null;
   }
   final limit = moneyCents(card['credit_limit']);
-  return (limit - used).clamp(0, limit).toInt();
+  return limit - used;
 }
+
+/// Reservation from the statement, not a second finalized expense.
+/// Archived statements retain the reservation until explicitly resolved.
+List<Map<String, dynamic>> cardBonifiableReservations(
+  Iterable<Map<String, dynamic>> statements,
+) => [
+  for (final s in statements)
+    if (s['is_voided'] != true &&
+        (s['bonifiable_interest_status'] ?? 'pending') == 'pending' &&
+        moneyCents(s['bonifiable_interest_due'] ?? 0) > 0)
+      {
+        'credit_card_id': s['credit_card_id'],
+        'currency': s['currency'],
+        'amount': s['bonifiable_interest_due'],
+        'transaction_type': 'bonifiable_interest',
+      },
+];

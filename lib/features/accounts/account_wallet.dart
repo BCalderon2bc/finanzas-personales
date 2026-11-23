@@ -48,9 +48,7 @@ class AccountWallet extends StatelessWidget {
                 account: {...account, 'notes': null, 'account_reference': null},
                 centerOnMobile: true,
                 balanceCents: balances[id] ?? 0,
-                balanceLabel: selected
-                    ? 'Seleccionada · Saldo registrado'
-                    : 'Saldo registrado',
+                balanceLabel: 'Saldo registrado',
               ),
             ),
           ),

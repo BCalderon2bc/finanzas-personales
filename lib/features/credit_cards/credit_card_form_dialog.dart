@@ -129,26 +129,34 @@ class _CreditCardFormDialogState extends State<CreditCardFormDialog> {
     });
   }
 
-  String? validateAmount(String? value) {
+  String? validateAmount(String? value, {bool allowNegative = false}) {
     final text = (value ?? '').trim();
     final amount = double.tryParse(text.replaceAll(',', '.'));
-    if (amount == null || !amount.isFinite || amount < 0) {
+    if (amount == null || !amount.isFinite || (!allowNegative && amount < 0)) {
       return 'Introduce un monto válido';
     }
-    return RegExp(r'^\d+([.,]\d{1,2})?$').hasMatch(text)
+    return RegExp(
+          allowNegative ? r'^-?\d+([.,]\d{1,2})?$' : r'^\d+([.,]\d{1,2})?$',
+        ).hasMatch(text)
         ? null
         : 'Usa máximo dos decimales, sin separadores de miles';
   }
 
   double number(TextEditingController c) =>
       double.parse(c.text.trim().replaceAll(',', '.'));
-  Widget amountField(String label, TextEditingController controller) =>
-      TextFormField(
-        controller: controller,
-        decoration: InputDecoration(labelText: label),
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        validator: validateAmount,
-      );
+  Widget amountField(
+    String label,
+    TextEditingController controller, {
+    bool allowNegative = false,
+  }) => TextFormField(
+    controller: controller,
+    decoration: InputDecoration(labelText: label),
+    keyboardType: TextInputType.numberWithOptions(
+      decimal: true,
+      signed: allowNegative,
+    ),
+    validator: (value) => validateAmount(value, allowNegative: allowNegative),
+  );
   Widget dayField(String label, TextEditingController controller) =>
       TextFormField(
         controller: controller,
@@ -397,13 +405,21 @@ class _CreditCardFormDialogState extends State<CreditCardFormDialog> {
                 const SizedBox(height: 20),
                 GuideAnchor(
                   id: 'opening',
-                  child: amountField('Deuda inicial en córdobas (C\$)', nio),
+                  child: amountField(
+                    'Saldo inicial en córdobas (C\$)',
+                    nio,
+                    allowNegative: true,
+                  ),
                 ),
                 const SizedBox(height: 12),
-                amountField('Deuda inicial en dólares (\$)', usd),
+                amountField(
+                  'Saldo inicial en dólares (\$)',
+                  usd,
+                  allowNegative: true,
+                ),
                 const SizedBox(height: 8),
                 Text(
-                  'Ingresa lo que debías antes del historial registrado. Los movimientos existentes se suman a estos importes.',
+                  'Ingresa el saldo anterior al historial registrado: positivo si debías o negativo si tenías saldo a favor (ejemplo: -40). Los movimientos existentes se suman a estos importes.',
                   style: TextStyle(color: appMuted, fontSize: 12),
                 ),
                 const SizedBox(height: 16),
