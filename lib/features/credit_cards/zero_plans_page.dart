@@ -27,7 +27,15 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
       statements = [],
       availableCards = [],
       charges = [];
-  bool loading = true, busy = false, showVoided = false;
+  bool loading = true, busy = false;
+  String planFilter = 'active';
+  static const planStates = {
+    'active': 'Vigentes',
+    'in_cuts': 'Incluidos en cortes',
+    'paid': 'Pagados',
+    'voided': 'Anulados',
+    'all': 'Todos',
+  };
   String? error;
   int request = 0;
   @override
@@ -739,6 +747,8 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
             Text(
               historical
                   ? 'Pagada antes de ingresar el plan'
+                  : data!.includedInCut(i, statements) && remaining > 0
+                  ? 'Incluida en el corte · Se paga desde la tarjeta'
                   : remaining == 0
                   ? 'Cuota cubierta'
                   : 'Pendiente: ${formatMoneyCents(remaining, curr)}',
@@ -775,7 +785,7 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
                       onPressed: busy ? null : () => removeCharge(i),
                       child: const Text('Quitar cargo'),
                     ),
-                  if (remaining > 0) ...[
+                  if (remaining > 0 && !data!.includedInCut(i, statements)) ...[
                     TextButton(
                       onPressed: busy ? null : () => pay(p, i),
                       child: const Text('Pagar cuota'),
@@ -874,22 +884,26 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
 
   Widget planCard(Map<String, dynamic> p) {
     final list = data!.forPlan('${p['id']}'),
-        pending = data!.pending('${p['id']}'),
+        pending = data!.pendingOutsideCuts('${p['id']}', statements),
         curr = '${p['currency']}';
     final source = data!.transactions
         .where((t) => t['id'] == p['source_transaction_id'])
         .firstOrNull;
     final inCuts = list
-        .where(
-          (i) =>
-              i['statement_id'] != null &&
-              statements.any(
-                (s) => s['id'] == i['statement_id'] && s['is_voided'] != true,
-              ),
-        )
+        .where((i) => data!.includedInCut(i, statements))
         .fold<int>(0, (sum, i) => sum + data!.remaining(i));
     final covered = list.where((i) => data!.remaining(i) == 0).length,
-        next = list.where((i) => data!.remaining(i) > 0).firstOrNull;
+        next = list
+            .where(
+              (i) =>
+                  data!.remaining(i) > 0 && !data!.includedInCut(i, statements),
+            )
+            .firstOrNull;
+    final included = list
+        .where(
+          (i) => data!.remaining(i) > 0 && data!.includedInCut(i, statements),
+        )
+        .length;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -903,16 +917,21 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
             Text(
               'Original: ${formatMoneyCents(moneyCents(p['original_amount']), curr)} · Interés: 0%',
             ),
-            Text('$covered de ${p['total_installments']} cuotas cubiertas'),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Chip(
+                label: Text(planStates[data!.planState(p, statements)]!),
+              ),
+            ),
             Text(
-              'Pendiente: ${formatMoneyCents(pending, curr)}',
+              '$covered cuotas pagadas · $included incluidas en corte · ${p['total_installments']} en total',
+            ),
+            Text(
+              'Pendiente del plan: ${formatMoneyCents(pending, curr)}',
               style: const TextStyle(fontSize: 23, fontWeight: FontWeight.w800),
             ),
             Text(
-              'De ese pendiente, vinculado a cortes: ${formatMoneyCents(inCuts, curr)}',
-            ),
-            Text(
-              'Sin corte vinculado: ${formatMoneyCents(pending - inCuts, curr)}',
+              'Incluido en cortes, por pagar al banco: ${formatMoneyCents(inCuts, curr)}',
             ),
             if (next != null)
               Text(
@@ -966,7 +985,8 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
             .where(
               (p) =>
                   p['credit_card_id'] == widget.card['id'] &&
-                  (showVoided || p['is_voided'] != true),
+                  (planFilter == 'all' ||
+                      data!.planState(p, statements) == planFilter),
             )
             .toList() ??
         [];
@@ -1046,7 +1066,7 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
                                       'Deuda TOTAL ${curr == 'NIO' ? 'en córdobas' : 'en dólares'}: ${cardMoney(cardBalance(card!, data!.transactions, curr), curr)}',
                                     ),
                                     Text(
-                                      'De esa deuda, pendiente controlado en tasa cero: ${cardMoney(data!.plans.where((p) => p['credit_card_id'] == card!['id'] && p['currency'] == curr && p['is_voided'] != true).fold<int>(0, (s, p) => s + data!.pending('${p['id']}')), curr)}',
+                                      'De esa deuda, pendiente del plan sin incluir en cortes: ${cardMoney(data!.plans.where((p) => p['credit_card_id'] == card!['id'] && p['currency'] == curr && p['is_voided'] != true).fold<int>(0, (s, p) => s + data!.pendingOutsideCuts('${p['id']}', statements)), curr)}',
                                     ),
                                   ],
                                 ),
@@ -1058,19 +1078,30 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
                           const Padding(
                             padding: EdgeInsets.symmetric(vertical: 10),
                             child: Text(
-                              'Si una cuota está incluida en el corte del banco, registra ese corte con su monto real y vincula la cuota. Este módulo no calcula ni modifica automáticamente tu saldo al corte ni el pago mínimo.',
+                              'Al vincular una cuota a un corte, sale del pendiente del plan y queda incluida en ese corte. La deuda de la tarjeta se reduce al registrar el pago. Quitar el vínculo devuelve la cuota al pendiente del plan.',
                             ),
                           ),
                           CollapsibleFilters(
                             children: [
                               GuideAnchor(
                                 id: 'voided',
-                                child: SwitchListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  title: const Text('Mostrar planes anulados'),
-                                  value: showVoided,
-                                  onChanged: (v) =>
-                                      setState(() => showVoided = v),
+                                child: DropdownButtonFormField<String>(
+                                  initialValue: planFilter,
+                                  isExpanded: true,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Estado del plan',
+                                  ),
+                                  items: [
+                                    for (final state in planStates.entries)
+                                      DropdownMenuItem(
+                                        value: state.key,
+                                        child: Text(state.value),
+                                      ),
+                                  ],
+                                  onChanged: (value) {
+                                    if (value != null)
+                                      setState(() => planFilter = value);
+                                  },
                                 ),
                               ),
                             ],
@@ -1079,7 +1110,7 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
                             const Padding(
                               padding: EdgeInsets.all(24),
                               child: Text(
-                                'Todavía no hay planes para mostrar.',
+                                'No hay planes en el estado seleccionado.',
                               ),
                             ),
                           discrepancyNotice(),

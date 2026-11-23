@@ -54,6 +54,32 @@ class ZeroPlanData {
       .toInt();
   int pending(String id) =>
       forPlan(id).fold<int>(0, (s, i) => s + remaining(i));
+  bool includedInCut(
+    Map<String, dynamic> installment,
+    Iterable<Map<String, dynamic>> statements,
+  ) =>
+      installment['statement_id'] != null &&
+      statements.any(
+        (s) => s['id'] == installment['statement_id'] && s['is_voided'] != true,
+      );
+
+  int pendingOutsideCuts(
+    String id,
+    Iterable<Map<String, dynamic>> statements,
+  ) => forPlan(id)
+      .where((i) => !includedInCut(i, statements))
+      .fold<int>(0, (sum, i) => sum + remaining(i));
+
+  String planState(
+    Map<String, dynamic> plan,
+    Iterable<Map<String, dynamic>> statements,
+  ) {
+    if (plan['is_voided'] == true) return 'voided';
+    final id = '${plan['id']}';
+    if (pendingOutsideCuts(id, statements) > 0) return 'active';
+    return pending(id) > 0 ? 'in_cuts' : 'paid';
+  }
+
   int unassigned(Map<String, dynamic> p) =>
       (moneyCents(p['amount']) -
               allocations
