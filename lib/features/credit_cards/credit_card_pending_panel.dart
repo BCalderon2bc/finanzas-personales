@@ -12,9 +12,11 @@ class CreditCardPendingPanel extends StatefulWidget {
     super.key,
     required this.card,
     required this.onChanged,
+    required this.onProcessed,
   });
   final Map<String, dynamic> card;
   final Future<void> Function() onChanged;
+  final VoidCallback onProcessed;
   @override
   State<CreditCardPendingPanel> createState() => _CreditCardPendingPanelState();
 }
@@ -95,6 +97,7 @@ class _CreditCardPendingPanelState extends State<CreditCardPendingPanel> {
     setState(() => busy = true);
     try {
       await action();
+      await load();
       await widget.onChanged();
     } catch (e) {
       if (mounted)
@@ -222,6 +225,7 @@ class _CreditCardPendingPanelState extends State<CreditCardPendingPanel> {
           'Úsalo cuando el banco publique la compra. Si ya la registraste en Movimientos, cancela y libera este flotante para evitar duplicarla.',
     );
     if (v == null || !mounted) return;
+    var processedSuccessfully = false;
     await run(() async {
       final txId = await supabase.rpc(
         'process_card_hold',
@@ -240,7 +244,9 @@ class _CreditCardPendingPanelState extends State<CreditCardPendingPanel> {
           'credit_card_transactions',
           txId,
         );
+      processedSuccessfully = true;
     });
+    if (mounted && processedSuccessfully) widget.onProcessed();
   }
 
   @override

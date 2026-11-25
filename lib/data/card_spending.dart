@@ -1,6 +1,7 @@
 import '../utils/money.dart';
 import 'exchange_rate.dart';
 import 'payment_agenda_labels.dart';
+import '../utils/card_cash_advance.dart';
 import 'period_logic.dart';
 
 typedef CardSpending = ({
@@ -19,9 +20,15 @@ int cardSpendingCents(Map<String, dynamic> movement) {
       movement['is_receivable_funding'] == true) {
     return 0;
   }
-  return switch (movement['transaction_type']) {
+  final type = movement['transaction_type'];
+  if (type == 'refund') return -moneyCents(movement['amount']);
+
+  // Los retiros de efectivo se reflejan como gasto únicamente por su comisión,
+  // igual que en los reportes; el principal no es consumo de compra.
+  if (isCardCashAdvance(movement)) return cardCashAdvanceFee(movement);
+
+  return switch (type) {
     'purchase' || 'interest' || 'fee' => moneyCents(movement['amount']),
-    'refund' => -moneyCents(movement['amount']),
     _ => 0,
   };
 }

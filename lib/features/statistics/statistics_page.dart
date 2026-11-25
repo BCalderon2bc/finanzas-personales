@@ -1,5 +1,7 @@
 import '../reports/consolidated_expenses_panel.dart';
 import '../../data/card_spending.dart';
+import '../credit_cards/credit_card_balances.dart'
+    show cardBalance;
 import '../dashboard/dashboard_financial_health.dart'
     show CreditCardSpendingChart;
 import '../../widgets/collapsible_filters.dart';
@@ -18,6 +20,7 @@ import 'obligation_repository.dart';
 import 'obligation_statistics.dart';
 import 'statistics_charts.dart';
 import 'statistics_summary.dart';
+import '../../core/app_theme.dart' show primaryColor;
 
 enum _StatisticsView { summary, expenses, debts }
 
@@ -31,6 +34,7 @@ class StatisticsPage extends StatefulWidget {
 class _StatisticsPageState extends State<StatisticsPage> {
   late DateTimeRange range;
   String currency = 'NIO';
+  ChartGrouping chartGrouping = ChartGrouping.months;
   _StatisticsView view = _StatisticsView.summary;
   ExchangeRate? rate;
   ObligationData? obligations;
@@ -190,6 +194,20 @@ class _StatisticsPageState extends State<StatisticsPage> {
                     'No se pudieron cargar los movimientos de tarjeta.',
                   ),
                 ),
+            ],
+            if (!loading && !failed && rate != null) ...[
+              const SizedBox(height: 24),
+              Text(
+                'Evolución de ingresos, gastos y tarjetas',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 10),
+              ChartGroupingSelector(value: chartGrouping, onChanged: (value) => setState(() => chartGrouping = value)),
+              const SizedBox(height: 12),
+              ...monthlyIncomeExpenseCharts(rate!),
+              ...monthlyCardCharts(rate!),
             ],
           ],
         ),
@@ -438,6 +456,108 @@ class _StatisticsPageState extends State<StatisticsPage> {
             ),
         ]),
       ],
+    ];
+  }
+
+  List<({String label, int cents})> _chartBuckets(
+    int Function(DateTime start, DateTime end) total,
+  ) => buildChartBuckets(range.start, range.end, chartGrouping, total);
+
+  List<Widget> monthlyIncomeExpenseCharts(ExchangeRate exchangeRate) {
+    int total(DateTime start, DateTime end, {required bool income}) {
+      var cents = 0;
+      for (final movement in movements) {
+        final day = DateUtils.dateOnly(movement.date);
+        if (day.isBefore(start) || day.isAfter(end)) continue;
+        final amount = income ? movement.income : movement.expense;
+        if (amount == 0) continue;
+        cents += exchangeRate.convert(amount, movement.currency, currency);
+      }
+      return cents;
+    }
+
+    return [
+      MonthlyBarChart(
+        title: 'Ingresos',
+        detail: 'Total de ingresos en cada intervalo seleccionado.',
+        values: _chartBuckets((start, end) => total(start, end, income: true)),
+        currency: currency,
+        color: const Color(0xFF277354),
+      ),
+      const SizedBox(height: 12),
+      MonthlyBarChart(
+        title: 'Gastos',
+        detail: 'Total de gastos en cada intervalo, descontando las devoluciones.',
+        values: _chartBuckets((start, end) => total(start, end, income: false)),
+        currency: currency,
+        color: const Color(0xFFB14838),
+      ),
+      const SizedBox(height: 12),
+    ];
+  }
+
+  List<Widget> monthlyCardCharts(ExchangeRate exchangeRate) {
+    final data = obligations;
+    if (data == null) return const [];
+
+    int consumption(DateTime start, DateTime end) {
+      var total = 0;
+      for (final movement in data.cardMovements) {
+        final date = DateTime.tryParse('${movement['transaction_date']}')
+            ?.toLocal();
+        if (date == null) continue;
+        final day = DateUtils.dateOnly(date);
+        if (day.isBefore(start) || day.isAfter(end)) continue;
+        final amount = cardSpendingCents(movement);
+        if (amount == 0) continue;
+        total += exchangeRate.convert(
+          amount,
+          '${movement['currency']}',
+          currency,
+        );
+      }
+      return total;
+    }
+
+    int outstanding(DateTime start, DateTime end) {
+      if (end.isBefore(start)) return 0;
+      var total = 0;
+      final transactions = data.cardMovements.where((movement) {
+        final date = DateTime.tryParse('${movement['transaction_date']}')
+            ?.toLocal();
+        return date != null && !DateUtils.dateOnly(date).isAfter(end);
+      }).toList();
+      for (final card in data.cards) {
+        for (final sourceCurrency in const ['NIO', 'USD']) {
+          final balance = cardBalance(card, transactions, sourceCurrency);
+          if (balance == null || balance <= 0) continue;
+          total += exchangeRate.convert(
+          balance,
+          sourceCurrency,
+          currency,
+        );
+        }
+      }
+      return total;
+    }
+
+    return [
+      MonthlyBarChart(
+        title: 'Consumo de tarjetas',
+        detail: 'Compras + intereses + cargos − devoluciones en cada intervalo.',
+        values: _chartBuckets(consumption),
+        currency: currency,
+        color: primaryColor,
+      ),
+      const SizedBox(height: 12),
+      MonthlyBarChart(
+        title: 'Deuda pendiente de tarjetas',
+        detail: 'Deuda total pendiente al cierre de cada intervalo, incluidos saldos iniciales y movimientos.',
+        values: _chartBuckets(outstanding),
+        currency: currency,
+        color: const Color(0xFF7554A3),
+      ),
+      const SizedBox(height: 12),
     ];
   }
 

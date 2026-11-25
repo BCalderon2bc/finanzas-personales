@@ -52,6 +52,37 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
   String? cardFilter, categoryFilter;
   DateTimeRange? customDates;
   bool useLatestCut = true;
+  bool restoredDateState = false;
+
+  PageStorageKey<String> get dateStateKey =>
+      PageStorageKey<String>('credit-card-date-filter/${widget.cardId ?? 'all'}');
+
+  void saveDateState() {
+    PageStorage.maybeOf(context)?.writeState(context, {
+      'useLatestCut': useLatestCut,
+      'start': customDates?.start.toIso8601String(),
+      'end': customDates?.end.toIso8601String(),
+    }, identifier: dateStateKey);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (restoredDateState) return;
+    restoredDateState = true;
+    final saved = PageStorage.maybeOf(context)?.readState(
+      context,
+      identifier: dateStateKey,
+    );
+    if (saved is Map) {
+      useLatestCut = saved['useLatestCut'] != false;
+      final start = DateTime.tryParse('${saved['start']}');
+      final end = DateTime.tryParse('${saved['end']}');
+      if (start != null && end != null) {
+        customDates = DateTimeRange(start: start, end: end);
+      }
+    }
+  }
   Map<String, DateTime> latestCuts = {};
   Map<String, int> closingDays = {};
 
@@ -1093,6 +1124,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
                 setState(() {
                   useLatestCut = false;
                   customDates = range;
+                  saveDateState();
                 });
               }
             },
@@ -1101,7 +1133,10 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
           ),
           if (!useLatestCut)
             TextButton(
-              onPressed: () => setState(() => useLatestCut = true),
+              onPressed: () => setState(() {
+                useLatestCut = true;
+                saveDateState();
+              }),
               child: const Text('Corte actual'),
             ),
           if (dateLabel != 'Todas las fechas')
@@ -1109,6 +1144,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
               onPressed: () => setState(() {
                 useLatestCut = false;
                 customDates = null;
+                saveDateState();
               }),
               child: const Text('Todas las fechas'),
             ),

@@ -1,7 +1,12 @@
+
 import '../../data/export_report_models.dart';
 import '../../data/export_report_repository.dart';
+import '../../utils/money.dart';
+import '../statistics/obligation_repository.dart' show loadObligationData;
+import '../statistics/obligation_statistics.dart' show ObligationData;
+import '../statistics/statistics_charts.dart'
+    show ChartGrouping, MonthlyBarChart, buildChartBuckets;
 import '../reports/consolidated_expenses_panel.dart';
-import '../../core/app_theme.dart' show appMuted;
 import '../../widgets/mobile_navigation.dart';
 import '../../widgets/adaptive_layout.dart';
 import '../help/app_help.dart';
@@ -44,7 +49,12 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   DashboardOverview? data;
   List<ExportMovement>? consolidatedMovements;
+  ObligationData? obligationData;
   DashboardPeriod period = DashboardPeriod.forMonth(DateTime.now());
+  ChartGrouping chartGrouping = ChartGrouping.weeks;
+  String? selectedCreditCardId;
+  bool obligationLoading = false;
+  bool obligationError = false;
   String currency = 'NIO';
   FinancialSettings? financialSettings;
   String? settingsError;
@@ -92,7 +102,7 @@ class _DashboardPageState extends State<DashboardPage> {
         loadDashboardOverview(selectedPeriod.start, until: selectedPeriod.end),
         readSettings(),
         loadIncomeExpenseData().then<List<ExportMovement>?>(
-          (value) => value.movements,
+              (value) => value.movements,
           onError: (Object _) => null,
         ),
       ]);
@@ -113,11 +123,41 @@ class _DashboardPageState extends State<DashboardPage> {
         settingsError = settingsResult.$2;
         loading = false;
       });
+      loadObligations(request, userId);
     } catch (e) {
       if (mounted && request == requestId) {
         setState(() {
           error = e.toString();
           loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> loadObligations(int request, String? userId) async {
+    if (mounted) {
+      setState(() {
+        obligationLoading = true;
+        obligationError = false;
+      });
+    }
+    try {
+      final result = await loadObligationData();
+      if (!mounted ||
+          request != requestId ||
+          supabase.auth.currentUser?.id != userId) {
+        return;
+      }
+      setState(() {
+        obligationData = result;
+        obligationLoading = false;
+        obligationError = false;
+      });
+    } catch (_) {
+      if (mounted && request == requestId) {
+        setState(() {
+          obligationLoading = false;
+          obligationError = true;
         });
       }
     }
@@ -152,13 +192,13 @@ class _DashboardPageState extends State<DashboardPage> {
     setState(() {
       period = from
           ? DashboardPeriod(
-              selected,
-              selected.isAfter(period.end) ? selected : period.end,
-            )
+        selected,
+        selected.isAfter(period.end) ? selected : period.end,
+      )
           : DashboardPeriod(
-              selected.isBefore(period.start) ? selected : period.start,
-              selected,
-            );
+        selected.isBefore(period.start) ? selected : period.start,
+        selected,
+      );
     });
     await loadData();
   }
@@ -259,10 +299,263 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  Widget creditCardEvolutionChart() {
+    final obligations = obligationData;
+    if (obligations == null) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              if (obligationLoading) ...[
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                child: Text(
+                  obligationError
+                      ? 'No se pudieron cargar los movimientos de tarjetas.'
+                      : 'Cargando movimientos de tarjetas...',
+                ),
+              ),
+              if (obligationError)
+                TextButton(
+                  onPressed: () => loadObligations(
+                    requestId,
+                    supabase.auth.currentUser?.id,
+                  ),
+                  child: const Text('Reintentar'),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final cards = [...obligations.cards]
+      ..sort((a, b) => '${a['name'] ?? ''}'.compareTo('${b['name'] ?? ''}'));
+    final validCardIds = cards.map((card) => '${card['id']}').toSet();
+    final selectedId = selectedCreditCardId != null &&
+        validCardIds.contains(selectedCreditCardId)
+        ? selectedCreditCardId!
+        : (cards.isEmpty ? null : '${cards.first['id']}');
+    final selectedCard = selectedId == null
+        ? null
+        : cards.firstWhere((card) => '${card['id']}' == selectedId);
+
+    final groupingLabel = switch (chartGrouping) {
+      ChartGrouping.days => 'día',
+      ChartGrouping.weeks => 'semana',
+      ChartGrouping.months => 'mes',
+      ChartGrouping.years => 'año',
+    };
+
+    if (cards.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Evolución por tarjeta de crédito',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const Card(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('No hay tarjetas de crédito registradas.'),
+            ),
+          ),
+        ],
+      );
+    }
+
+    final cardId = selectedId!;
+
+    // El gráfico sigue el filtro principal de moneda del Dashboard.
+    final chartCurrency = currency.toUpperCase();
+    final chartRate = financialSettings?.rate;
+    final cardReference = '${selectedCard?['card_reference'] ?? ''}';
+    final digits = cardReference.replaceAll(RegExp(r'\D'), '');
+    final ending = digits.length >= 4
+        ? digits.substring(digits.length - 4)
+        : '••••';
+
+    final institution = selectedCard?['financial_institutions'];
+    final bank = institution is Map ? '${institution['name'] ?? ''}' : '';
+
+    final movements = obligations.cardMovements
+        .where((movement) => movement['credit_card_id']?.toString() == cardId)
+        .toList();
+
+    var skippedCurrencyMovements = false;
+
+    int netForRange(DateTime start, DateTime end) {
+      var total = 0;
+
+      for (final movement in movements) {
+        // La marca de financiamiento por cobrar no elimina el consumo de la tarjeta.
+        if (movement['is_voided'] == true) continue;
+
+        final type = movement['transaction_type'];
+
+        // Este gráfico representa únicamente gastos/compras; los pagos
+        // realizados a la tarjeta no reducen el total de consumo.
+        if (!['purchase', 'interest', 'fee'].contains(type)) continue;
+
+        final rawDate = movement['transaction_date'];
+        final parsedDate = DateTime.tryParse('$rawDate');
+        if (parsedDate == null) continue;
+
+        final date = parsedDate.toLocal();
+        final day = DateUtils.dateOnly(date);
+
+        if (day.isBefore(DateUtils.dateOnly(start)) ||
+            day.isAfter(DateUtils.dateOnly(end))) {
+          continue;
+        }
+
+        final sourceCurrency =
+        '${movement['currency'] ?? chartCurrency}'.toUpperCase();
+
+        var amount = moneyCents(movement['amount']);
+
+        if (sourceCurrency != chartCurrency) {
+          if (chartRate == null) {
+            skippedCurrencyMovements = true;
+            continue;
+          }
+
+          amount = chartRate.convert(amount, sourceCurrency, chartCurrency);
+        }
+
+        total += amount;
+      }
+
+      return total;
+    }
+
+    final values = buildChartBuckets(
+      period.start,
+      period.end,
+      chartGrouping,
+      netForRange,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Evolución por tarjeta de crédito',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              flex: 3,
+              child: DropdownButtonFormField<String>(
+                value: cardId,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Tarjeta',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.credit_card_rounded),
+                  isDense: true,
+                ),
+                items: cards.map((card) {
+                  final reference = '${card['card_reference'] ?? ''}';
+                  final cardDigits = reference.replaceAll(RegExp(r'\D'), '');
+                  final lastFour = cardDigits.length >= 4
+                      ? cardDigits.substring(cardDigits.length - 4)
+                      : '••••';
+
+                  final institutionData = card['financial_institutions'];
+                  final institutionName = institutionData is Map
+                      ? '${institutionData['name'] ?? ''}'
+                      : '';
+
+                  // Mostrar únicamente el banco y la terminación.
+                  final label = [
+                    if (institutionName.isNotEmpty) institutionName,
+                    '••$lastFour',
+                  ].join(' · ');
+
+                  return DropdownMenuItem<String>(
+                    value: '${card['id']}',
+                    child: Text(
+                      label,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => selectedCreditCardId = value);
+                  }
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 2,
+              child: DropdownButtonFormField<ChartGrouping>(
+                value: chartGrouping,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Agrupar',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                items: ChartGrouping.values.map((grouping) {
+                  final label = switch (grouping) {
+                    ChartGrouping.days => 'Días',
+                    ChartGrouping.weeks => 'Semanas',
+                    ChartGrouping.months => 'Meses',
+                    ChartGrouping.years => 'Años',
+                  };
+
+                  return DropdownMenuItem(
+                    value: grouping,
+                    child: Text(
+                      label,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => chartGrouping = value);
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        MonthlyBarChart(
+          title: bank.isEmpty ? '••$ending' : '$bank · ••$ending',
+          detail: 'Gastos (compras, intereses y comisiones) · $chartCurrency · Por $groupingLabel'
+              '${skippedCurrencyMovements ? ' · Hay movimientos en otra moneda sin tasa disponible' : ''}',
+          values: values,
+          currency: chartCurrency,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final current = data;
     final rate = financialSettings?.rate;
+
     final presented = current == null || rate == null
         ? current
         : convertDashboard(current, currency, rate);
@@ -271,8 +564,10 @@ class _DashboardPageState extends State<DashboardPage> {
     final activeEmail = email == null || email.isEmpty
         ? 'Correo no disponible'
         : email;
+
     final gutter = pageGutter(context);
     final compact = compactLayout(context);
+
     return GuideScope(
       topic: 'dashboard',
       ready: !loading && error == null,
@@ -308,7 +603,10 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             ),
           ),
-          title: GuideAnchor(id: 'title', child: const Text('Mi Billete')),
+          title: GuideAnchor(
+            id: 'title',
+            child: const Text('Mi Billete'),
+          ),
           actions: [
             IconButton(
               tooltip: 'Cerrar sesión',
@@ -319,10 +617,10 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
         floatingActionButton: showBackToTop && !compact
             ? FloatingActionButton.small(
-                tooltip: 'Volver arriba',
-                onPressed: backToTop,
-                child: const Icon(Icons.keyboard_arrow_up_rounded),
-              )
+          tooltip: 'Volver arriba',
+          onPressed: backToTop,
+          child: const Icon(Icons.keyboard_arrow_up_rounded),
+        )
             : null,
         body: SafeArea(
           top: false,
@@ -355,7 +653,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           onCurrent: () {
                             final now = DateTime.now();
                             setState(
-                              () => period = DashboardPeriod.forMonth(now),
+                                  () => period = DashboardPeriod.forMonth(now),
                             );
                             loadData();
                           },
@@ -366,7 +664,9 @@ class _DashboardPageState extends State<DashboardPage> {
                       if (loading)
                         const Padding(
                           padding: EdgeInsets.all(32),
-                          child: Center(child: CircularProgressIndicator()),
+                          child: Center(
+                            child: CircularProgressIndicator(),
+                          ),
                         )
                       else if (error != null)
                         Card(
@@ -447,7 +747,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             onDebt: (debt) => pushPage(
                               DebtsPage(
                                 initialSearch:
-                                    debt['description']?.toString() ?? '',
+                                debt['description']?.toString() ?? '',
                               ),
                             ),
                           ),
@@ -458,13 +758,6 @@ class _DashboardPageState extends State<DashboardPage> {
                         DashboardFinancialHealth(
                           data: presented,
                           currency: currency,
-                          trailingChart: current == null
-                              ? null
-                              : CreditCardSpendingChart(
-                                  spending: current.cardSpending,
-                                  currency: currency,
-                                  exchangeRate: rate,
-                                ),
                         ),
                       ],
                       if (!loading &&
@@ -486,15 +779,8 @@ class _DashboardPageState extends State<DashboardPage> {
                             },
                           ),
                         ),
-                        const SizedBox(height: 14),
-                        Text(
-                          'Actualizado a las '
-                          '${current.loadedAt.hour.toString().padLeft(2, '0')}:'
-                          '${current.loadedAt.minute.toString().padLeft(2, '0')} · '
-                          '${presented.currencies[currency]!.movements} '
-                          'movimientos en el rango',
-                          style: TextStyle(color: appMuted, fontSize: 14),
-                        ),
+                        const SizedBox(height: 20),
+                        creditCardEvolutionChart(),
                       ],
                     ],
                   ),

@@ -32,6 +32,7 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
   List<Map<String, dynamic>> cards = [], transactions = [];
   bool loading = true, saving = false;
   bool showPending = false;
+  int historyRevision = 0;
   List<Map<String, dynamic>> holds = [];
   bool hasLoaded = false;
   final scrollController = ScrollController(keepScrollOffset: false);
@@ -853,8 +854,11 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
                                 selectedId: selectedCardId,
                                 onSelected: loading || saving
                                     ? null
-                                    : (id) =>
-                                          setState(() => selectedCardId = id),
+                                    : (id) => setState(() {
+                                          selectedCardId = id;
+                                          showPending = false;
+                                          historyRevision++;
+                                        }),
                               ),
                             ),
                             const SizedBox(height: 14),
@@ -986,6 +990,13 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
                                           ),
                                           card: selected,
                                           onChanged: loadData,
+                                          onProcessed: () {
+                                            if (!mounted) return;
+                                            setState(() {
+                                              showPending = false;
+                                              historyRevision++;
+                                            });
+                                          },
                                         ),
                                       ),
                                       Visibility(
@@ -993,7 +1004,7 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
                                         maintainState: true,
                                         child: CreditCardMovementsPage(
                                           key: ValueKey(
-                                            'cut-history/${selected['id']}',
+                                            'cut-history/${selected['id']}/$historyRevision',
                                           ),
                                           cardId: '${selected['id']}',
                                           embedded: true,
