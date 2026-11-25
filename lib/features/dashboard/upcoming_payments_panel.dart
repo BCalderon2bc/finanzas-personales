@@ -305,7 +305,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
           ),
           Text(
             'Fechas pasadas, hoy y próximos 7 días. Importes en la moneda del pago.',
-            style: TextStyle(color: appMuted, fontSize: 12),
+            style: TextStyle(color: appMuted, fontSize: 14),
           ),
           if (loading)
             const Padding(
@@ -315,7 +315,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
           else if (error != null) ...[
             const SizedBox(height: 12),
             const Text('No se pudo cargar la agenda.'),
-            SelectableText(error!, style: const TextStyle(fontSize: 12)),
+            SelectableText(error!, style: const TextStyle(fontSize: 14)),
             TextButton(onPressed: load, child: const Text('Reintentar')),
           ] else if (items.isEmpty)
             const Padding(
@@ -342,7 +342,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
             tilePadding: EdgeInsets.zero,
             title: const Text(
               'Qué incluye esta agenda',
-              style: TextStyle(fontSize: 13),
+              style: TextStyle(fontSize: 14),
             ),
             children: [
               Padding(
@@ -352,7 +352,7 @@ class _UpcomingPaymentsPanelState extends State<UpcomingPaymentsPanel> {
                   'solo aparece como recordatorio sin monto. Los préstamos muestran su fecha registrada de vencimiento y '
                   'el capital pendiente si no hay cuotas configuradas. Con un calendario vigente, muestra sus cuotas pendientes, sin sumarlas otra vez al capital. Los pagos cubiertos no aparecen como pendientes. '
                   'La agenda se calcula al actualizar el inicio y es independiente del mes del reporte.',
-                  style: TextStyle(color: appMuted, fontSize: 12, height: 1.5),
+                  style: TextStyle(color: appMuted, fontSize: 14, height: 1.5),
                 ),
               ),
             ],

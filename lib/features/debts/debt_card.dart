@@ -41,7 +41,7 @@ class DebtCard extends StatelessWidget {
             text,
             style: TextStyle(
               color: color,
-              fontSize: 11,
+              fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -53,7 +53,7 @@ class DebtCard extends StatelessWidget {
   Widget amountDetail(String label, int amount) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Text(label, style: TextStyle(color: appMuted, fontSize: 12)),
+      Text(label, style: TextStyle(color: appMuted, fontSize: 14)),
       const SizedBox(height: 6),
       FittedBox(
         fit: BoxFit.scaleDown,
@@ -171,7 +171,7 @@ class DebtCard extends StatelessWidget {
                             const SizedBox(height: 4),
                             Text(
                               creditor,
-                              style: TextStyle(color: muted, fontSize: 13),
+                              style: TextStyle(color: muted, fontSize: 14),
                             ),
                           ],
                         ],
@@ -204,7 +204,7 @@ class DebtCard extends StatelessWidget {
                   'CAPITAL PENDIENTE',
                   style: TextStyle(
                     color: muted,
-                    fontSize: 11,
+                    fontSize: 14,
                     letterSpacing: 1.2,
                     fontWeight: FontWeight.w600,
                   ),
@@ -226,13 +226,13 @@ class DebtCard extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   'No incluye intereses ni comisiones.',
-                  style: TextStyle(color: muted, fontSize: 11),
+                  style: TextStyle(color: muted, fontSize: 14),
                 ),
                 if (pending < 0) ...[
                   const SizedBox(height: 10),
                   const Text(
                     'Revisa los abonos: superan el capital original.',
-                    style: TextStyle(color: red, fontSize: 12),
+                    style: TextStyle(color: red, fontSize: 14),
                   ),
                 ],
                 const SizedBox(height: 20),
@@ -270,7 +270,7 @@ class DebtCard extends StatelessWidget {
                         alignment: Alignment.centerLeft,
                         child: Text(
                           '${(progress * 100).toStringAsFixed(0)}% del capital abonado',
-                          style: TextStyle(color: muted, fontSize: 11),
+                          style: TextStyle(color: muted, fontSize: 14),
                         ),
                       ),
                     ],
@@ -293,7 +293,7 @@ class DebtCard extends StatelessWidget {
                       nextInstallmentLabel!,
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
-                        fontSize: 13,
+                        fontSize: 14,
                       ),
                     ),
                   ),

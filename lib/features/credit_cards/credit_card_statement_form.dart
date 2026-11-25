@@ -96,11 +96,11 @@ class _CreditCardStatementFormState extends State<CreditCardStatementForm> {
     final text = (value ?? '').trim();
     if (text.isEmpty) return null;
     final parsed = amount(text);
-    if (!RegExp(r'^\d+([.,]\d{1,2})?$').hasMatch(text) ||
+    if (!RegExp(r'^\d+([.,]\d{1,6})?$').hasMatch(text) ||
         parsed == null ||
         !parsed.isFinite ||
         parsed > 999999999999.99) {
-      return 'Ingresa un monto no negativo con hasta dos decimales.';
+      return 'Ingresa un monto no negativo con hasta seis decimales.';
     }
     return null;
   }

@@ -16,9 +16,9 @@ class FinanzasApp extends StatelessWidget {
         theme: createAppTheme(),
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(context).copyWith(
-            textScaler: TextScaler.linear(
-              MediaQuery.textScalerOf(context).scale(1) *
-                  AppearanceController.instance.scale,
+            textScaler: ReadableTextScaler(
+              MediaQuery.textScalerOf(context),
+              AppearanceController.instance.scale,
             ),
           ),
           child: child!,
@@ -27,4 +27,20 @@ class FinanzasApp extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Apply the chosen size without forcing a minimum or an extra enlargement.
+/// Preserve the operating system's accessibility scaling.
+class ReadableTextScaler extends TextScaler {
+  const ReadableTextScaler(this.system, this.preference);
+  final TextScaler system;
+  final double preference;
+  @override
+  double scale(double fontSize) {
+    if (fontSize == 0) return 0;
+    return system.scale(fontSize) * preference;
+  }
+
+  @override
+  double get textScaleFactor => scale(14) / 14;
 }

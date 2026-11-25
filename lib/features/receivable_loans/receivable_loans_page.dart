@@ -567,7 +567,7 @@ class _ReceivableLoansPageState extends State<ReceivableLoansPage> {
                             : overdue
                             ? 'Capital vencido'
                             : 'Pendiente de cobro',
-                        style: TextStyle(color: color, fontSize: 12),
+                        style: TextStyle(color: color, fontSize: 14),
                       ),
                     ],
                   ),
@@ -591,7 +591,7 @@ class _ReceivableLoansPageState extends State<ReceivableLoansPage> {
             const SizedBox(height: 16),
             Text(
               voided ? 'Registro sin efecto en saldos' : 'Capital que te deben',
-              style: TextStyle(color: appMuted, fontSize: 12),
+              style: TextStyle(color: appMuted, fontSize: 14),
             ),
             Text(
               receivableMoney(voided ? 0 : pending, currency),
@@ -628,7 +628,7 @@ class _ReceivableLoansPageState extends State<ReceivableLoansPage> {
                   : loan['credit_card_id'] != null
                   ? 'Origen: crédito · ${creditCardName(loan['credit_card_id'])}'
                   : 'Origen: cuenta / débito · ${accountName(loan['account_id'])}',
-              style: TextStyle(color: appMuted, fontSize: 12),
+              style: TextStyle(color: appMuted, fontSize: 14),
             ),
             if ((loan['reference']?.toString() ?? '').isNotEmpty)
               SelectableText('Referencia: ${loan['reference']}'),

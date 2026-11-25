@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show MaxLengthEnforcement;
 import 'package:flutter/material.dart';
 import '../../utils/money.dart';
 import '../../data/card_statement_logic.dart';
@@ -45,7 +46,7 @@ class _CreditCardPaymentEditDialogState
     final n = double.tryParse(amount.text.trim().replaceAll(',', '.'));
     return n == null || !n.isFinite || n < 0 || n > 999999999999.99
         ? null
-        : (n * 100).round();
+        : (n * moneyScale).round();
   }
 
   int? get debitCents {
@@ -63,7 +64,9 @@ class _CreditCardPaymentEditDialogState
     super.initState();
     payment = Map<String, dynamic>.from(widget.preview['payment'] as Map);
     currency = '${payment['currency']}';
-    amount.text = (moneyCents(payment['amount']) / 100).toStringAsFixed(2);
+    amount.text = (moneyCents(payment['amount']) / moneyScale).toStringAsFixed(
+      6,
+    );
     reference.text = payment['reference']?.toString() ?? '';
     description.text = payment['description']?.toString() ?? '';
     rate.text = payment['payment_exchange_rate']?.toString() ?? '';
@@ -177,10 +180,10 @@ class _CreditCardPaymentEditDialogState
                         !n.isFinite ||
                         n <= 0 ||
                         n > 999999999999.99 ||
-                        !RegExp(r'^\d+([.,]\d{1,2})?$').hasMatch(text))
-                      return 'Monto positivo con máximo dos decimales';
+                        !RegExp(r'^\d+([.,]\d{1,6})?$').hasMatch(text))
+                      return 'Monto positivo con máximo seis decimales';
                     return currency == payment['currency'] &&
-                            (n * 100).round() < allocated
+                            (n * moneyScale).round() < allocated
                         ? 'Ya hay ${cardMoney(allocated, currency)} asignados a cuotas'
                         : null;
                   },
@@ -216,7 +219,7 @@ class _CreditCardPaymentEditDialogState
                     decoration: const InputDecoration(
                       labelText: 'Tasa: córdobas por \$1',
                       helperText:
-                          'El débito de cuenta se redondea a dos decimales.',
+                          'El débito de cuenta se redondea a seis decimales.',
                       helperMaxLines: 2,
                     ),
                     onChanged: (_) => setState(() {}),
@@ -259,6 +262,7 @@ class _CreditCardPaymentEditDialogState
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: reference,
+                  maxLengthEnforcement: MaxLengthEnforcement.enforced,
                   maxLength: 200,
                   decoration: const InputDecoration(
                     labelText: 'Referencia (opcional)',
@@ -266,6 +270,7 @@ class _CreditCardPaymentEditDialogState
                 ),
                 TextFormField(
                   controller: description,
+                  maxLengthEnforcement: MaxLengthEnforcement.enforced,
                   maxLength: 1000,
                   maxLines: 2,
                   decoration: const InputDecoration(

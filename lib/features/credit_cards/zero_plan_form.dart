@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show MaxLengthEnforcement;
 import '../person_accounts/receipt_draft_field.dart';
 import '../../widgets/adaptive_layout.dart';
 import '../help/app_help.dart';
@@ -225,6 +226,7 @@ class _ZeroFormState extends State<ZeroForm> {
     return TextFormField(
       controller: controllers[f.key],
       readOnly: f.readOnly,
+      maxLengthEnforcement: MaxLengthEnforcement.enforced,
       maxLength: f.type == 'money'
           ? null
           : f.key == 'description'
@@ -267,14 +269,14 @@ class _ZeroFormState extends State<ZeroForm> {
         if (f.type == 'money') {
           final n = num.tryParse(s.replaceAll(',', '.'));
           final pattern = f.signed
-              ? r'^-?\d+([.,]\d{1,2})?$'
-              : r'^\d+([.,]\d{1,2})?$';
+              ? r'^-?\d+([.,]\d{1,6})?$'
+              : r'^\d+([.,]\d{1,6})?$';
           if (!RegExp(pattern).hasMatch(s) ||
               n == null ||
               !n.isFinite ||
               n.abs() > 1000000000 ||
               (!f.signed && (n < 0 || (!f.zero && n == 0))))
-            return 'Monto inválido. Usa máximo dos decimales.';
+            return 'Monto inválido. Usa máximo seis decimales.';
         }
         return null;
       },

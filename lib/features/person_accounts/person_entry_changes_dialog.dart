@@ -127,8 +127,11 @@ class _PersonEntryChangesDialogState extends State<PersonEntryChangesDialog> {
       add('Movimiento', movementLabel(before), movementLabel(after));
       add(
         'Monto',
-        formatMoneyCents(moneyCents(before['amount']), '${before['currency']}'),
-        formatMoneyCents(moneyCents(after['amount']), currency),
+        formatRecordMoneyCents(
+          moneyCents(before['amount']),
+          '${before['currency']}',
+        ),
+        formatRecordMoneyCents(moneyCents(after['amount']), currency),
       );
       if (before['exchange_rate'] != after['exchange_rate']) {
         add(
@@ -176,7 +179,7 @@ class _PersonEntryChangesDialogState extends State<PersonEntryChangesDialog> {
             ),
             const SizedBox(height: 8),
             Text(
-              '${movementLabel(after)} · ${formatMoneyCents(moneyCents(after['amount']), currency)}',
+              '${movementLabel(after)} · ${formatRecordMoneyCents(moneyCents(after['amount']), currency)}',
             ),
             if (widget.entryId == null || before == null) ...[
               Text(

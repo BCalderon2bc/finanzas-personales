@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show MaxLengthEnforcement;
 import 'package:flutter/material.dart';
 
 class PersonAccountFormDialog extends StatefulWidget {
@@ -47,6 +48,7 @@ class _PersonAccountFormDialogState extends State<PersonAccountFormDialog> {
               TextFormField(
                 controller: name,
                 autofocus: true,
+                maxLengthEnforcement: MaxLengthEnforcement.enforced,
                 maxLength: 100,
                 textCapitalization: TextCapitalization.words,
                 decoration: const InputDecoration(
@@ -58,6 +60,7 @@ class _PersonAccountFormDialogState extends State<PersonAccountFormDialog> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: notes,
+                maxLengthEnforcement: MaxLengthEnforcement.enforced,
                 maxLength: 2000,
                 maxLines: 3,
                 decoration: const InputDecoration(

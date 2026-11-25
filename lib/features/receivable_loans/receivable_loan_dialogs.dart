@@ -1,3 +1,4 @@
+import '../../utils/money.dart';
 import '../../core/app_theme.dart' show appMuted;
 import '../person_accounts/receipt_draft_field.dart';
 import 'package:flutter/material.dart';
@@ -13,9 +14,9 @@ String? receivableAmountValidator(String? value) {
   if (amount == null || !amount.isFinite || amount < 0) {
     return 'Introduce un monto válido';
   }
-  return RegExp(r'^\d+([.,]\d{1,2})?$').hasMatch(text)
+  return RegExp(r'^\d+([.,]\d{1,6})?$').hasMatch(text)
       ? null
-      : 'Usa máximo dos decimales, sin separadores de miles';
+      : 'Usa máximo seis decimales, sin separadores de miles';
 }
 
 double receivableNumber(TextEditingController controller) =>
@@ -205,7 +206,7 @@ class _ReceivableLoanFormDialogState extends State<ReceivableLoanFormDialog> {
                       padding: EdgeInsets.only(top: 8),
                       child: Text(
                         'No registres otra compra manual por este mismo préstamo. El cargo se crea al guardar.',
-                        style: TextStyle(color: appMuted, fontSize: 12),
+                        style: TextStyle(color: appMuted, fontSize: 14),
                       ),
                     ),
                 ],
@@ -321,7 +322,7 @@ class _ReceivableLoanPaymentDialogState
     }
     final principal = receivableNumber(capital),
         fees = receivableNumber(interest);
-    if ((principal * 100).round() > widget.pendingCents) {
+    if ((principal * moneyScale).round() > widget.pendingCents) {
       setState(() => error = 'El capital cobrado supera lo pendiente.');
       return;
     }
@@ -380,8 +381,8 @@ class _ReceivableLoanPaymentDialogState
                 ),
                 TextButton(
                   onPressed: () => setState(
-                    () => capital.text = (widget.pendingCents / 100)
-                        .toStringAsFixed(2),
+                    () => capital.text = (widget.pendingCents / moneyScale)
+                        .toStringAsFixed(6),
                   ),
                   child: const Text('Cobrar todo el capital pendiente'),
                 ),

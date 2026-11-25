@@ -178,7 +178,7 @@ class _Metric extends StatelessWidget {
                   title,
                   style: TextStyle(
                     color: hero ? Colors.white.withAlpha(225) : _muted,
-                    fontSize: 13,
+                    fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -309,7 +309,7 @@ class DashboardPanels extends StatelessWidget {
     padding: const EdgeInsets.symmetric(vertical: 7),
     child: LayoutBuilder(
       builder: (context, box) {
-        final caption = Text(label, style: const TextStyle(fontSize: 13));
+        final caption = Text(label, style: const TextStyle(fontSize: 14));
         final value = Text(
           money(amount),
           style: TextStyle(
@@ -424,7 +424,7 @@ class DashboardPanels extends StatelessWidget {
                                   : '${(ratio * 100).toStringAsFixed(1)}%',
                               style: TextStyle(
                                 color: entry.value < 0 ? _green : _muted,
-                                fontSize: 11,
+                                fontSize: 14,
                               ),
                             ),
                           ],
@@ -449,14 +449,14 @@ class DashboardPanels extends StatelessWidget {
           if (entries.isNotEmpty)
             Text(
               'Porcentajes entre categorías con gasto neto positivo.',
-              style: TextStyle(color: _muted, fontSize: 11),
+              style: TextStyle(color: _muted, fontSize: 14),
             ),
           if (entries.length > 5)
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Text(
                 '${entries.length - 5} categorías más en el reporte.',
-                style: TextStyle(color: _muted, fontSize: 11),
+                style: TextStyle(color: _muted, fontSize: 14),
               ),
             ),
           if (entries.any((entry) => entry.value < 0))
@@ -464,7 +464,7 @@ class DashboardPanels extends StatelessWidget {
               padding: EdgeInsets.only(top: 6),
               child: Text(
                 'Hay categorías con devoluciones netas.',
-                style: TextStyle(color: _green, fontSize: 11),
+                style: TextStyle(color: _green, fontSize: 14),
               ),
             ),
         ],
@@ -493,7 +493,7 @@ class DashboardPanels extends StatelessWidget {
             padding: EdgeInsets.only(bottom: 12),
             child: Text(
               'Límites mensuales completos, sin prorratear. El gasto incluye solo las fechas seleccionadas.',
-              style: TextStyle(fontSize: 12, color: _muted),
+              style: TextStyle(fontSize: 14, color: _muted),
             ),
           ),
           if (budgets.isEmpty)
@@ -602,7 +602,7 @@ class DashboardPanels extends StatelessWidget {
                     const SizedBox(height: 8),
                     Text(
                       '${money(spent)} de ${money(limit)}',
-                      style: TextStyle(color: _muted, fontSize: 12),
+                      style: TextStyle(color: _muted, fontSize: 14),
                     ),
                     const SizedBox(height: 12),
                     ClipRRect(
@@ -632,7 +632,7 @@ class DashboardPanels extends StatelessWidget {
                             status,
                             style: TextStyle(
                               color: color,
-                              fontSize: 11,
+                              fontSize: 14,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -643,7 +643,7 @@ class DashboardPanels extends StatelessWidget {
                             exceeded
                                 ? 'Exceso: ${money(spent - limit)}'
                                 : 'Disponible: ${money(limit - spent)}',
-                            style: TextStyle(fontSize: 11, color: color),
+                            style: TextStyle(fontSize: 14, color: color),
                           ),
                         ),
                       ],
@@ -656,7 +656,7 @@ class DashboardPanels extends StatelessWidget {
           if (budgets.length > 4)
             Text(
               '${budgets.length - 4} presupuestos más en Administrar.',
-              style: TextStyle(color: _muted, fontSize: 12),
+              style: TextStyle(color: _muted, fontSize: 14),
             ),
         ],
       ),
@@ -703,14 +703,14 @@ class DashboardPanels extends StatelessWidget {
         if (!c.cardKnown)
           const Text(
             'Hay ajustes de tarjeta que requieren revisión.',
-            style: TextStyle(color: _red, fontSize: 12),
+            style: TextStyle(color: _red, fontSize: 14),
           ),
         const Divider(height: 24),
         amountRow('Saldo menos deuda registrada', c.position, bold: true),
         Text(
           'Considera cuentas activas y saldos a favor de tarjetas. '
           'No incluye bienes ni intereses futuros.',
-          style: TextStyle(color: _muted, fontSize: 12),
+          style: TextStyle(color: _muted, fontSize: 14),
         ),
         if (c.overdueCount > 0 || c.todayCount > 0) ...[
           const SizedBox(height: 14),
@@ -801,7 +801,7 @@ class DashboardPanels extends StatelessWidget {
                         ),
                         Text(
                           types[a['account_type']] ?? 'Cuenta',
-                          style: TextStyle(color: _muted, fontSize: 12),
+                          style: TextStyle(color: _muted, fontSize: 14),
                         ),
                       ],
                     ),
@@ -931,7 +931,7 @@ class DashboardPanels extends StatelessWidget {
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
                                           color: _muted,
-                                          fontSize: 12,
+                                          fontSize: 14,
                                         ),
                                       ),
                                       if (style != null)
@@ -943,7 +943,7 @@ class DashboardPanels extends StatelessWidget {
                                             style['name'].toString(),
                                             style: TextStyle(
                                               color: visualColor,
-                                              fontSize: 11,
+                                              fontSize: 14,
                                               fontWeight: FontWeight.w600,
                                             ),
                                           ),

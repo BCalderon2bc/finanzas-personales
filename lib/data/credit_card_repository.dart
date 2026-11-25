@@ -24,7 +24,9 @@ Future<List<Map<String, dynamic>>> loadUserCardExpenses(String userId) async {
       expenses.add({
         'id': tx['id'],
         'transaction_type': 'expense',
-        'amount': (tx['transaction_type'] == 'refund' ? -amount : amount) / 100,
+        'amount':
+            (tx['transaction_type'] == 'refund' ? -amount : amount) /
+            moneyScale,
         'currency': tx['currency'],
         'transaction_date': tx['transaction_date'],
         'created_at': tx['created_at'],

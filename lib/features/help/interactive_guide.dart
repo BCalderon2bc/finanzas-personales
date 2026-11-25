@@ -500,7 +500,7 @@ class _GuideOverlayState extends State<_GuideOverlay>
                                       child: Text(
                                         'Este control aparece cuando hay datos o al elegir esa opción. Puedes continuar.',
                                         style: TextStyle(
-                                          fontSize: 12,
+                                          fontSize: 14,
                                           color: appMuted,
                                         ),
                                       ),

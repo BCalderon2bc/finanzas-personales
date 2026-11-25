@@ -1,3 +1,4 @@
+import '../notes/notes_page.dart';
 import '../../core/app_theme.dart';
 import '../statistics/statistics_page.dart';
 import '../recurring_expenses/recurring_expenses_page.dart';
@@ -182,6 +183,19 @@ class DashboardNavigation extends StatelessWidget {
                       ),
                     ]),
                     group('Planificación', Icons.event_repeat_outlined, [
+                      ListTile(
+                        leading: const Icon(Icons.note_alt_outlined),
+                        title: const Text('Notas'),
+                        onTap: () {
+                          final nav = Navigator.of(context);
+                          nav.pop();
+                          nav.push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const NotesPage(),
+                            ),
+                          );
+                        },
+                      ),
                       ListTile(
                         leading: const Icon(Icons.event_repeat_outlined),
                         title: const Text('Gastos fijos y suscripciones'),

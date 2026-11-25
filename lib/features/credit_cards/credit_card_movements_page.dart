@@ -512,80 +512,89 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
       final user = supabase.auth.currentUser;
       if (user == null) throw Exception('Debes iniciar sesión nuevamente.');
       final cardId = widget.cardId;
-      final cards = cardId == null
-          ? await statementRows(
-              'credit_cards',
-              'id, name, card_reference, closing_day, financial_institutions(name)',
-              user.id,
-            )
-          : [
-              await supabase
-                  .from('credit_cards')
-                  .select('id,name,closing_day')
-                  .eq('id', cardId)
-                  .eq('user_id', user.id)
-                  .single(),
-            ];
-      final cuts = await statementRows(
-        'credit_card_statements',
-        'id,credit_card_id,closing_date,is_voided',
-        user.id,
-      );
+      Future<List<Map<String, dynamic>>> selectedCards() async {
+        if (cardId == null)
+          return statementRows(
+            'credit_cards',
+            'id,name,card_reference,closing_day,financial_institutions(name)',
+            user.id,
+          );
+        final row = await supabase
+            .from('credit_cards')
+            .select('id,name,closing_day')
+            .eq('id', cardId)
+            .eq('user_id', user.id)
+            .single();
+        return [row];
+      }
+
+      Future<List<Map<String, dynamic>>> transactionRows() async {
+        final rows = <Map<String, dynamic>>[];
+        for (var offset = 0; ; offset += 500) {
+          var query = supabase
+              .from('credit_card_transactions')
+              .select(
+                'id,credit_card_id,additional_card_id,transaction_type,charge_kind,amount,currency,transaction_date,created_at,'
+                'description,reference,account_id,account_debit_amount,account_debit_currency,payment_exchange_rate,'
+                'category_id,is_voided,is_receivable_funding,void_reason,voided_at,'
+                'cash_advance_fee,cash_advance_account_id,excludes_from_limit,'
+                'accounts!credit_card_transactions_account_id_user_id_fkey(name),categories(name)',
+              )
+              .eq('user_id', user.id);
+          if (cardId != null) query = query.eq('credit_card_id', cardId);
+          final page = List<Map<String, dynamic>>.from(
+            await query
+                .order(
+                  allCards ? 'transaction_date' : 'created_at',
+                  ascending: false,
+                )
+                .order('id', ascending: false)
+                .range(offset, offset + 499),
+          );
+          rows.addAll(page);
+          if (page.length < 500) break;
+        }
+        return rows;
+      }
+
+      final results = await Future.wait([
+        selectedCards(),
+        statementRows(
+          'credit_card_statements',
+          'id,credit_card_id,closing_date,is_voided',
+          user.id,
+          cardId: cardId,
+        ),
+        cardId == null
+            ? statementRows(
+                'credit_card_additionals',
+                'id,credit_card_id,holder_name,last_four,is_active',
+                user.id,
+              )
+            : loadAdditionalCards(cardId, user.id),
+        transactionRows(),
+        loadZeroInstallmentCharges(user.id, cardId: cardId),
+      ]);
+      final cards = results[0],
+          cuts = results[1],
+          additions = results[2],
+          rows = results[3];
       final today = dayOnly(DateTime.now());
       final lastCutByCard = <String, DateTime>{};
       for (final cut in cuts) {
         if (cut['is_voided'] == true) continue;
         final date = statementDate(cut['closing_date']);
         if (date == null || date.isAfter(today)) continue;
-        final id = cut['credit_card_id'].toString();
-        final previous = lastCutByCard[id];
-        if (previous == null || date.isAfter(previous))
+        final id = '${cut['credit_card_id']}';
+        if (lastCutByCard[id] == null || date.isAfter(lastCutByCard[id]!))
           lastCutByCard[id] = date;
       }
-      final additions = cardId == null
-          ? await statementRows(
-              'credit_card_additionals',
-              'id, credit_card_id, holder_name, last_four, is_active',
-              user.id,
-            )
-          : await loadAdditionalCards(cardId, user.id);
       final labels = {
         if (allCards)
           for (final card in cards)
-            card['id'].toString(): agendaCardLabel(card, includeName: false),
+            '${card['id']}': agendaCardLabel(card, includeName: false),
       };
-      final rows = <Map<String, dynamic>>[];
-      for (var offset = 0; ; offset += 500) {
-        final query = supabase
-            .from('credit_card_transactions')
-            .select(
-              'id, credit_card_id, additional_card_id, transaction_type, charge_kind, amount, currency, transaction_date, created_at, '
-              'description, reference, account_id, account_debit_amount, account_debit_currency, payment_exchange_rate, '
-              'category_id, is_voided, is_receivable_funding, void_reason, voided_at, '
-              'cash_advance_fee, cash_advance_account_id, excludes_from_limit, '
-              'accounts!credit_card_transactions_account_id_user_id_fkey(name), categories(name)',
-            )
-            .eq('user_id', user.id);
-        final result =
-            await (cardId == null ? query : query.eq('credit_card_id', cardId))
-                .order(
-                  allCards ? 'transaction_date' : 'created_at',
-                  ascending: false,
-                )
-                .order('id', ascending: false)
-                .range(offset, offset + 499);
-        final page = List<Map<String, dynamic>>.from(result);
-        rows.addAll(page);
-        if (page.length < 500) break;
-      }
-      final charges = await loadZeroInstallmentCharges(user.id);
-      rows.addAll(
-        charges
-            .where(
-              (c) => cardId == null || c['credit_card_id'].toString() == cardId,
-            )
-            .map(zeroInstallmentHistoryRow),
-      );
+      rows.addAll(results[4].map(zeroInstallmentHistoryRow));
       if (!mounted || request != requestId) return;
       if (supabase.auth.currentUser?.id != user.id) {
         throw StateError('La sesión cambió. Actualiza la pantalla.');
@@ -715,7 +724,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
           'p_date': values['date'],
           'p_description': '${values['description']}'.trim(),
           'p_reference': values['reference'] ?? '',
-          'p_amount': moneyCents(values['amount']) / 100,
+          'p_amount': moneyCents(values['amount']) / moneyScale,
         },
       );
       if (!mounted) return;
@@ -750,7 +759,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
         ? 'Fecha no disponible'
         : '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
     final txCurrency = tx['currency'].toString();
-    final amount = cardMoney(moneyCents(tx['amount']), txCurrency);
+    final amount = formatRecordMoneyCents(moneyCents(tx['amount']), txCurrency);
     final description = tx['description']?.toString().trim() ?? '';
     final reference = tx['reference']?.toString().trim() ?? '';
     final account = relatedName(tx['accounts']);
@@ -823,7 +832,7 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
               Text('Cuenta: ${account.isEmpty ? 'No disponible' : account}'),
             if (type == 'payment' && tx['account_debit_amount'] != null)
               Text(
-                'Débito de cuenta: ${cardMoney(moneyCents(tx['account_debit_amount']), '${tx['account_debit_currency']}')}',
+                'Débito de cuenta: ${formatRecordMoneyCents(moneyCents(tx['account_debit_amount']), '${tx['account_debit_currency']}')}',
               ),
             if (type == 'payment' && tx['payment_exchange_rate'] != null)
               Text('Tasa: C\$ ${tx['payment_exchange_rate']} por \$1'),
@@ -1003,7 +1012,10 @@ class _CreditCardMovementsPageState extends State<CreditCardMovementsPage> {
     final theme = Theme.of(context);
     final date = DateTime.tryParse('${tx['transaction_date']}')?.toLocal();
     final dateText = date == null ? '' : movementDateLabel(date);
-    final amount = cardMoney(moneyCents(tx['amount']), '${tx['currency']}');
+    final amount = formatRecordMoneyCents(
+      moneyCents(tx['amount']),
+      '${tx['currency']}',
+    );
     final description = tx['description']?.toString().trim() ?? '';
     return ExpansionTile(
       key: PageStorageKey('cut-movement/${tx['id']}'),

@@ -71,6 +71,29 @@ Future<Map<String, int>> loadReceiptCounts(
       counts[row['folder'] as String] = (row['total'] as num).toInt();
     }
   }
+  if (bucket == 'movement-receipts') {
+    final ids = paths
+        .where((p) => p.startsWith('credit_card_transactions/'))
+        .map((p) => p.split('/').last)
+        .where((id) => RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(id))
+        .toList();
+    for (var start = 0; start < ids.length; start += 100) {
+      checkPersonSession(uid);
+      final rows =
+          await supabase.rpc(
+                'hold_receipt_counts',
+                params: {
+                  'p_transaction_ids': ids.skip(start).take(100).toList(),
+                },
+              )
+              as List;
+      checkPersonSession(uid);
+      for (final row in rows) {
+        final key = 'credit_card_transactions/${row['transaction_id']}';
+        counts[key] = (counts[key] ?? 0) + (row['total'] as num).toInt();
+      }
+    }
+  }
   return counts;
 }
 

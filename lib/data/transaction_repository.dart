@@ -1,3 +1,4 @@
+import '../utils/money.dart';
 import '../utils/card_cash_advance.dart';
 import '../core/supabase_client.dart';
 import '../utils/entry_order.dart';
@@ -63,7 +64,7 @@ Future<List<Map<String, dynamic>>> loadUserTransactions(String userId) async {
       rows.add({
         ...row,
         'account_id': row['cash_advance_account_id'],
-        'amount': cardCashAdvancePrincipal(row) / 100,
+        'amount': cardCashAdvancePrincipal(row) / moneyScale,
         'transaction_type': 'deposit',
         'description': row['description'] == null
             ? 'Efectivo recibido de tarjeta'

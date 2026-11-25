@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show MaxLengthEnforcement;
 import '../../data/payment_agenda_labels.dart' show additionalCardLabel;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -249,6 +250,7 @@ class _AdditionalCardFormState extends State<_AdditionalCardForm> {
             children: [
               TextFormField(
                 controller: holder,
+                maxLengthEnforcement: MaxLengthEnforcement.enforced,
                 maxLength: 100,
                 decoration: const InputDecoration(
                   labelText: 'Nombre en la tarjeta',
@@ -259,6 +261,7 @@ class _AdditionalCardFormState extends State<_AdditionalCardForm> {
               TextFormField(
                 controller: digits,
                 keyboardType: TextInputType.number,
+                maxLengthEnforcement: MaxLengthEnforcement.enforced,
                 maxLength: 4,
                 decoration: const InputDecoration(
                   labelText: 'Últimos 4 dígitos',
@@ -314,10 +317,10 @@ class _AdditionalCardFormState extends State<_AdditionalCardForm> {
                   if (amount == null ||
                       !amount.isFinite ||
                       amount <= 0 ||
-                      !RegExp(r'^[0-9]+(\.[0-9]{1,2})?$').hasMatch(text)) {
-                    return 'Ingresa un monto positivo con hasta dos decimales.';
+                      !RegExp(r'^[0-9]+(\.[0-9]{1,6})?$').hasMatch(text)) {
+                    return 'Ingresa un monto positivo con hasta seis decimales.';
                   }
-                  return amount > widget.maxLimit / 100
+                  return amount > widget.maxLimit / moneyScale
                       ? 'El límite supera el de la tarjeta titular.'
                       : null;
                 },
@@ -325,6 +328,7 @@ class _AdditionalCardFormState extends State<_AdditionalCardForm> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: merchants,
+                maxLengthEnforcement: MaxLengthEnforcement.enforced,
                 maxLength: 500,
                 minLines: 1,
                 maxLines: 3,

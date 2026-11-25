@@ -135,7 +135,7 @@ class AccountCard extends StatelessWidget {
                 ),
                 child: Text(
                   active ? 'Activa' : 'Inactiva',
-                  style: const TextStyle(color: Colors.white, fontSize: 11),
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
                 ),
               ),
             ],
@@ -154,13 +154,13 @@ class AccountCard extends StatelessWidget {
           Text(
             accountSubtitle,
             textAlign: textAlign,
-            style: TextStyle(color: Colors.white.withAlpha(205), fontSize: 13),
+            style: TextStyle(color: Colors.white.withAlpha(205), fontSize: 14),
           ),
           SizedBox(height: compact ? 9 : 14),
           Text(
             balanceLabel,
             textAlign: textAlign,
-            style: TextStyle(color: Colors.white.withAlpha(205), fontSize: 13),
+            style: TextStyle(color: Colors.white.withAlpha(205), fontSize: 14),
           ),
           const SizedBox(height: 5),
           FittedBox(
@@ -197,7 +197,7 @@ class AccountCard extends StatelessWidget {
                       'DÉBITO',
                       style: TextStyle(
                         color: Colors.white.withAlpha(190),
-                        fontSize: 10,
+                        fontSize: 14,
                         letterSpacing: 2,
                       ),
                     ),
@@ -242,7 +242,7 @@ class AccountCard extends StatelessWidget {
               'Referencia: $reference',
               style: TextStyle(
                 color: Colors.white.withAlpha(210),
-                fontSize: 13,
+                fontSize: 14,
               ),
             ),
           ],
@@ -252,7 +252,7 @@ class AccountCard extends StatelessWidget {
               notes,
               style: TextStyle(
                 color: Colors.white.withAlpha(190),
-                fontSize: 13,
+                fontSize: 14,
               ),
             ),
           ],

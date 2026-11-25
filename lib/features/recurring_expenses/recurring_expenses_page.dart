@@ -1,3 +1,4 @@
+import '../../data/recurring_share_logic.dart';
 import '../../core/status_colors.dart';
 import '../../widgets/collapsible_filters.dart';
 import '../help/app_help.dart';
@@ -201,8 +202,16 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
       expense == null ? 'Nuevo gasto mensual' : 'Editar gasto mensual',
       [
         const ZeroField('name', 'Nombre del gasto'),
-        if (!variable)
-          const ZeroField('amount', 'Monto mensual previsto', type: 'money'),
+        if (!variable) ...[
+          const ZeroField('amount', 'Monto total mensual', type: 'money'),
+          const ZeroField(
+            'discount_amount',
+            'Descuento (opcional)',
+            type: 'money',
+            zero: true,
+            required: false,
+          ),
+        ],
         const ZeroField(
           'currency',
           'Moneda',
@@ -240,15 +249,29 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
         'is_active': true,
         ...?expense,
         'due_day': '${expense?['due_day'] ?? 1}',
+        'amount': expense != null && (expense['split_count'] as num? ?? 1) > 1
+            ? (moneyCents(expense['amount']) +
+                      moneyCents(expense['discount_amount'] ?? 0)) /
+                  moneyScale
+            : expense?['gross_amount'] ?? expense?['amount'] ?? '',
+        'discount_amount': expense?['discount_amount'] ?? 0,
       },
       info: variable
           ? 'Es un control informativo. Después podrás editar el acumulado del mes en la tarjeta.'
-          : 'El importe es una previsión mensual. Marca el servicio en la lista cuando lo hayas pagado y registra el gasto real en Movimientos.',
+          : 'Monto mensual previsto = monto total − descuento. Es una previsión; registra tu gasto real en Movimientos. El ajuste del mes se aplica después.',
     );
     if (values == null || !mounted) return;
     checkPersonSession(uid);
+    final total = variable ? 0 : moneyCents(values['amount']);
+    final discount = variable ? 0 : moneyCents(values['discount_amount'] ?? 0);
+    const people = 1;
+    final own = variable ? 0 : recurringOwnShare(total, discount, people);
     final data = {
       ...values,
+      'gross_amount': variable ? null : total / moneyScale,
+      'discount_amount': discount / moneyScale,
+      'split_count': people,
+      if (!variable) 'amount': own / moneyScale,
       'tracking_type': type,
       'due_day': variable ? null : int.parse('${values['due_day']}'),
       if (variable) ...{'amount': null, 'category_id': null, 'ends_on': null},
@@ -338,7 +361,7 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
           }
         },
         itemBuilder: (_) => [
-          if (!isVariable(expense) && recurringInMonth(expense, month))
+          if (recurringInMonth(expense, month))
             PopupMenuItem(
               value: _ExpenseAction.adjustment,
               child: Text(
@@ -372,24 +395,29 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
         [
           ZeroField(
             'amount',
-            'Gastado en el mes ($currency)',
+            'Acumulado base del mes ($currency)',
             type: 'money',
             zero: true,
           ),
         ],
-        initial: {'amount': ((saved?.cents ?? 0) / 100).toStringAsFixed(2)},
+        initial: {
+          'amount': (((saved?.cents ?? 0) - extraCents(expense)) / moneyScale)
+              .toStringAsFixed(6),
+        },
         info:
-            'Escribe el total que llevas gastado. Este importe reemplaza al anterior del mes.',
+            'Escribe el acumulado base. Reemplaza al anterior; el ajuste del mes se aplica por separado al total mostrado.',
       );
       if (values == null || !mounted) return;
       checkPersonSession(uid);
-      final cents = moneyCents(values['amount']);
+      final cents = moneyCents(values['amount']) + extraCents(expense);
+      if (cents < 0)
+        throw StateError('El ajuste deja el total por debajo de cero.');
       await supabase.rpc(
         'set_recurring_variable_total',
         params: {
           'p_expense': id,
           'p_period': period,
-          'p_amount': cents / 100,
+          'p_amount': cents / moneyScale,
           'p_currency': currency,
         },
       );
@@ -434,6 +462,10 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
             ),
             const Text('Gastado este mes'),
             Text(amount, style: theme.textTheme.titleLarge),
+            if (extraCents(expense) != 0)
+              Text(
+                'Ajuste del mes: ${formatMoneyCents(extraCents(expense), total?.currency ?? '${expense['currency']}')}',
+              ),
             if (notes.isNotEmpty) Text(notes),
             if (inMonth)
               TextButton.icon(
@@ -489,8 +521,9 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
         ZeroField('reason', 'Motivo (opcional)', required: false),
       ],
       initial: {
-        'amount': ((extra == null ? 0 : moneyCents(extra['amount'])) / 100)
-            .toStringAsFixed(2),
+        'amount':
+            ((extra == null ? 0 : moneyCents(extra['amount'])) / moneyScale)
+                .toStringAsFixed(6),
         'reason': extra?['reason'] ?? '',
       },
       info:
@@ -498,18 +531,27 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
     );
     if (values == null || !mounted) return;
     checkPersonSession(uid);
-    if (moneyCents(expense['amount']) + moneyCents(values['amount']) < 0) {
+    final baseAmount = isVariable(expense)
+        ? (monthlyTotals[('${expense['id']}', period)]?.cents ?? 0) -
+              extraCents(expense)
+        : moneyCents(expense['amount']);
+    if (baseAmount + moneyCents(values['amount']) < 0) {
       throw StateError(
         'El ajuste no puede dejar el total del mes por debajo de cero.',
       );
     }
     await supabase.rpc(
-      'set_recurring_fixed_extra',
+      isVariable(expense)
+          ? 'set_recurring_variable_extra'
+          : 'set_recurring_fixed_extra',
       params: {
         'p_expense': expense['id'],
         'p_period': period,
-        'p_amount': moneyCents(values['amount']) / 100,
-        'p_currency': expense['currency'],
+        'p_amount': moneyCents(values['amount']) / moneyScale,
+        'p_currency': isVariable(expense)
+            ? (monthlyTotals[('${expense['id']}', period)]?.currency ??
+                  expense['currency'])
+            : expense['currency'],
         'p_reason': values['reason'] ?? '',
       },
     );
@@ -531,83 +573,142 @@ class _RecurringExpensesPageState extends State<RecurringExpensesPage> {
       '${expense['currency']}',
     );
     final notes = '${expense['notes'] ?? ''}'.trim();
+    final currency = '${expense['currency']}';
+    final discount = moneyCents(expense['discount_amount'] ?? 0);
+    final hasDiscount =
+        discount > 0 || (expense['split_count'] as num? ?? 1) > 1;
+    final reason = '${extraRow?['reason'] ?? ''}'.trim();
     return Card(
       margin: EdgeInsets.zero,
-      color: inMonth ? stateColor.withValues(alpha: .07) : null,
+      color: theme.colorScheme.surface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: stateColor.withValues(alpha: .3)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
       ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Semantics(
-              label: '${checked ? 'Desmarcar' : 'Marcar'} ${expense['name']} como pagado',
-              child: Checkbox(
-                value: checked,
-                onChanged: inMonth && !saving
-                    ? (value) => setChecked(expense, value == true)
-                    : null,
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${expense['name']}',
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(amount, style: theme.textTheme.titleMedium),
-                          if (extra != 0) ...[
-                            Text(
-                              'Base · ${formatMoneyCents(moneyCents(expense['amount']), '${expense['currency']}')}',
-                            ),
-                            Text(
-                              'Ajuste · ${formatMoneyCents(extra, '${expense['currency']}')}',
-                            ),
-                            if ('${extraRow?['reason'] ?? ''}'
-                                .trim()
-                                .isNotEmpty)
-                              Text('${extraRow!['reason']}'),
-                          ],
-                          if (inMonth)
-                            Text(
-                              'Vence el día ${recurringDue(expense, month).day}',
-                              style: TextStyle(
-                                color: stateColor,
-                                fontWeight: FontWeight.w600,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 8, 4, 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Semantics(
+                  label:
+                      '${checked ? 'Desmarcar' : 'Marcar'} ${expense['name']} como pagado',
+                  child: Checkbox(
+                    value: checked,
+                    onChanged: inMonth && !saving
+                        ? (value) => setChecked(expense, value == true)
+                        : null,
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight:
+                                MediaQuery.textScalerOf(context).scale(
+                                  theme.textTheme.bodyMedium?.fontSize ?? 16,
+                                ) *
+                                (theme.textTheme.bodyMedium?.height ?? 1.4) *
+                                2,
+                          ),
+                          child: Tooltip(
+                            message: '${expense['name']}',
+                            child: Text(
+                              '${expense['name']}',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
-                          if (!inMonth)
-                            Text(
-                              expense['is_active'] == true
-                                  ? 'Fuera del mes'
-                                  : 'Pausado',
-                            ),
-                          if (notes.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Text(notes),
-                          ],
-                        ],
-                      ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          amount,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          inMonth
+                              ? '${checked ? 'Pagado · vence' : 'Vence'} el día ${recurringDue(expense, month).day}'
+                              : expense['is_active'] == true
+                              ? 'Fuera del mes'
+                              : 'Pausado',
+                          style: TextStyle(
+                            color: stateColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
+                expenseMenu(expense),
+              ],
             ),
-            expenseMenu(expense),
-          ],
-        ),
+          ),
+          ExpansionTile(
+            key: PageStorageKey('recurring-details-${expense['id']}'),
+            tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            title: const Text('Ver desglose'),
+            shape: const Border(),
+            collapsedShape: const Border(),
+            children: [
+              if (hasDiscount) ...[
+                summaryLine(
+                  'Monto total',
+                  (expense['split_count'] as num? ?? 1) > 1
+                      ? moneyCents(expense['amount']) + discount
+                      : moneyCents(
+                          expense['gross_amount'] ?? expense['amount'],
+                        ),
+                  currency,
+                ),
+                if (discount > 0) summaryLine('Descuento', -discount, currency),
+              ],
+              summaryLine(
+                'Previsto mensual',
+                moneyCents(expense['amount']),
+                currency,
+              ),
+              if (extra != 0) summaryLine('Ajuste del mes', extra, currency),
+              if (reason.isNotEmpty)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 4, bottom: 8),
+                    child: Text(reason),
+                  ),
+                ),
+              const Divider(),
+              summaryLine(
+                'Total del mes',
+                moneyCents(expense['amount']) + extra,
+                currency,
+                total: true,
+              ),
+              if (notes.isNotEmpty)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(notes),
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }

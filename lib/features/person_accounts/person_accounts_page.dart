@@ -300,7 +300,7 @@ class _PersonAccountsPageState extends State<PersonAccountsPage> {
                           const SizedBox(height: 6),
                           const Text(
                             'Totales de cuentas activas. No se suman a las deudas bancarias del dashboard.',
-                            style: TextStyle(fontSize: 12),
+                            style: TextStyle(fontSize: 14),
                           ),
                           const SizedBox(height: 18),
                           Text(

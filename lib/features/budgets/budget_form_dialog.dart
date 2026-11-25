@@ -133,8 +133,8 @@ class _BudgetFormDialogState extends State<BudgetFormDialog> {
                   final amount = double.tryParse(text.replaceAll(',', '.'));
                   if (amount == null || !amount.isFinite || amount <= 0)
                     return 'Introduce un monto mayor que cero';
-                  if (!RegExp(r'^\d+([.,]\d{1,2})?$').hasMatch(text))
-                    return 'Usa como máximo dos decimales, sin separadores de miles';
+                  if (!RegExp(r'^\d+([.,]\d{1,6})?$').hasMatch(text))
+                    return 'Usa como máximo seis decimales, sin separadores de miles';
                   return null;
                 },
               ),

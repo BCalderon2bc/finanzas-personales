@@ -38,7 +38,7 @@ class AccountShareSection extends StatelessWidget {
           Text(
             title,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 14,
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
@@ -78,7 +78,7 @@ class AccountShareSection extends StatelessWidget {
               padding: const EdgeInsets.only(top: 8),
               child: Text(
                 'Completa ${missing.join(', ')} en Editar cuenta para copiar la ficha completa.',
-                style: const TextStyle(fontSize: 12),
+                style: const TextStyle(fontSize: 14),
               ),
             ),
         ],

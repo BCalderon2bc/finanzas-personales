@@ -249,7 +249,7 @@ class _BudgetsPageState extends State<BudgetsPage> {
       children: [
         Text(
           'Desde ${isoDay(budgetStart(budget))} hasta ${isoDay(budgetEnd(budget))}',
-          style: const TextStyle(fontSize: 12),
+          style: const TextStyle(fontSize: 14),
         ),
         BudgetCard(
           name: categoryStyle?['name']?.toString() ?? 'Categoría no disponible',

@@ -543,7 +543,7 @@ class _DebtInstallmentsPageState extends State<DebtInstallmentsPage> {
                         Text(
                           'Un abono se vincula completo a una cuota. Vincularlo no descuenta dinero otra vez. Si se anula, deja de cubrirla. '
                           'Si liquidaste el préstamo anticipadamente, revisa y archiva las cuotas futuras que ya no correspondan.',
-                          style: TextStyle(fontSize: 12, color: appMuted),
+                          style: TextStyle(fontSize: 14, color: appMuted),
                         ),
                       ],
                     ),

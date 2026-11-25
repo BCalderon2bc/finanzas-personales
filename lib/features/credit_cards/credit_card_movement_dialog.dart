@@ -41,8 +41,12 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
 
   int? cashInputCents(String input) {
     final text = input.trim().replaceAll(',', '.');
-    if (!RegExp(r'^\d{1,12}(\.\d{1,2})?$').hasMatch(text)) return null;
-    return moneyCents(text);
+    if (!RegExp(r'^\d{1,12}(\.\d{1,6})?$').hasMatch(text)) return null;
+    try {
+      return moneyCents(text);
+    } on FormatException {
+      return null;
+    }
   }
 
   final formKey = GlobalKey<FormState>();
@@ -88,9 +92,9 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
     categoryId = tx['category_id']?.toString();
     additionalId = tx['additional_card_id']?.toString() ?? '';
     amount.text = cashAdvance
-        ? (cardCashAdvancePrincipal(tx) / 100).toStringAsFixed(2)
+        ? (cardCashAdvancePrincipal(tx) / moneyScale).toStringAsFixed(6)
         : tx['amount'].toString();
-    commission.text = (cardCashAdvanceFee(tx) / 100).toStringAsFixed(2);
+    commission.text = (cardCashAdvanceFee(tx) / moneyScale).toStringAsFixed(6);
     cashAccountId = tx['cash_advance_account_id']?.toString();
     description.text = tx['description']?.toString() ?? '';
     reference.text = tx['reference']?.toString() ?? '';
@@ -130,10 +134,10 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
       'currency': currency,
       'amount': cashAdvance
           ? (cashInputCents(amount.text)! + cashInputCents(commission.text)!) /
-                100
+                moneyScale
           : double.parse(amount.text.trim().replaceAll(',', '.')),
       if (cashAdvance) ...{
-        'cash_advance_fee': cashInputCents(commission.text)! / 100,
+        'cash_advance_fee': cashInputCents(commission.text)! / moneyScale,
         'cash_advance_account_id': cashAccountId,
       },
       'additional_card_id': additionalId.isEmpty ? null : additionalId,
@@ -273,9 +277,7 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
                   decoration: InputDecoration(
                     labelText:
                         '${cashAdvance ? 'Efectivo recibido' : 'Monto'} (${currency == 'USD' ? '\$' : 'C\$'})',
-                    helperText: type == cardRebate
-                        ? 'Ingresa solo el descuento abonado al corte. Ejemplo: consumo 1,000 al 6% = abono de 60.'
-                        : type == cardPointsRedemption
+                    helperText: type == cardPointsRedemption
                         ? 'Ingresa el importe abonado por el banco.'
                         : null,
                     helperMaxLines: 2,
@@ -287,10 +289,10 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
                       return 'Escribe un monto mayor que cero';
                     }
                     if (cashAdvance && cashInputCents(text) == null)
-                      return 'Usa hasta 12 enteros y dos decimales';
-                    return RegExp(r'^\d+([.,]\d{1,2})?$').hasMatch(text)
+                      return 'Usa hasta 12 enteros y seis decimales';
+                    return RegExp(r'^\d+([.,]\d{1,6})?$').hasMatch(text)
                         ? null
-                        : 'Usa máximo dos decimales, sin separadores de miles';
+                        : 'Usa máximo seis decimales, sin separadores de miles';
                   },
                 ),
                 if (cashAdvance) ...[
@@ -309,7 +311,7 @@ class _CreditCardMovementDialogState extends State<CreditCardMovementDialog> {
                     validator: (value) {
                       return cashInputCents(value ?? '') != null
                           ? null
-                          : 'Ingresa cero o una comisión con hasta dos decimales';
+                          : 'Ingresa cero o una comisión con hasta seis decimales';
                     },
                   ),
                   const SizedBox(height: 12),

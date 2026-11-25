@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show MaxLengthEnforcement;
 import 'package:flutter/material.dart';
 import 'account_card.dart';
 
@@ -53,6 +54,7 @@ class AccountDesignFields extends StatelessWidget {
           TextFormField(
             initialValue: value['last_four']?.toString() ?? '',
             keyboardType: TextInputType.number,
+            maxLengthEnforcement: MaxLengthEnforcement.enforced,
             maxLength: 4,
             decoration: const InputDecoration(
               labelText: 'Últimos 4 dí  gitos (opcional)',

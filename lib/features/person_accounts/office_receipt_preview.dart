@@ -35,7 +35,7 @@ class _OfficeReceiptPreviewState extends State<OfficeReceiptPreview> {
       final archive = ZipDecoder().decodeBytes(widget.bytes);
       final totalSize = archive.files.fold<int>(
         0,
-            (size, file) => size + file.size,
+        (size, file) => size + file.size,
       );
       if (totalSize > 32 * 1024 * 1024 || archive.files.length > 1000) {
         throw const FormatException('Documento demasiado grande.');
@@ -50,19 +50,19 @@ class _OfficeReceiptPreviewState extends State<OfficeReceiptPreview> {
             .whereType<XmlElement>()
             .where(
               (element) =>
-              const {'t', 'tab', 'br'}.contains(element.name.local),
-        )
+                  const {'t', 'tab', 'br'}.contains(element.name.local),
+            )
             .map(
               (element) => switch (element.name.local) {
-            'tab' => '\t',
-            'br' => '\n',
-            _ => element.innerText,
-          },
-        )
+                'tab' => '\t',
+                'br' => '\n',
+                _ => element.innerText,
+              },
+            )
             .join();
 
         final body = document.rootElement.childElements.firstWhere(
-              (element) => element.name.local == 'body',
+          (element) => element.name.local == 'body',
         );
         final lines = <String>[];
         for (final block in body.childElements) {
@@ -70,17 +70,17 @@ class _OfficeReceiptPreviewState extends State<OfficeReceiptPreview> {
             lines.add(paragraphText(block));
           } else if (block.name.local == 'tbl') {
             for (final row in block.childElements.where(
-                  (element) => element.name.local == 'tr',
+              (element) => element.name.local == 'tr',
             )) {
               lines.add(
                 row.childElements
                     .where((element) => element.name.local == 'tc')
                     .map(
                       (cell) => cell.childElements
-                      .where((element) => element.name.local == 'p')
-                      .map(paragraphText)
-                      .join(' '),
-                )
+                          .where((element) => element.name.local == 'p')
+                          .map(paragraphText)
+                          .join(' '),
+                    )
                     .join('  │  '),
               );
             }
@@ -160,51 +160,51 @@ class _OfficeReceiptPreviewState extends State<OfficeReceiptPreview> {
           child: rowCount == 0 || columns == 0
               ? const Center(child: Text('La hoja está vacía.'))
               : SingleChildScrollView(
-            key: ValueKey(_sheet),
-            primary: false,
-            scrollDirection: Axis.horizontal,
-            child: SizedBox(
-              width: columns * 130.0 + 48,
-              child: ListView.builder(
-                primary: false,
-                itemCount: rowCount,
-                itemBuilder: (context, row) => Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 48,
-                      child: Text(
-                        '${row + 1}',
-                        textAlign: TextAlign.center,
+                  key: ValueKey(_sheet),
+                  primary: false,
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: columns * 130.0 + 48,
+                    child: ListView.builder(
+                      primary: false,
+                      itemCount: rowCount,
+                      itemBuilder: (context, row) => Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(
+                            width: 48,
+                            child: Text(
+                              '${row + 1}',
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          for (var column = 0; column < columns; column++)
+                            Container(
+                              width: 130,
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: Theme.of(context).dividerColor,
+                                ),
+                              ),
+                              child: SelectableText(
+                                sheet
+                                        .cell(
+                                          CellIndex.indexByColumnRow(
+                                            columnIndex: column,
+                                            rowIndex: row,
+                                          ),
+                                        )
+                                        .value
+                                        ?.toString() ??
+                                    '',
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                    for (var column = 0; column < columns; column++)
-                      Container(
-                        width: 130,
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: Theme.of(context).dividerColor,
-                          ),
-                        ),
-                        child: SelectableText(
-                          sheet
-                              .cell(
-                            CellIndex.indexByColumnRow(
-                              columnIndex: column,
-                              rowIndex: row,
-                            ),
-                          )
-                              .value
-                              ?.toString() ??
-                              '',
-                        ),
-                      ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-          ),
         ),
       ],
     );

@@ -16,7 +16,7 @@ const appHelp = <String, (String, String)>{
   ),
   'movements': (
     'Ingresos, gastos y transferencias',
-    'Ingreso: dinero que recibes. Gasto: dinero que sale por un consumo. Transferencia: dinero que mueves entre tus propias cuentas; no cuenta como ingreso ni gasto personal.\n\nSelecciona origen y destino. Si son de monedas diferentes, escribe la tasa en córdobas por \$1.\nEjemplo: \$100 a tasa 36.50 recibe C\$3,650.00. C\$365.00 a tasa 36.50 recibe \$10.00. El importe recibido se redondea a dos decimales.\n\nComprueba el resumen antes de guardar. Las comisiones del banco se registran como gasto aparte.\n\nConciliar significa que verificaste el movimiento contra el banco; quita la conciliación antes de editar o eliminar.',
+    'Ingreso: dinero que recibes. Gasto: dinero que sale por un consumo. Transferencia: dinero que mueves entre tus propias cuentas; no cuenta como ingreso ni gasto personal.\n\nSelecciona origen y destino. Si son de monedas diferentes, escribe la tasa en córdobas por \$1.\nEjemplo: \$100 a tasa 36.50 recibe C\$3,650.00. C\$365.00 a tasa 36.50 recibe \$10.00. El importe recibido se redondea a seis decimales.\n\nComprueba el resumen antes de guardar. Las comisiones del banco se registran como gasto aparte.\n\nConciliar significa que verificaste el movimiento contra el banco; quita la conciliación antes de editar o eliminar.',
   ),
   'cards': (
     'Tarjetas de crédito',
@@ -222,7 +222,7 @@ class _AppManualPageState extends State<AppManualPage> {
                                 snapshot.data == true
                                     ? 'Guía completada · puedes repetirla'
                                     : 'Guía disponible',
-                                style: const TextStyle(fontSize: 12),
+                                style: const TextStyle(fontSize: 14),
                               ),
                             ),
                             OutlinedButton.icon(

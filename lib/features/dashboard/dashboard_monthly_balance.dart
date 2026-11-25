@@ -124,7 +124,7 @@ class DashboardMonthlyBalance extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               'Las barras comparan magnitudes. El resultado excluye transferencias y pagos de capital.',
-              style: TextStyle(color: appMuted, fontSize: 12),
+              style: TextStyle(color: appMuted, fontSize: 14),
             ),
           ],
         ),

@@ -93,15 +93,15 @@ ExportReport personAccountReport({
       reportDate(d),
       switch (e['kind']) {
         'payment' =>
-          effect > 0 ? 'Pago de ${account['name']} (+)' : 'Pago de $owner (−)',
+          effect > 0 ? 'Pago de ${account['name']} (+)' : 'Pago de $owner (-)',
         'opening' =>
           effect > 0
               ? 'Saldo anterior a favor de ${account['name']} (+)'
-              : 'Saldo anterior a favor de $owner (−)',
+              : 'Saldo anterior a favor de $owner (-)',
         _ =>
           effect > 0
               ? 'Compra de ${account['name']} (+)'
-              : 'Compra de $owner (−)',
+              : 'Compra de $owner (-)',
       },
       '${e['description'] ?? ''}',
       '${e['currency']}',
@@ -145,8 +145,8 @@ ExportReport personAccountReport({
     ],
     totals: [
       ReportTotal('NIO', 'Compras de $name (+)', otherPurchases),
-      ReportTotal('NIO', 'Compras de $owner (−)', -myPurchases),
-      ReportTotal('NIO', 'Pagos hechos por $owner (−)', -myPayments),
+      ReportTotal('NIO', 'Compras de $owner (-)', -myPurchases),
+      ReportTotal('NIO', 'Pagos hechos por $owner (-)', -myPayments),
       ReportTotal('NIO', 'Pagos recibidos por $owner (+)', receivedPayments),
       if (previousEntries != 0)
         ReportTotal(

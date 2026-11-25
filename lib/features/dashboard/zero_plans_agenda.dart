@@ -125,7 +125,7 @@ class _ZeroPlansAgendaState extends State<ZeroPlansAgenda> {
         ),
         const Text(
           'Vencidas o próximas 7 días, sin corte vigente vinculado. Si ya están en el estado de cuenta, vincúlalas para que no aparezcan también aquí.',
-          style: TextStyle(fontSize: 12),
+          style: TextStyle(fontSize: 14),
         ),
         AdaptiveColumns(
           minColumnWidth: 380,

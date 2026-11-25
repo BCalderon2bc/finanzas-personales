@@ -58,12 +58,12 @@ class _DebtInstallmentPlanDialogState extends State<DebtInstallmentPlanDialog> {
       return null;
     }
     final n = double.tryParse(s.replaceAll(',', '.'));
-    return !RegExp(r'^\d+([.,]\d{1,2})?$').hasMatch(s) ||
+    return !RegExp(r'^\d+([.,]\d{1,6})?$').hasMatch(s) ||
             n == null ||
             !n.isFinite ||
             n <= 0 ||
             n > 999999999999.99
-        ? 'Monto positivo, máximo dos decimales, sin separadores de miles.'
+        ? 'Monto positivo, máximo seis decimales, sin separadores de miles.'
         : null;
   }
 
@@ -204,7 +204,7 @@ class _DebtInstallmentPlanDialogState extends State<DebtInstallmentPlanDialog> {
                   Text(
                     'El nuevo calendario reemplaza al vigente y conserva el anterior con sus pagos en el historial. '
                     'La primera fecha se respeta exactamente; el día habitual se usa desde la segunda cuota.',
-                    style: TextStyle(fontSize: 12, color: appMuted),
+                    style: TextStyle(fontSize: 14, color: appMuted),
                   ),
                 ] else ...[
                   const SizedBox(height: 12),

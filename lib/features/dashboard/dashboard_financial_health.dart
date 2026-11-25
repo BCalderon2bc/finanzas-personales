@@ -116,7 +116,7 @@ class DashboardFinancialHealth extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${data.period.label} · $currency',
-                    style: TextStyle(color: _muted, fontSize: 12),
+                    style: TextStyle(color: _muted, fontSize: 14),
                   ),
                 ],
               ),
@@ -379,7 +379,7 @@ class _ChartPanel extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: _muted, fontSize: 10),
+                        style: TextStyle(color: _muted, fontSize: 14),
                       ),
                     ],
                   ),
@@ -415,7 +415,7 @@ class _ChartPanel extends StatelessWidget {
                       children: [
                         Text(
                           item.label,
-                          style: TextStyle(fontSize: 13, color: _muted),
+                          style: TextStyle(fontSize: 14, color: _muted),
                         ),
                         const SizedBox(height: 3),
                         Text(
@@ -460,7 +460,7 @@ class _ChartPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          Text(subtitle, style: TextStyle(color: _muted, fontSize: 13)),
+          Text(subtitle, style: TextStyle(color: _muted, fontSize: 14)),
           const SizedBox(height: 16),
           LayoutBuilder(
             builder: (context, box) {
@@ -494,21 +494,21 @@ class _ChartPanel extends StatelessWidget {
               padding: const EdgeInsets.only(top: 12),
               child: Text(
                 emptyText,
-                style: TextStyle(color: _muted, fontSize: 12),
+                style: TextStyle(color: _muted, fontSize: 14),
               ),
             ),
           ExpansionTile(
             tilePadding: EdgeInsets.zero,
             title: Text(
               'Cómo se calcula',
-              style: TextStyle(fontSize: 13, color: _muted),
+              style: TextStyle(fontSize: 14, color: _muted),
             ),
             children: [
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Text(
                   footer,
-                  style: TextStyle(color: _muted, fontSize: 13, height: 1.5),
+                  style: TextStyle(color: _muted, fontSize: 14, height: 1.5),
                 ),
               ),
             ],
@@ -554,7 +554,7 @@ class _ChartPanel extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             subtitle,
-            style: TextStyle(color: _muted, fontSize: 12, height: 1.4),
+            style: TextStyle(color: _muted, fontSize: 14, height: 1.4),
           ),
           const SizedBox(height: 24),
           Center(
@@ -586,7 +586,7 @@ class _ChartPanel extends StatelessWidget {
                           Text(
                             centerLabel,
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: _muted, fontSize: 11),
+                            style: TextStyle(color: _muted, fontSize: 14),
                           ),
                         ],
                       ),
@@ -601,7 +601,7 @@ class _ChartPanel extends StatelessWidget {
             Text(
               emptyText,
               textAlign: TextAlign.center,
-              style: TextStyle(color: _muted, fontSize: 12),
+              style: TextStyle(color: _muted, fontSize: 14),
             ),
           ],
           const SizedBox(height: 22),
@@ -625,7 +625,7 @@ class _ChartPanel extends StatelessWidget {
                     flex: 5,
                     child: Text(
                       item.label,
-                      style: const TextStyle(fontSize: 12),
+                      style: const TextStyle(fontSize: 14),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -635,7 +635,7 @@ class _ChartPanel extends StatelessWidget {
                       item.value,
                       textAlign: TextAlign.right,
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -646,7 +646,7 @@ class _ChartPanel extends StatelessWidget {
           const Divider(height: 26),
           Text(
             footer,
-            style: TextStyle(color: _muted, fontSize: 11, height: 1.5),
+            style: TextStyle(color: _muted, fontSize: 14, height: 1.5),
           ),
         ],
       ),

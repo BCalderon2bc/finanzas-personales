@@ -596,7 +596,7 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${plus ? '+' : '−'}${formatMoneyCents(moneyCents(row['amount']), '${row['currency']}')}',
+                        '${plus ? '+' : '−'}${formatRecordMoneyCents(moneyCents(row['amount']), '${row['currency']}')}',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w700,
@@ -608,14 +608,14 @@ class _PersonAccountDetailPageState extends State<PersonAccountDetailPage> {
                       ),
                       if (row['currency'] == 'USD')
                         Text(
-                          'Tasa: C\$${row['exchange_rate']} / \$1 · Equivalente: ${formatMoneyCents(moneyCents(row['amount_nio']), 'NIO')}',
+                          'Tasa: C\$${row['exchange_rate']} / \$1 · Equivalente: ${formatRecordMoneyCents(moneyCents(row['amount_nio']), 'NIO')}',
                         ),
                       if (!voided)
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: Text(
                             'Saldo tras el movimiento: ${personBalanceLabel(running)} ${formatMoneyCents(running.abs(), 'NIO')}',
-                            style: const TextStyle(fontSize: 12),
+                            style: const TextStyle(fontSize: 14),
                           ),
                         ),
                     ],

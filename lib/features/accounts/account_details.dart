@@ -71,7 +71,7 @@ class AccountDetails extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: TextStyle(color: muted, fontSize: 12)),
+                Text(label, style: TextStyle(color: muted, fontSize: 14)),
                 const SizedBox(height: 5),
                 Text(
                   value,
@@ -98,7 +98,7 @@ class AccountDetails extends StatelessWidget {
           children: [
             Text(
               'CUENTA SELECCIONADA',
-              style: TextStyle(color: muted, fontSize: 10, letterSpacing: 1.3),
+              style: TextStyle(color: muted, fontSize: 14, letterSpacing: 1.3),
             ),
             const SizedBox(height: 7),
             Text(
@@ -125,7 +125,7 @@ class AccountDetails extends StatelessWidget {
                 if (bank.isNotEmpty)
                   BankLogo(name: bank, width: 105, height: 30),
                 if (bank.isNotEmpty)
-                  Text(bank, style: TextStyle(color: muted, fontSize: 12)),
+                  Text(bank, style: TextStyle(color: muted, fontSize: 14)),
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
@@ -139,7 +139,7 @@ class AccountDetails extends StatelessWidget {
                     active ? 'Activa' : 'Inactiva',
                     style: TextStyle(
                       color: active ? const Color(0xFF397455) : muted,
-                      fontSize: 11,
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -160,7 +160,7 @@ class AccountDetails extends StatelessWidget {
                     'Saldo registrado',
                     style: TextStyle(
                       color: color,
-                      fontSize: 12,
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -181,7 +181,7 @@ class AccountDetails extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     'Incluye los movimientos y pagos vinculados a esta cuenta.',
-                    style: TextStyle(color: muted, fontSize: 12, height: 1.5),
+                    style: TextStyle(color: muted, fontSize: 14, height: 1.5),
                   ),
                 ],
               ),
@@ -246,13 +246,13 @@ class AccountDetails extends StatelessWidget {
             AccountShareSection(account: account),
             if (reference.isNotEmpty) ...[
               const SizedBox(height: 12),
-              Text('Referencia', style: TextStyle(color: muted, fontSize: 12)),
+              Text('Referencia', style: TextStyle(color: muted, fontSize: 14)),
               const SizedBox(height: 5),
               SelectableText(reference),
             ],
             if (notes.isNotEmpty) ...[
               const SizedBox(height: 12),
-              Text('Notas', style: TextStyle(color: muted, fontSize: 12)),
+              Text('Notas', style: TextStyle(color: muted, fontSize: 14)),
               const SizedBox(height: 5),
               Text(notes),
             ],
@@ -261,7 +261,7 @@ class AccountDetails extends StatelessWidget {
                 padding: EdgeInsets.only(top: 16),
                 child: Text(
                   'Esta cuenta conserva su historial y no se ofrece para nuevos movimientos.',
-                  style: TextStyle(color: muted, fontSize: 12, height: 1.5),
+                  style: TextStyle(color: muted, fontSize: 14, height: 1.5),
                 ),
               ),
             Divider(height: 22, color: border),

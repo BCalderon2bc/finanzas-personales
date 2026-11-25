@@ -59,7 +59,7 @@ class CategoryTile extends StatelessWidget {
                     const SizedBox(height: 5),
                     Text(
                       '${income ? 'Ingreso' : 'Gasto'} · ${active ? 'Activa' : 'Inactiva'}',
-                      style: TextStyle(color: appMuted, fontSize: 12),
+                      style: TextStyle(color: appMuted, fontSize: 14),
                     ),
                   ],
                 ),

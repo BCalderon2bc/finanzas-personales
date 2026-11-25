@@ -667,7 +667,7 @@ class CreditCardProductField extends StatelessWidget {
               : 'Elige el producto que coincide con tu tarjeta. La marca y categoría se completan según el diseño elegido.',
           style: const TextStyle(
             color: Color(0xFF64748B),
-            fontSize: 12,
+            fontSize: 14,
             height: 1.4,
           ),
         ),

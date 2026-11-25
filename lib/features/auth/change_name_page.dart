@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show MaxLengthEnforcement;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -131,6 +132,7 @@ class _ChangeNamePageState extends State<ChangeNamePage> {
                           textCapitalization: TextCapitalization.words,
                           textInputAction: TextInputAction.done,
                           onFieldSubmitted: (_) => save(),
+                          maxLengthEnforcement: MaxLengthEnforcement.enforced,
                           maxLength: 100,
                           decoration: const InputDecoration(
                             labelText: 'Nombre',

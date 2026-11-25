@@ -91,8 +91,8 @@ class _DebtFormDialogState extends State<DebtFormDialog> {
                   final amount = double.tryParse(text.replaceAll(',', '.'));
                   if (amount == null || !amount.isFinite || amount <= 0)
                     return 'Escribe un monto mayor que cero';
-                  if (!RegExp(r'^\d+([.,]\d{1,2})?$').hasMatch(text))
-                    return 'Usa máximo dos decimales, sin separadores de miles';
+                  if (!RegExp(r'^\d+([.,]\d{1,6})?$').hasMatch(text))
+                    return 'Usa máximo seis decimales, sin separadores de miles';
                   return null;
                 },
               ),

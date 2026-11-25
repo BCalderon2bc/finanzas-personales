@@ -854,7 +854,7 @@ class _CreditCardStatementsPageState extends State<CreditCardStatementsPage> {
                               'Cubrir el mínimo no significa liquidar la deuda ni garantiza evitar intereses.',
                               style: TextStyle(
                                 color: appMuted,
-                                fontSize: 12,
+                                fontSize: 14,
                                 height: 1.5,
                               ),
                             ),

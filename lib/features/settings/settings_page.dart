@@ -268,7 +268,7 @@ class _SettingsPageState extends State<SettingsPage> {
                               const SizedBox(height: 12),
                               Text(
                                 'Última actualización: ${date.day}/${date.month}/${date.year}',
-                                style: TextStyle(color: appMuted, fontSize: 12),
+                                style: TextStyle(color: appMuted, fontSize: 14),
                               ),
                             ],
                             const SizedBox(height: 22),

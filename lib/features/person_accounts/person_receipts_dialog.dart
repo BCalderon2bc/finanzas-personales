@@ -407,6 +407,19 @@ class _PersonReceiptsDialogState extends State<PersonReceiptsDialog> {
               'credit_card_statements/${entry.key}': entry.value,
           }
         : {_folder: widget.canRemove};
+    // Processed holds keep their original folder; no file copying or duplicate upload.
+    if (widget.movementTable == 'credit_card_transactions') {
+      final holds = await supabase
+          .from('credit_card_holds')
+          .select('id')
+          .eq('user_id', _uid)
+          .eq('transaction_id', widget.entryId)
+          .eq('status', 'processed');
+      checkPersonSession(_uid);
+      for (final hold in holds) {
+        folders['credit_card_holds/${hold['id']}'] = widget.canRemove;
+      }
+    }
     final files = <({String folder, String name, bool writable})>[];
     for (final folder in folders.entries) {
       for (var offset = 0; ; offset += 100) {

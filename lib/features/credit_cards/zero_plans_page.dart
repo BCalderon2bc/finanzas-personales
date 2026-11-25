@@ -536,7 +536,7 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
           const ZeroField('date', 'Fecha real del pago', type: 'date'),
       ],
       initial: {
-        'amount': (pending / 100).toStringAsFixed(2),
+        'amount': (pending / moneyScale).toStringAsFixed(6),
         'date': zeroDate(DateTime.now()),
       },
       attachReceipt: !existing,
@@ -599,7 +599,7 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
             'Cuota ${i['number']}/${p['total_installments']} · ${p['description']}',
         'amount':
             existing?['amount'] ??
-            (moneyCents(i['amount']) / 100).toStringAsFixed(2),
+            (moneyCents(i['amount']) / moneyScale).toStringAsFixed(6),
         'date': existing?['charge_date'] ?? zeroDate(DateTime.now()),
         'reference': existing?['reference'] ?? '',
       },
@@ -615,7 +615,7 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
     final saved = await commands.run('register_zero_installment_charge', {
       'p_installment_id': i['id'],
       'p_date': zeroDate(date),
-      'p_amount': moneyCents(values['amount']) / 100,
+      'p_amount': moneyCents(values['amount']) / moneyScale,
       'p_description': '${values['description']}'.trim(),
       'p_reference': values['reference'] ?? '',
     });
@@ -943,7 +943,7 @@ class _ZeroPlansPageState extends State<ZeroPlansPage> {
                   : p['entry_mode'] == 'opening'
                   ? 'Origen: pendiente añadido a deuda inicial'
                   : 'Origen: pendiente ya incluido en tu tarjeta',
-              style: const TextStyle(fontSize: 12),
+              style: const TextStyle(fontSize: 14),
             ),
             if (source != null)
               MovementReceiptsButton(

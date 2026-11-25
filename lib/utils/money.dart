@@ -1,9 +1,33 @@
+/// Historical API name retained; values now use millionths, not cents.
+const int moneyScale = 1000000;
+const int maxExactMoneyUnits = 9007199254740991;
+
 int moneyCents(dynamic value) {
-  final amount = num.tryParse('$value');
-  if (amount == null || !amount.isFinite) {
-    throw FormatException('Monto inválido: $value');
+  var text = '$value'.trim().replaceAll(',', '.');
+  if (text.contains(RegExp(r'[eE]'))) {
+    final n = num.tryParse(text);
+    if (n == null || !n.isFinite)
+      throw FormatException('Monto inválido: $value');
+    final fixed = n.toStringAsFixed(6);
+    if (num.tryParse(fixed) != n) {
+      throw FormatException('Usa hasta seis decimales: $value');
+    }
+    text = fixed;
   }
-  return (amount * 100).round();
+  if (!RegExp(r'^-?\d+(\.\d{1,6})?$').hasMatch(text)) {
+    throw FormatException('Monto inválido; usa hasta seis decimales: $value');
+  }
+  final negative = text.startsWith('-');
+  final parts = (negative ? text.substring(1) : text).split('.');
+  final whole = BigInt.parse(parts[0]);
+  final fraction = BigInt.parse(
+    parts.length == 1 ? '0' : parts[1].padRight(6, '0'),
+  );
+  final units = whole * BigInt.from(moneyScale) + fraction;
+  if (units > BigInt.from(maxExactMoneyUnits)) {
+    throw FormatException('El monto excede el rango de precisión admitido.');
+  }
+  return (negative ? -units : units).toInt();
 }
 
 Map<String, int> calculateBalances(
@@ -84,13 +108,31 @@ int debtPaymentTotalCents(Map<String, dynamic> payment) =>
     moneyCents(payment['interest_amount']) +
     moneyCents(payment['fee_amount']);
 
-String formatAmountCents(int cents) {
+// Amounts are stored in millionths. Round only after summing, for display.
+// Round to the nearest cent; exact halves round away from zero.
+int totalUnitsRounded(int units) {
+  const unitsPerCent = moneyScale ~/ 100;
+  final absolute = units.abs();
+  final cents = absolute ~/ unitsPerCent;
+  final remainder = absolute % unitsPerCent;
+  final rounded =
+      (cents + (remainder >= unitsPerCent ~/ 2 ? 1 : 0)) * unitsPerCent;
+  return units < 0 ? -rounded : rounded;
+}
+
+String formatAmountCents(int cents) =>
+    formatRecordAmountCents(totalUnitsRounded(cents));
+
+String formatRecordAmountCents(int cents) {
   final absolute = cents.abs();
-  final whole = (absolute ~/ 100).toString().replaceAllMapped(
+  final whole = (absolute ~/ moneyScale).toString().replaceAllMapped(
     RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
     (match) => '${match[1]},',
   );
-  final decimals = (absolute % 100).toString().padLeft(2, '0');
+  var decimals = (absolute % moneyScale).toString().padLeft(6, '0');
+  while (decimals.length > 2 && decimals.endsWith('0')) {
+    decimals = decimals.substring(0, decimals.length - 1);
+  }
 
   return '${cents < 0 ? '-' : ''}$whole.$decimals';
 }
@@ -102,4 +144,11 @@ String formatMoneyCents(int? cents, String currency) {
 
   final symbol = currency == 'USD' ? '\$' : 'C\$';
   return '$symbol${formatAmountCents(cents)}';
+}
+
+// Individual records retain their original precision (up to six decimals).
+String formatRecordMoneyCents(int? cents, String currency) {
+  if (cents == null) return 'Por revisar';
+  final symbol = currency == 'USD' ? r'$' : r'C$';
+  return '$symbol${formatRecordAmountCents(cents)}';
 }

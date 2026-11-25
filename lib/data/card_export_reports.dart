@@ -104,7 +104,7 @@ ExportReport creditCardsExport({
               null,
               for (final c in cardCurrencies)
                 if (sums[c] case final totals?)
-                  MoneyCell(totals[label]!)
+                  MoneyCell(totals[label]!, isTotal: true)
                 else
                   null,
               null,
@@ -240,8 +240,8 @@ ExportReport debitCardsExport({
         '${event['description'] ?? ''}',
         c == 'NIO' ? MoneyCell(delta) : null,
         c == 'USD' ? MoneyCell(delta) : null,
-        c == 'NIO' ? MoneyCell(balance) : null,
-        c == 'USD' ? MoneyCell(balance) : null,
+        c == 'NIO' ? MoneyCell(balance, isTotal: true) : null,
+        c == 'USD' ? MoneyCell(balance, isTotal: true) : null,
         '${event['reference'] ?? ''}',
       ]);
     }
@@ -250,8 +250,8 @@ ExportReport debitCardsExport({
       '${account['name']}',
       if (!allAccounts) linkedLabels,
       c,
-      c == 'NIO' ? MoneyCell(balance) : null,
-      c == 'USD' ? MoneyCell(balance) : null,
+      c == 'NIO' ? MoneyCell(balance, isTotal: true) : null,
+      c == 'USD' ? MoneyCell(balance, isTotal: true) : null,
     ]);
   }
   return ExportReport(

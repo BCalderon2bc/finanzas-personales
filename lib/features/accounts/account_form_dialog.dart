@@ -1,3 +1,5 @@
+import 'package:flutter/services.dart' show MaxLengthEnforcement;
+import '../../utils/money.dart';
 import '../../core/app_theme.dart' show appMuted;
 import '../../widgets/adaptive_layout.dart';
 import '../help/app_help.dart';
@@ -77,7 +79,7 @@ class _AccountFormDialogState extends State<AccountFormDialog> {
     final amount = double.tryParse(
       balanceController.text.trim().replaceAll(',', '.'),
     );
-    final cents = amount == null ? null : amount * 100;
+    final cents = amount == null ? null : amount * moneyScale;
     return cents != null && cents.isFinite ? cents.round() : 0;
   }
 
@@ -381,8 +383,8 @@ class _AccountFormDialogState extends State<AccountFormDialog> {
                       if (amount == null || !amount.isFinite || amount < 0) {
                         return 'Introduce un saldo válido';
                       }
-                      if (!RegExp(r'^\d+([.,]\d{1,2})?$').hasMatch(text)) {
-                        return 'Usa máximo dos decimales, sin separadores de miles';
+                      if (!RegExp(r'^\d+([.,]\d{1,6})?$').hasMatch(text)) {
+                        return 'Usa máximo seis decimales, sin separadores de miles';
                       }
                       return null;
                     },
@@ -393,12 +395,13 @@ class _AccountFormDialogState extends State<AccountFormDialog> {
                     padding: EdgeInsets.only(top: 8),
                     child: Text(
                       'El tipo y la moneda se conservan al editar.',
-                      style: TextStyle(color: appMuted, fontSize: 12),
+                      style: TextStyle(color: appMuted, fontSize: 14),
                     ),
                   ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: holderController,
+                  maxLengthEnforcement: MaxLengthEnforcement.enforced,
                   maxLength: 200,
                   textCapitalization: TextCapitalization.words,
                   decoration: const InputDecoration(
@@ -420,6 +423,7 @@ class _AccountFormDialogState extends State<AccountFormDialog> {
                   id: 'number',
                   child: TextFormField(
                     controller: numberController,
+                    maxLengthEnforcement: MaxLengthEnforcement.enforced,
                     maxLength: 100,
                     autocorrect: false,
                     enableSuggestions: false,

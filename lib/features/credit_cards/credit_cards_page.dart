@@ -79,12 +79,9 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
   ) async {
     final rows = <Map<String, dynamic>>[];
     for (var offset = 0; ; offset += 500) {
-      final result = await supabase
-          .from(table)
-          .select(columns)
-          .eq('user_id', userId)
-          .order('id')
-          .range(offset, offset + 499);
+      var query = supabase.from(table).select(columns).eq('user_id', userId);
+      if (table == 'credit_card_holds') query = query.eq('status', 'active');
+      final result = await query.order('id').range(offset, offset + 499);
       final page = List<Map<String, dynamic>>.from(result);
       rows.addAll(page);
       if (page.length < 500) {
@@ -108,21 +105,31 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
       if (user == null) {
         throw StateError('Debes iniciar sesión nuevamente.');
       }
-      final cardRows = await readRows(
+      final cardFuture = readRows(
         'credit_cards',
         'id, name, card_reference, currency, credit_limit, opening_balance, opening_balance_nio, '
             'opening_balance_usd, limit_exchange_rate, closing_day, payment_day, is_active, '
             'institution_id, network, card_tier, card_product, financial_institutions(name, code)',
         user.id,
       );
-      final txRows = await readRows(
+      final txFuture = readRows(
         'credit_card_transactions',
         'id, credit_card_id, transaction_type, amount, currency, is_voided, '
             'charge_kind, cash_advance_fee, excludes_from_limit',
         user.id,
       );
-      final pending = await readRows('credit_card_holds', '*', user.id);
-      final periods = await loadCardStatements(user.id);
+      final pendingFuture = readRows('credit_card_holds', '*', user.id);
+      final periodsFuture = loadCardStatements(user.id);
+      final result = await Future.wait<Object>([
+        cardFuture,
+        txFuture,
+        pendingFuture,
+        periodsFuture,
+      ]);
+      final cardRows = result[0] as List<Map<String, dynamic>>;
+      final txRows = result[1] as List<Map<String, dynamic>>;
+      final pending = result[2] as List<Map<String, dynamic>>;
+      final periods = result[3] as CardStatementData;
       checkSession(user.id);
       if (!mounted || request != requestId) {
         return;
@@ -970,22 +977,28 @@ class _CreditCardsPageState extends State<CreditCardsPage> {
                                               ),
                                         ),
                                       ),
-                                      if (showPending)
-                                        CreditCardPendingPanel(
+                                      Visibility(
+                                        visible: showPending,
+                                        maintainState: true,
+                                        child: CreditCardPendingPanel(
                                           key: ValueKey(
                                             'holds/${selected['id']}',
                                           ),
                                           card: selected,
                                           onChanged: loadData,
-                                        )
-                                      else
-                                        CreditCardMovementsPage(
+                                        ),
+                                      ),
+                                      Visibility(
+                                        visible: !showPending,
+                                        maintainState: true,
+                                        child: CreditCardMovementsPage(
                                           key: ValueKey(
                                             'cut-history/${selected['id']}',
                                           ),
                                           cardId: '${selected['id']}',
                                           embedded: true,
                                         ),
+                                      ),
                                     ],
                                   ],
                                 ),

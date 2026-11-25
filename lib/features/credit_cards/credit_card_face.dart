@@ -184,7 +184,7 @@ class CreditCardFace extends StatelessWidget {
                   textAlign: TextAlign.right,
                   style: const TextStyle(
                     color: Color(0xFF64748B),
-                    fontSize: 12,
+                    fontSize: 14,
                   ),
                 ),
               ),
@@ -211,7 +211,7 @@ class CreditCardFace extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Color(0xFF64748B),
-                    fontSize: 12,
+                    fontSize: 14,
                   ),
                 ),
               ),
@@ -227,7 +227,7 @@ class CreditCardFace extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(
             color: Color(0xFF334155),
-            fontSize: 12,
+            fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -235,7 +235,7 @@ class CreditCardFace extends StatelessWidget {
         if (!compact)
           Text(
             'Terminación $ending${visual == null ? ' · Diseño general' : ''}',
-            style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
+            style: const TextStyle(color: Color(0xFF64748B), fontSize: 14),
           ),
       ],
     );

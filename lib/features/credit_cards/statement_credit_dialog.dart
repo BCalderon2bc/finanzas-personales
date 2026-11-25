@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show MaxLengthEnforcement;
 import 'package:flutter/material.dart';
 import '../../data/card_statement_logic.dart';
 import '../../utils/money.dart';
@@ -60,8 +61,8 @@ class _StatementCreditDialogState extends State<StatementCreditDialog> {
             !n.isFinite ||
             n < 0 ||
             n > 999999999999.99 ||
-            !RegExp(r'^\d+([.,]\d{1,2})?$').hasMatch(text)
-        ? 'Usa un monto positivo o cero, con máximo dos decimales'
+            !RegExp(r'^\d+([.,]\d{1,6})?$').hasMatch(text)
+        ? 'Usa un monto positivo o cero, con máximo seis decimales'
         : null;
   }
 
@@ -87,9 +88,9 @@ class _StatementCreditDialogState extends State<StatementCreditDialog> {
           'Indica una reversión mayor que cero y reducciones entre cero y su monto.';
     if (m > 0 && s['minimum_due'] == null)
       error = 'Primero registra el mínimo informado del corte.';
-    if ((b * 100).round() + p.balanceCredit > p.balance ||
+    if ((b * moneyScale).round() + p.balanceCredit > p.balance ||
         (s['minimum_due'] != null &&
-            (m * 100).round() + p.minimumCredit >
+            (m * moneyScale).round() + p.minimumCredit >
                 moneyCents(s['minimum_due']))) {
       error =
           'Las reducciones superarían el saldo o mínimo informado del corte.';
@@ -122,10 +123,12 @@ class _StatementCreditDialogState extends State<StatementCreditDialog> {
         m = number(minimum) ?? 0;
     final nextBalance = p.remaining == null
         ? null
-        : (p.remaining! - (b * 100).round()).clamp(0, p.balance).toInt();
+        : (p.remaining! - (b * moneyScale).round()).clamp(0, p.balance).toInt();
     final nextMinimum = p.minimumRemaining == null
         ? null
-        : (p.minimumRemaining! - (m * 100).round()).clamp(0, p.balance).toInt();
+        : (p.minimumRemaining! - (m * moneyScale).round())
+              .clamp(0, p.balance)
+              .toInt();
     return AlertDialog(
       title: const Text('Reversión aplicada al corte'),
       content: SizedBox(
@@ -196,6 +199,7 @@ class _StatementCreditDialogState extends State<StatementCreditDialog> {
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: description,
+                    maxLengthEnforcement: MaxLengthEnforcement.enforced,
                     maxLength: 200,
                     decoration: const InputDecoration(labelText: 'Concepto'),
                     validator: (v) =>

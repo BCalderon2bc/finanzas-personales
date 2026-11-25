@@ -27,6 +27,7 @@ Uint8List reportExcel(ExportReport report) {
       x.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row),
     );
     summary.cell(start).cellStyle = x.CellStyle(
+      fontSize: 14,
       fontFamily: AppearanceController.instance.fontFamily,
       bold: true,
       textWrapping: x.TextWrapping.WrapText,
@@ -37,7 +38,7 @@ Uint8List reportExcel(ExportReport report) {
     x.TextCellValue('Generado: ${report.generatedAt.toIso8601String()}'),
   ]);
   if (person != null) {
-    void highlighted(String value, {int fontSize = 12, double height = 30}) {
+    void highlighted(String value, {int fontSize = 14, double height = 30}) {
       summary.appendRow([x.TextCellValue(value)]);
       final row = summary.maxRows - 1;
       summary.merge(
@@ -88,13 +89,14 @@ Uint8List reportExcel(ExportReport report) {
       summary.appendRow([
         x.TextCellValue(total.currency),
         x.TextCellValue(total.label),
-        x.DoubleCellValue(total.cents / 100),
+        x.DoubleCellValue(totalUnitsRounded(total.cents) / moneyScale),
       ]);
       if (person != null) {
         final row = summary.maxRows - 1;
         summary
             .cell(x.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row))
             .cellStyle = x.CellStyle(
+          fontSize: 14,
           fontFamily: AppearanceController.instance.fontFamily,
           textWrapping: x.TextWrapping.WrapText,
         );
@@ -108,6 +110,7 @@ Uint8List reportExcel(ExportReport report) {
             ),
           )
           .cellStyle = x.CellStyle(
+        fontSize: 14,
         fontFamily: AppearanceController.instance.fontFamily,
         numberFormat: x.NumFormat.custom(formatCode: '#,##0.00'),
       );
@@ -128,8 +131,12 @@ Uint8List reportExcel(ExportReport report) {
           .firstOrNull;
       summary.appendRow([
         x.TextCellValue(label),
-        nio == null ? null : x.DoubleCellValue(nio.cents / 100),
-        usd == null ? null : x.DoubleCellValue(usd.cents / 100),
+        nio == null
+            ? null
+            : x.DoubleCellValue(totalUnitsRounded(nio.cents) / moneyScale),
+        usd == null
+            ? null
+            : x.DoubleCellValue(totalUnitsRounded(usd.cents) / moneyScale),
       ]);
       for (var col = 1; col <= 2; col++) {
         summary
@@ -140,6 +147,7 @@ Uint8List reportExcel(ExportReport report) {
               ),
             )
             .cellStyle = x.CellStyle(
+          fontSize: 14,
           fontFamily: AppearanceController.instance.fontFamily,
           numberFormat: x.NumFormat.custom(formatCode: '#,##0.00'),
         );
@@ -159,9 +167,9 @@ Uint8List reportExcel(ExportReport report) {
         .cellStyle = x.CellStyle(
       fontFamily: AppearanceController.instance.fontFamily,
       textWrapping: x.TextWrapping.WrapText,
-      fontSize: 11,
+      fontSize: 14,
     );
-    summary.setRowHeight(row, 52);
+    summary.setRowHeight(row, 60);
   }
   summary.merge(
     x.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
@@ -177,6 +185,7 @@ Uint8List reportExcel(ExportReport report) {
   for (final table in report.tables) {
     final sheet = excel[table.name];
     sheet.appendRow(table.columns.map((c) => x.TextCellValue(c)).toList());
+    sheet.setRowHeight(0, 32);
     final cardColumns = <int>{
       for (var col = 0; col < table.columns.length; col++)
         if (['Tarjeta', 'Tarjetas vinculadas'].contains(table.columns[col]))
@@ -199,6 +208,7 @@ Uint8List reportExcel(ExportReport report) {
       sheet
           .cell(x.CellIndex.indexByColumnRow(columnIndex: col, rowIndex: 0))
           .cellStyle = x.CellStyle(
+        fontSize: 14,
         fontFamily: AppearanceController.instance.fontFamily,
         bold: true,
         fontColorHex: x.ExcelColor.white,
@@ -215,14 +225,19 @@ Uint8List reportExcel(ExportReport report) {
         row
             .map<x.CellValue?>(
               (v) => switch (v) {
-                MoneyCell(:final cents) => x.DoubleCellValue(cents / 100),
+                MoneyCell(:final cents, :final isTotal) => x.DoubleCellValue(
+                  (isTotal ? totalUnitsRounded(cents) : cents) / moneyScale,
+                ),
                 int n => x.IntCellValue(n),
                 double n => x.DoubleCellValue(n),
-                _ => x.TextCellValue(v?.toString() ?? ''),
+                _ => x.TextCellValue(
+                  (v?.toString() ?? '').replaceAll('−', '-'),
+                ),
               },
             )
             .toList(),
       );
+      sheet.setRowHeight(sheet.maxRows - 1, 28);
       for (var column = 0; column < row.length; column++) {
         sheet
             .cell(
@@ -232,6 +247,7 @@ Uint8List reportExcel(ExportReport report) {
               ),
             )
             .cellStyle = x.CellStyle(
+          fontSize: 14,
           fontFamily: AppearanceController.instance.fontFamily,
         );
       }
@@ -244,7 +260,7 @@ Uint8List reportExcel(ExportReport report) {
               .fold<int>(
                 0,
                 (n, line) =>
-                    n + ((line.length + 47) ~/ 48).clamp(1, 30).toInt(),
+                    n + ((line.length + 35) ~/ 36).clamp(1, 30).toInt(),
               );
           if (lines > lineCount) lineCount = lines;
           sheet
@@ -255,6 +271,7 @@ Uint8List reportExcel(ExportReport report) {
                 ),
               )
               .cellStyle = x.CellStyle(
+            fontSize: 14,
             fontFamily: AppearanceController.instance.fontFamily,
             textWrapping: x.TextWrapping.WrapText,
           );
@@ -262,7 +279,7 @@ Uint8List reportExcel(ExportReport report) {
         if (lineCount > 1) {
           sheet.setRowHeight(
             sheet.maxRows - 1,
-            (lineCount * 16.0).clamp(32.0, 400.0).toDouble(),
+            (lineCount * 20.0).clamp(32.0, 400.0).toDouble(),
           );
         }
       }
@@ -277,6 +294,7 @@ Uint8List reportExcel(ExportReport report) {
                   ),
                 )
                 .cellStyle = x.CellStyle(
+              fontSize: 14,
               fontFamily: AppearanceController.instance.fontFamily,
               textWrapping: x.TextWrapping.WrapText,
             );
@@ -305,7 +323,7 @@ Uint8List reportExcel(ExportReport report) {
         }
         sheet.setRowHeight(
           sheet.maxRows - 1,
-          (lines * 14.0 + 10).clamp(52, 400).toDouble(),
+          (lines * 20.0 + 14).clamp(52, 400).toDouble(),
         );
       }
       for (var col = 0; col < row.length; col++) {
@@ -318,8 +336,13 @@ Uint8List reportExcel(ExportReport report) {
                 ),
               )
               .cellStyle = x.CellStyle(
+            fontSize: 14,
             fontFamily: AppearanceController.instance.fontFamily,
-            numberFormat: x.NumFormat.custom(formatCode: '#,##0.00'),
+            numberFormat: x.NumFormat.custom(
+              formatCode: (row[col] as MoneyCell).isTotal
+                  ? '#,##0.00'
+                  : '#,##0.00####',
+            ),
           );
         }
       }
@@ -335,8 +358,11 @@ Uint8List reportExcel(ExportReport report) {
   return Uint8List.fromList(bytes);
 }
 
-String reportCellText(Object? v) =>
-    v is MoneyCell ? formatAmountCents(v.cents) : v?.toString() ?? '';
+String reportCellText(Object? v) => v is MoneyCell
+    ? (v.isTotal
+          ? formatAmountCents(v.cents)
+          : formatRecordAmountCents(v.cents))
+    : (v?.toString() ?? '').replaceAll('−', '-');
 List<List<String>> _pdfRows(List<List<Object?>> rows) {
   final output = <List<String>>[];
   for (final row in rows) {
@@ -382,7 +408,9 @@ Future<Uint8List> reportPdf(
   );
   pdf.addPage(
     pw.MultiPage(
-      pageFormat: PdfPageFormat.a4.landscape,
+      pageFormat: report.tables.any((t) => t.columns.length >= 10)
+          ? PdfPageFormat.a3.landscape
+          : PdfPageFormat.a4.landscape,
       margin: pw.EdgeInsets.all(person == null ? 28 : 24),
       theme: theme,
       maxPages: 1000,
@@ -404,11 +432,11 @@ Future<Uint8List> reportPdf(
             report.title,
             style: pw.TextStyle(fontSize: 17, fontWeight: pw.FontWeight.bold),
           ),
-          pw.Text(report.period, style: const pw.TextStyle(fontSize: 10)),
+          pw.Text(report.period, style: const pw.TextStyle(fontSize: 11)),
           if (report.scopeLabel case final scope?)
             pw.Text(
               scope,
-              style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+              style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
             ),
           pw.SizedBox(height: 10),
         ],
@@ -418,11 +446,11 @@ Future<Uint8List> reportPdf(
         children: [
           pw.Text(
             'Generado: ${reportDate(report.generatedAt)}',
-            style: const pw.TextStyle(fontSize: 8),
+            style: const pw.TextStyle(fontSize: 11),
           ),
           pw.Text(
             'Página ${c.pageNumber} de ${c.pagesCount}',
-            style: const pw.TextStyle(fontSize: 8),
+            style: const pw.TextStyle(fontSize: 11),
           ),
         ],
       ),
@@ -443,7 +471,7 @@ Future<Uint8List> reportPdf(
                 pw.Text(
                   'QUIÉN LE DEBE A QUIÉN',
                   style: pw.TextStyle(
-                    fontSize: 10,
+                    fontSize: 11,
                     fontWeight: pw.FontWeight.bold,
                     color: PdfColor.fromInt(
                       AppearanceController.instance.palette.navigation
@@ -486,14 +514,14 @@ Future<Uint8List> reportPdf(
                 pw.SizedBox(height: 5),
                 pw.Text(
                   person.paymentRateLabel,
-                  style: const pw.TextStyle(fontSize: 9),
+                  style: const pw.TextStyle(fontSize: 11),
                 ),
 
                 pw.SizedBox(height: 5),
                 if (person.settled)
                   pw.Text(
                     'Titular: ${person.ownerName}  |  Cuenta con: ${person.personName}',
-                    style: const pw.TextStyle(fontSize: 9),
+                    style: const pw.TextStyle(fontSize: 11),
                   ),
               ],
             ),
@@ -512,9 +540,9 @@ Future<Uint8List> reportPdf(
             ],
             headerStyle: pw.TextStyle(
               fontWeight: pw.FontWeight.bold,
-              fontSize: 8,
+              fontSize: 11,
             ),
-            cellStyle: const pw.TextStyle(fontSize: 8),
+            cellStyle: const pw.TextStyle(fontSize: 11),
             cellAlignments: {
               1: pw.Alignment.centerRight,
               2: pw.Alignment.centerRight,
@@ -529,7 +557,7 @@ Future<Uint8List> reportPdf(
           ),
           pw.SizedBox(height: 6),
           if (table.rows.isEmpty && person == null)
-            pw.Text('Sin registros.', style: const pw.TextStyle(fontSize: 9)),
+            pw.Text('Sin registros.', style: const pw.TextStyle(fontSize: 11)),
           if (table.rows.isNotEmpty ||
               table.footerRows.isNotEmpty ||
               person != null)
@@ -572,11 +600,7 @@ Future<Uint8List> reportPdf(
                     n: pw.Alignment.centerRight,
               },
               headerStyle: pw.TextStyle(
-                fontSize: table.columns.length >= 11
-                    ? 7
-                    : person == null
-                    ? 8
-                    : 7.5,
+                fontSize: 11,
                 fontWeight: pw.FontWeight.bold,
                 color: PdfColors.white,
               ),
@@ -585,14 +609,8 @@ Future<Uint8List> reportPdf(
                   AppearanceController.instance.palette.primary.toARGB32(),
                 ),
               ),
-              cellStyle: pw.TextStyle(
-                fontSize: table.columns.length >= 11
-                    ? 7
-                    : person == null
-                    ? 8
-                    : 7.5,
-              ),
-              cellPadding: const pw.EdgeInsets.all(5),
+              cellStyle: pw.TextStyle(fontSize: 11),
+              cellPadding: const pw.EdgeInsets.all(7),
               border: pw.TableBorder.all(color: PdfColors.grey300, width: .4),
             ),
           pw.SizedBox(height: 12),
@@ -602,7 +620,7 @@ Future<Uint8List> reportPdf(
             padding: const pw.EdgeInsets.only(bottom: 4),
             child: pw.Text(
               note,
-              style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
+              style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey700),
             ),
           ),
       ],
@@ -621,7 +639,19 @@ String _totalLabel(ExportReport report, String label, String currency) {
 // Total al pie del detalle. Suma únicamente las columnas de importes visibles;
 // la tasa no se suma y el saldo neto conserva su cálculo independiente.
 List<List<Object?>> _exportTableRows(ReportTable table, bool person) {
-  if (table.footerRows.isNotEmpty) return [...table.rows, ...table.footerRows];
+  if (table.footerRows.isNotEmpty) {
+    return [
+      ...table.rows,
+      for (final row in table.footerRows)
+        [
+          for (final cell in row)
+            if (cell is MoneyCell)
+              MoneyCell(cell.cents, isTotal: true)
+            else
+              cell,
+        ],
+    ];
+  }
   if (!person) return table.rows;
   final amountColumns = <int>[
     for (var i = 0; i < table.columns.length; i++)
@@ -636,7 +666,7 @@ List<List<Object?>> _exportTableRows(ReportTable table, bool person) {
       final value = row[column];
       if (value is MoneyCell) sum += value.cents;
     }
-    footer[column] = MoneyCell(sum);
+    footer[column] = MoneyCell(sum, isTotal: true);
   }
   return [...table.rows, footer];
 }

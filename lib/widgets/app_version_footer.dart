@@ -33,7 +33,7 @@ class _AppVersionFooterState extends State<AppVersionFooter> {
               Center(
                 child: const Text(
                   'Consultando versión…',
-                  style: TextStyle(fontSize: 12),
+                  style: TextStyle(fontSize: 14),
                 ),
               )
             else if (snapshot.hasError || version.isEmpty)
@@ -43,7 +43,7 @@ class _AppVersionFooterState extends State<AppVersionFooter> {
                     child: Center(
                       child: Text(
                         'Versión no disponible',
-                        style: TextStyle(fontSize: 12),
+                        style: TextStyle(fontSize: 14),
                       ),
                     ),
                   ),
@@ -61,7 +61,7 @@ class _AppVersionFooterState extends State<AppVersionFooter> {
                 child: Text(
                   'Versión $version${build.isEmpty ? '' : '.$build'}',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 14,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),

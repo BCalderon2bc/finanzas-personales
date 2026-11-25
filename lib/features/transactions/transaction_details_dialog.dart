@@ -54,7 +54,7 @@ class TransactionDetailsDialog extends StatelessWidget {
         : labels[type] ?? 'Movimiento';
     final insurance = moneyCents(tx['insurance_amount'] ?? 0);
     String money(Object? value) =>
-        formatMoneyCents(moneyCents(value ?? 0), currency);
+        formatRecordMoneyCents(moneyCents(value ?? 0), currency);
 
     return AlertDialog(
       title: Text(title),
@@ -66,7 +66,7 @@ class TransactionDetailsDialog extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                formatMoneyCents(amount, currency),
+                formatRecordMoneyCents(amount, currency),
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const Divider(height: 24),
@@ -79,7 +79,7 @@ class TransactionDetailsDialog extends StatelessWidget {
               if (tx['destination_amount'] != null) ...[
                 _detail(
                   'Monto recibido',
-                  formatMoneyCents(
+                  formatRecordMoneyCents(
                     moneyCents(tx['destination_amount']),
                     '${tx['destination_currency']}',
                   ),
@@ -89,7 +89,7 @@ class TransactionDetailsDialog extends StatelessWidget {
               if (source == 'credit_card_payment') ...[
                 _detail(
                   'Aplicado a la tarjeta',
-                  formatMoneyCents(
+                  formatRecordMoneyCents(
                     moneyCents(tx['card_amount'] ?? tx['amount']),
                     '${tx['card_currency'] ?? currency}',
                   ),
@@ -99,16 +99,22 @@ class TransactionDetailsDialog extends StatelessWidget {
               ],
               if (source == 'debt_payment' || receivable) ...[
                 if (tx['payment_total'] != null)
-                  _detail('Total del cobro', money(tx['payment_total'])),
+                  _detail(
+                    'Total del cobro',
+                    formatMoneyCents(moneyCents(tx['payment_total']), currency),
+                  ),
                 _detail('Capital', money(tx['principal_amount'])),
                 if (tx['interest_amount'] != null)
                   _detail('Intereses', money(tx['interest_amount'])),
                 if (insurance != 0)
-                  _detail('Seguro', formatMoneyCents(insurance, currency)),
+                  _detail(
+                    'Seguro',
+                    formatRecordMoneyCents(insurance, currency),
+                  ),
                 if (tx['fee_amount'] != null)
                   _detail(
                     'Comisiones y otros cargos',
-                    formatMoneyCents(
+                    formatRecordMoneyCents(
                       moneyCents(tx['fee_amount']) - insurance,
                       currency,
                     ),

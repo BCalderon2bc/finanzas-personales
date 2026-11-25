@@ -802,6 +802,7 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                       TextField(
                         controller: reportOwner,
                         enabled: !busy,
+                        maxLengthEnforcement: MaxLengthEnforcement.enforced,
                         maxLength: 120,
                         decoration: const InputDecoration(
                           labelText: 'Tu nombre en el reporte',
@@ -979,7 +980,7 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                               'QUIÉN LE DEBE A QUIÉN',
                               style: TextStyle(
                                 fontWeight: FontWeight.w700,
-                                fontSize: 12,
+                                fontSize: 14,
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -1056,7 +1057,7 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                     padding: EdgeInsets.only(top: 10),
                     child: Text(
                       'En la web, el navegador gestiona la descarga. Compartir muestra los destinos disponibles en tu dispositivo.',
-                      style: TextStyle(fontSize: 12, color: appMuted),
+                      style: TextStyle(fontSize: 14, color: appMuted),
                     ),
                   ),
                   if (pdfNotice != null)
@@ -1070,7 +1071,7 @@ class _ExportReportsPageState extends State<ExportReportsPage> {
                       padding: const EdgeInsets.only(bottom: 6),
                       child: Text(
                         n,
-                        style: TextStyle(fontSize: 12, color: appMuted),
+                        style: TextStyle(fontSize: 14, color: appMuted),
                       ),
                     ),
                   ),

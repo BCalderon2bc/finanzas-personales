@@ -62,7 +62,7 @@ class BudgetCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(color: muted, fontSize: 12)),
+          Text(label, style: TextStyle(color: muted, fontSize: 14)),
           const SizedBox(height: 6),
           FittedBox(
             fit: BoxFit.scaleDown,
@@ -125,7 +125,7 @@ class BudgetCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       'Presupuesto mensual · $currency',
-                      style: TextStyle(color: muted, fontSize: 12),
+                      style: TextStyle(color: muted, fontSize: 14),
                     ),
                   ],
                 ),
@@ -142,7 +142,7 @@ class BudgetCard extends StatelessWidget {
             exceeded ? 'EXCESO' : 'DISPONIBLE NETO',
             style: TextStyle(
               color: muted,
-              fontSize: 11,
+              fontSize: 14,
               letterSpacing: 1.2,
               fontWeight: FontWeight.w600,
             ),
@@ -193,7 +193,7 @@ class BudgetCard extends StatelessWidget {
                   limitCents > 0
                       ? '${(ratio * 100).toStringAsFixed(0)}% de gasto neto sobre el límite'
                       : 'Sin porcentaje: el límite asignado es cero',
-                  style: TextStyle(color: muted, fontSize: 11),
+                  style: TextStyle(color: muted, fontSize: 14),
                 ),
               ],
             ),
@@ -218,7 +218,7 @@ class BudgetCard extends StatelessWidget {
                   status,
                   style: TextStyle(
                     color: color,
-                    fontSize: 11,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
                 ),

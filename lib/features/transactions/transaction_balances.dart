@@ -51,7 +51,7 @@ class TransactionBalances extends StatelessWidget {
                 currency,
                 style: TextStyle(
                   color: Colors.white.withAlpha(200),
-                  fontSize: 11,
+                  fontSize: 14,
                 ),
               ),
             ],
@@ -82,7 +82,7 @@ class TransactionBalances extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'Saldo registrado · cuentas activas',
-            style: TextStyle(color: Colors.white.withAlpha(210), fontSize: 11),
+            style: TextStyle(color: Colors.white.withAlpha(210), fontSize: 14),
           ),
         ],
       ),
@@ -115,7 +115,7 @@ class TransactionBalances extends StatelessWidget {
       const SizedBox(height: 10),
       Text(
         'Los saldos incluyen todos los registros y no cambian con los filtros.',
-        style: TextStyle(color: appMuted, fontSize: 12),
+        style: TextStyle(color: appMuted, fontSize: 14),
       ),
     ],
   );

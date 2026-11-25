@@ -104,7 +104,7 @@ const guideCatalog = <String, List<GuideStep>>{
     GuideStep(
       'amount',
       'Monto que sale o entra',
-      'Escribe un importe positivo y con hasta dos decimales. En una transferencia corresponde a lo que sale de origen.',
+      'Escribe un importe positivo y con hasta seis decimales. En una transferencia corresponde a lo que sale de origen.',
     ),
     GuideStep(
       'rate',

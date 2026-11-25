@@ -410,7 +410,7 @@ class _ResponsiveWalletState extends State<ResponsiveWallet> {
               mobile && widget.items.length > 1
                   ? '${index + 1} de ${widget.items.length} · Desliza o usa las flechas'
                   : 'Selecciona una tarjeta para ver sus detalles.',
-              style: TextStyle(color: appMuted, fontSize: 13),
+              style: TextStyle(color: appMuted, fontSize: 14),
             ),
             const SizedBox(height: 14),
             Stack(

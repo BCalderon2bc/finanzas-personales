@@ -42,6 +42,7 @@ const appearanceFonts = {
   'noto': 'Noto Sans',
   'open': 'Open Sans',
   'serif': 'DejaVu Serif',
+  'liberation': 'Liberation Sans',
 };
 
 class AppearanceController extends ChangeNotifier {
@@ -53,11 +54,13 @@ class AppearanceController extends ChangeNotifier {
   AppearancePalette get palette => appearancePalettes[theme]!;
   String get fontFamily => appearanceFonts[font]!;
   String get regularAsset => switch (font) {
+    'liberation' => 'assets/fonts/LiberationSans-Regular.ttf',
     'open' => 'assets/fonts/OpenSans-Regular.ttf',
     'serif' => 'assets/fonts/DejaVuSerif.ttf',
     _ => 'assets/fonts/NotoSans-Regular.ttf',
   };
   String get boldAsset => switch (font) {
+    'liberation' => 'assets/fonts/LiberationSans-Bold.ttf',
     'open' => 'assets/fonts/OpenSans-Bold.ttf',
     'serif' => 'assets/fonts/DejaVuSerif-Bold.ttf',
     _ => 'assets/fonts/NotoSans-Bold.ttf',
@@ -73,6 +76,7 @@ class AppearanceController extends ChangeNotifier {
       if (appearanceFonts.containsKey(data['font'])) font = data['font'];
       if (data['scale'] is num &&
           const [
+            .8,
             .9,
             1.0,
             1.1,
@@ -93,7 +97,7 @@ class AppearanceController extends ChangeNotifier {
     bool? compact,
   }) async {
     final nextTheme = theme ?? this.theme, nextFont = font ?? this.font;
-    final nextScale = (scale ?? this.scale).clamp(.9, 1.2).toDouble();
+    final nextScale = (scale ?? this.scale).clamp(.8, 1.2).toDouble();
     final nextCompact = compact ?? this.compact;
     if (!appearancePalettes.containsKey(nextTheme) ||
         !appearanceFonts.containsKey(nextFont))

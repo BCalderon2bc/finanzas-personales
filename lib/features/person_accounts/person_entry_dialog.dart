@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show MaxLengthEnforcement;
 import 'person_receipts_dialog.dart';
 import '../../widgets/adaptive_layout.dart';
 import '../help/app_help.dart';
@@ -88,7 +89,7 @@ class _PersonEntryDialogState extends State<PersonEntryDialog> {
         n = num.tryParse(amount.text.trim().replaceAll(',', '.'));
     if (r == null || n == null || !n.isFinite || n <= 0 || n > 1000000000)
       return null;
-    return r.convert((n * 100).round(), currency, 'NIO');
+    return r.convert((n * moneyScale).round(), currency, 'NIO');
   }
 
   String get plus => switch (kind) {
@@ -287,13 +288,13 @@ class _PersonEntryDialogState extends State<PersonEntryDialog> {
                             final text = (v ?? '').trim();
                             final n = num.tryParse(text.replaceAll(',', '.'));
                             return !RegExp(
-                                      r'^\d+([.,]\d{1,2})?$',
+                                      r'^\d+([.,]\d{1,6})?$',
                                     ).hasMatch(text) ||
                                     n == null ||
                                     !n.isFinite ||
                                     n <= 0 ||
                                     n > 1000000000
-                                ? 'Introduce un monto mayor que cero, con máximo dos decimales'
+                                ? 'Introduce un monto mayor que cero, con máximo seis decimales'
                                 : null;
                           },
                         ),
@@ -363,6 +364,7 @@ class _PersonEntryDialogState extends State<PersonEntryDialog> {
                   const SizedBox(height: 14),
                   TextFormField(
                     controller: description,
+                    maxLengthEnforcement: MaxLengthEnforcement.enforced,
                     maxLength: 1000,
                     maxLines: 2,
                     decoration: const InputDecoration(
@@ -425,7 +427,7 @@ class _PersonEntryDialogState extends State<PersonEntryDialog> {
                   const SizedBox(height: 10),
                   const Text(
                     'El movimiento se registra en el saldo de esta cuenta personal.',
-                    style: TextStyle(fontSize: 12),
+                    style: TextStyle(fontSize: 14),
                   ),
                 ],
               ),

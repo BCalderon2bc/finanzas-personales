@@ -44,7 +44,7 @@ class ExpenseReportSummary extends StatelessWidget {
         children: [
           Text(
             label,
-            style: TextStyle(color: Colors.white.withAlpha(200), fontSize: 11),
+            style: TextStyle(color: Colors.white.withAlpha(200), fontSize: 14),
           ),
           const SizedBox(height: 5),
           FittedBox(
@@ -99,7 +99,7 @@ class ExpenseReportSummary extends StatelessWidget {
                 currency,
                 style: TextStyle(
                   color: Colors.white.withAlpha(210),
-                  fontSize: 11,
+                  fontSize: 14,
                 ),
               ),
             ],
@@ -121,7 +121,7 @@ class ExpenseReportSummary extends StatelessWidget {
           const SizedBox(height: 7),
           Text(
             '$count movimientos',
-            style: TextStyle(color: Colors.white.withAlpha(210), fontSize: 12),
+            style: TextStyle(color: Colors.white.withAlpha(210), fontSize: 14),
           ),
           const SizedBox(height: 18),
           Row(
@@ -205,7 +205,7 @@ class ExpenseCategoryCard extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           '$count movimientos',
-                          style: TextStyle(color: appMuted, fontSize: 12),
+                          style: TextStyle(color: appMuted, fontSize: 14),
                         ),
                       ],
                     ),
@@ -244,7 +244,7 @@ class ExpenseCategoryCard extends StatelessWidget {
                       style: TextStyle(
                         color: accent,
                         fontWeight: FontWeight.w600,
-                        fontSize: 11,
+                        fontSize: 14,
                       ),
                     ),
                   ),
@@ -368,12 +368,12 @@ class ExpenseDetailTile extends StatelessWidget {
                 const SizedBox(height: 5),
                 Text(
                   '$dateText · $label',
-                  style: TextStyle(color: appMuted, fontSize: 12),
+                  style: TextStyle(color: appMuted, fontSize: 14),
                 ),
                 if (card && cardLabel.isNotEmpty)
                   Text(
                     cardLabel,
-                    style: TextStyle(color: appMuted, fontSize: 12),
+                    style: TextStyle(color: appMuted, fontSize: 14),
                   ),
                 const SizedBox(height: 9),
                 Text(
@@ -387,34 +387,34 @@ class ExpenseDetailTile extends StatelessWidget {
                 if (originalCurrency != currency)
                   Text(
                     'Original · ${expenseMoney(originalAmount, originalCurrency)}',
-                    style: const TextStyle(fontSize: 12),
+                    style: const TextStyle(fontSize: 14),
                   ),
                 if (debt) ...[
                   const SizedBox(height: 7),
                   Text(
                     'Capital: ${component(moneyCents(tx['principal_amount']))}',
-                    style: const TextStyle(fontSize: 12),
+                    style: const TextStyle(fontSize: 14),
                   ),
                   Text(
                     'Intereses: ${component(moneyCents(tx['interest_amount']))}',
-                    style: const TextStyle(fontSize: 12),
+                    style: const TextStyle(fontSize: 14),
                   ),
                   if (insurance != 0)
                     Text(
                       'Seguro: ${component(insurance)}',
-                      style: const TextStyle(fontSize: 12),
+                      style: const TextStyle(fontSize: 14),
                     ),
                   if (otherFees != 0)
                     Text(
                       'Comisiones y otros cargos: ${component(otherFees)}',
-                      style: const TextStyle(fontSize: 12),
+                      style: const TextStyle(fontSize: 14),
                     ),
                 ],
                 if (reference.isNotEmpty) ...[
                   const SizedBox(height: 7),
                   SelectableText(
                     'Referencia: $reference',
-                    style: TextStyle(color: appMuted, fontSize: 12),
+                    style: TextStyle(color: appMuted, fontSize: 14),
                   ),
                 ],
               ],

@@ -16,6 +16,6 @@ int cardCashAdvancePrincipal(Map<String, dynamic> row) =>
 
 String cardCashAdvanceBreakdown(Map<String, dynamic> row) {
   final currency = '${row['currency']}';
-  return 'Efectivo: ${formatMoneyCents(cardCashAdvancePrincipal(row), currency)}'
-      ' · Comisión: ${formatMoneyCents(cardCashAdvanceFee(row), currency)}';
+  return 'Efectivo: ${formatRecordMoneyCents(cardCashAdvancePrincipal(row), currency)}'
+      ' · Comisión: ${formatRecordMoneyCents(cardCashAdvanceFee(row), currency)}';
 }

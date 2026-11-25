@@ -399,7 +399,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
           ...payment,
           'transaction_type': 'debt_payment',
           'transaction_date': payment['payment_date'],
-          'amount': debtPaymentTotalCents(payment) / 100,
+          'amount': debtPaymentTotalCents(payment) / moneyScale,
           'description': name.isEmpty
               ? 'Abono de deuda'
               : 'Abono de deuda: $name',
@@ -467,7 +467,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
         padding: EdgeInsets.only(bottom: 8),
         child: Text(
           'Movimientos más recientes primero',
-          style: TextStyle(fontSize: 12),
+          style: TextStyle(fontSize: 14),
         ),
       ),
       for (final row in rows) _transactionCard(row),
@@ -608,7 +608,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
                           padding: const EdgeInsets.only(top: 14),
                           child: Text(
                             '${visibleTransactions.length} de ${movements.length} movimientos',
-                            style: TextStyle(color: appMuted, fontSize: 12),
+                            style: TextStyle(color: appMuted, fontSize: 14),
                           ),
                         ),
                         const SizedBox(height: 12),

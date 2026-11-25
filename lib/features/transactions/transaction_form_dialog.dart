@@ -163,7 +163,7 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
     Navigator.of(context).pop(<String, dynamic>{
       ..._receipt.fields,
       if (crossCurrency) ...{
-        'destination_amount': receivedCents! / 100,
+        'destination_amount': receivedCents! / moneyScale,
         'destination_currency': destinationCurrency,
         'exchange_rate': double.parse(
           rateController.text.trim().replaceAll(',', '.'),
@@ -420,9 +420,9 @@ class _TransactionFormDialogState extends State<TransactionFormDialog> {
                         if (amount == null || !amount.isFinite || amount <= 0)
                           return 'Escribe un monto mayor que cero';
                         if (!RegExp(
-                          r'^\d+([.,]\d{1,2})?$',
+                          r'^\d+([.,]\d{1,6})?$',
                         ).hasMatch((value ?? '').trim())) {
-                          return 'Usa como máximo dos decimales, sin separadores de miles';
+                          return 'Usa como máximo seis decimales, sin separadores de miles';
                         }
                         return null;
                       },

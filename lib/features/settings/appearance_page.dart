@@ -171,6 +171,10 @@ class _AppearancePageState extends State<AppearancePage> {
                       ),
                       items: const [
                         DropdownMenuItem(
+                          value: .8,
+                          child: Text('Más pequeño · 80%'),
+                        ),
+                        DropdownMenuItem(
                           value: .9,
                           child: Text('Pequeño · 90%'),
                         ),

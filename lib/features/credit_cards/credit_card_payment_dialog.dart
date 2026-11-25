@@ -1,3 +1,4 @@
+import '../../utils/money.dart';
 import '../../core/app_theme.dart' show appMuted;
 import '../person_accounts/receipt_draft_field.dart';
 import 'package:flutter/material.dart';
@@ -61,7 +62,9 @@ class _CreditCardPaymentDialogState extends State<CreditCardPaymentDialog> {
   void initState() {
     super.initState();
     if (widget.initialAmountCents != null) {
-      amount.text = (widget.initialAmountCents! / 100).toStringAsFixed(2);
+      amount.text = (widget.initialAmountCents! / moneyScale).toStringAsFixed(
+        6,
+      );
     }
     statementId = widget.initialStatementId ?? defaultStatement();
   }
@@ -132,8 +135,8 @@ class _CreditCardPaymentDialogState extends State<CreditCardPaymentDialog> {
                   final number = double.tryParse(text.replaceAll(',', '.'));
                   if (number == null || !number.isFinite || number <= 0)
                     return 'Escribe un monto mayor que cero';
-                  if (!RegExp(r'^\d+([.,]\d{1,2})?$').hasMatch(text))
-                    return 'Usa máximo dos decimales, sin separadores de miles';
+                  if (!RegExp(r'^\d+([.,]\d{1,6})?$').hasMatch(text))
+                    return 'Usa máximo seis decimales, sin separadores de miles';
                   return null;
                 },
               ),
@@ -167,7 +170,7 @@ class _CreditCardPaymentDialogState extends State<CreditCardPaymentDialog> {
                 const SizedBox(height: 8),
                 Text(
                   'Asigna solo pagos que no estén descontados del saldo al corte registrado.',
-                  style: TextStyle(fontSize: 12, color: appMuted),
+                  style: TextStyle(fontSize: 14, color: appMuted),
                 ),
                 const SizedBox(height: 12),
               ],

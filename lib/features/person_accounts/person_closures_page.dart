@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show MaxLengthEnforcement;
 import 'package:flutter/material.dart';
 import '../../core/supabase_client.dart';
 import '../../data/person_account_repository.dart';
@@ -131,7 +132,7 @@ class _PersonClosuresPageState extends State<PersonClosuresPage> {
                                 '${closureDate(e['entry_date'])} · ${e['description']}${e['is_voided'] == true ? ' · ANULADO' : ''}',
                               ),
                               trailing: Text(
-                                '${e['direction'].toString() == '1' ? '+' : '−'}${formatMoneyCents(moneyCents(e['amount_nio']), 'NIO')}',
+                                '${e['direction'].toString() == '1' ? '+' : '−'}${formatRecordMoneyCents(moneyCents(e['amount_nio']), 'NIO')}',
                               ),
                             ),
                           )
@@ -139,6 +140,7 @@ class _PersonClosuresPageState extends State<PersonClosuresPage> {
                     ),
                     TextField(
                       controller: notes,
+                      maxLengthEnforcement: MaxLengthEnforcement.enforced,
                       maxLength: 2000,
                       maxLines: 3,
                       decoration: const InputDecoration(
@@ -156,7 +158,7 @@ class _PersonClosuresPageState extends State<PersonClosuresPage> {
                     ),
                     const Text(
                       'Esta es tu constancia manual. La otra persona no recibe ni firma nada desde la app.',
-                      style: TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 14),
                     ),
                   ],
                 ),
@@ -231,10 +233,10 @@ class _PersonClosuresPageState extends State<PersonClosuresPage> {
                     (e) => ListTile(
                       title: Text(personEntryLabel(e)),
                       subtitle: Text(
-                        '${closureDate(e['entry_date'])} · ${e['description']}\n${formatMoneyCents(moneyCents(e['amount']), '${e['currency']}')} · Tasa ${e['exchange_rate']}${e['is_voided'] == true ? ' · ANULADO' : ''}',
+                        '${closureDate(e['entry_date'])} · ${e['description']}\n${formatRecordMoneyCents(moneyCents(e['amount']), '${e['currency']}')} · Tasa ${e['exchange_rate']}${e['is_voided'] == true ? ' · ANULADO' : ''}',
                       ),
                       trailing: Text(
-                        '${e['direction'].toString() == '1' ? '+' : '−'}${formatMoneyCents(moneyCents(e['amount_nio']), 'NIO')}',
+                        '${e['direction'].toString() == '1' ? '+' : '−'}${formatRecordMoneyCents(moneyCents(e['amount_nio']), 'NIO')}',
                       ),
                     ),
                   )

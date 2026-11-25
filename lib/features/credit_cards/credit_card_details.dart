@@ -98,14 +98,14 @@ class _CreditCardDetailsState extends State<CreditCardDetails> {
               currency == 'USD' ? 'DÓLARES' : 'CÓRDOBAS',
               style: TextStyle(
                 color: accent,
-                fontSize: 11,
+                fontSize: 14,
                 fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               credit ? 'Saldo a favor' : 'Deuda registrada',
-              style: TextStyle(color: muted, fontSize: 12),
+              style: TextStyle(color: muted, fontSize: 14),
             ),
             const SizedBox(height: 8),
             FittedBox(
@@ -155,7 +155,7 @@ class _CreditCardDetailsState extends State<CreditCardDetails> {
                               'TARJETA TITULAR',
                               style: TextStyle(
                                 color: muted,
-                                fontSize: 10,
+                                fontSize: 14,
                                 letterSpacing: 1.2,
                               ),
                             ),
@@ -197,9 +197,7 @@ class _CreditCardDetailsState extends State<CreditCardDetails> {
             if (!compact) ...[const SizedBox(height: 16), bankStatus],
             const SizedBox(height: 12),
             LayoutBuilder(
-              builder: (context, box) =>
-                  box.maxWidth < 340 ||
-                      MediaQuery.textScalerOf(context).scale(14) > 17.5
+              builder: (context, box) => box.maxWidth < 560
                   ? Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -249,7 +247,7 @@ class _CreditCardDetailsState extends State<CreditCardDetails> {
               const SizedBox(height: 8),
               Text(
                 'Uso estimado: ${cardMoney(used, base)}${limit > 0 ? ' · ${(used * 100 / limit).toStringAsFixed(0)}%' : ''}',
-                style: TextStyle(color: color, fontSize: 12),
+                style: TextStyle(color: color, fontSize: 14),
               ),
               if (exceeded)
                 Text(
@@ -269,7 +267,7 @@ class _CreditCardDetailsState extends State<CreditCardDetails> {
             const SizedBox(height: 12),
             Text(
               'Los intereses no se generan automáticamente.',
-              style: TextStyle(color: muted, fontSize: 12),
+              style: TextStyle(color: muted, fontSize: 14),
             ),
             const Divider(height: 20),
             ExpansionTile(

@@ -493,7 +493,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           '${current.loadedAt.minute.toString().padLeft(2, '0')} · '
                           '${presented.currencies[currency]!.movements} '
                           'movimientos en el rango',
-                          style: TextStyle(color: appMuted, fontSize: 12),
+                          style: TextStyle(color: appMuted, fontSize: 14),
                         ),
                       ],
                     ],

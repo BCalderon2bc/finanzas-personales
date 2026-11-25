@@ -3,7 +3,7 @@ description: "A new Flutter project."
 
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
-version: 1.1.1+13
+version: 1.1.1+12
 
 environment:
   sdk: ^3.10.4
@@ -39,6 +39,12 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   fonts:
+    - family: Liberation Sans
+      fonts:
+        - asset: assets/fonts/LiberationSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/LiberationSans-Bold.ttf
+          weight: 700
     - family: DejaVuSerif
       fonts:
         - asset: assets/fonts/DejaVuSerif.ttf

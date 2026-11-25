@@ -12,8 +12,9 @@ import 'card_statement_logic.dart';
 import 'debt_installment_logic.dart';
 
 class MoneyCell {
-  const MoneyCell(this.cents);
+  const MoneyCell(this.cents, {this.isTotal = false});
   final int cents;
+  final bool isTotal;
 }
 
 class ReportTable {
@@ -463,9 +464,9 @@ ExportReport debtsReport({
       debt['description'] ?? '',
       debt['creditor_name'] ?? '',
       c,
-      MoneyCell(original),
-      MoneyCell(paid),
-      MoneyCell(pending),
+      MoneyCell(original, isTotal: true),
+      MoneyCell(paid, isTotal: true),
+      MoneyCell(pending, isTotal: true),
       status[debt['status']] ?? '${debt['status']}',
       debt['due_date'] == null
           ? 'Sin fecha'
@@ -479,8 +480,10 @@ ExportReport debtsReport({
         shortStatementDate(i['due_date']),
         c,
         MoneyCell(moneyCents(i['amount'])),
-        MoneyCell(p.paid),
-        p.remaining == null ? 'Por revisar' : MoneyCell(p.remaining!),
+        MoneyCell(p.paid, isTotal: true),
+        p.remaining == null
+            ? 'Por revisar'
+            : MoneyCell(p.remaining!, isTotal: true),
         p.settled ? 'Cubierta' : 'Pendiente',
       ]);
     }
@@ -549,7 +552,7 @@ ExportReport debtsReport({
                   moneyCents(p['fee_amount']) -
                       moneyCents(p['insurance_amount'] ?? 0),
                 ),
-                MoneyCell(debtPaymentTotalCents(p)),
+                MoneyCell(debtPaymentTotalCents(p), isTotal: true),
               ],
         ],
       ),
@@ -598,9 +601,9 @@ ExportReport budgetsReport({
       _lookup(categories, b['category_id'], 'name', 'Categoría no disponible'),
       '${reportDate(from)} al ${reportDate(until)}',
       c,
-      MoneyCell(limit),
-      MoneyCell(spent),
-      MoneyCell(limit - spent),
+      MoneyCell(limit, isTotal: true),
+      MoneyCell(spent, isTotal: true),
+      MoneyCell(limit - spent, isTotal: true),
       spent > limit ? 'Excedido' : 'Dentro del límite',
     ]);
   }

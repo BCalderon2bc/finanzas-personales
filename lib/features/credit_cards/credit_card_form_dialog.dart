@@ -1,3 +1,5 @@
+import 'package:flutter/services.dart' show MaxLengthEnforcement;
+import '../../utils/money.dart';
 import '../../core/app_theme.dart' show appMuted;
 import '../../widgets/adaptive_layout.dart';
 import '../help/app_help.dart';
@@ -71,8 +73,8 @@ class _CreditCardFormDialogState extends State<CreditCardFormDialog> {
     }
     currency = c['currency'].toString();
     limit.text = '${c['credit_limit'] ?? 0}';
-    nio.text = (cardOpening(c, 'NIO') / 100).toStringAsFixed(2);
-    usd.text = (cardOpening(c, 'USD') / 100).toStringAsFixed(2);
+    nio.text = (cardOpening(c, 'NIO') / moneyScale).toStringAsFixed(6);
+    usd.text = (cardOpening(c, 'USD') / moneyScale).toStringAsFixed(6);
     rate.text = c['limit_exchange_rate']?.toString() ?? '';
     closing.text = c['closing_day']?.toString() ?? '';
     payment.text = c['payment_day']?.toString() ?? '';
@@ -136,10 +138,10 @@ class _CreditCardFormDialogState extends State<CreditCardFormDialog> {
       return 'Introduce un monto válido';
     }
     return RegExp(
-          allowNegative ? r'^-?\d+([.,]\d{1,2})?$' : r'^\d+([.,]\d{1,2})?$',
+          allowNegative ? r'^-?\d+([.,]\d{1,6})?$' : r'^\d+([.,]\d{1,6})?$',
         ).hasMatch(text)
         ? null
-        : 'Usa máximo dos decimales, sin separadores de miles';
+        : 'Usa máximo seis decimales, sin separadores de miles';
   }
 
   double number(TextEditingController c) =>
@@ -322,6 +324,7 @@ class _CreditCardFormDialogState extends State<CreditCardFormDialog> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: reference,
+                  maxLengthEnforcement: MaxLengthEnforcement.enforced,
                   maxLength: 4,
                   keyboardType: TextInputType.number,
                   onChanged: (_) => setState(() {}),
@@ -342,7 +345,7 @@ class _CreditCardFormDialogState extends State<CreditCardFormDialog> {
                 const SizedBox(height: 8),
                 Text(
                   'Las compras y pagos se registran en su moneda. El límite corresponde a toda la tarjeta.',
-                  style: TextStyle(color: appMuted, fontSize: 12),
+                  style: TextStyle(color: appMuted, fontSize: 14),
                 ),
                 const SizedBox(height: 12),
                 GuideAnchor(
@@ -420,7 +423,7 @@ class _CreditCardFormDialogState extends State<CreditCardFormDialog> {
                 const SizedBox(height: 8),
                 Text(
                   'Ingresa el saldo anterior al historial registrado: positivo si debías o negativo si tenías saldo a favor (ejemplo: -40). Los movimientos existentes se suman a estos importes.',
-                  style: TextStyle(color: appMuted, fontSize: 12),
+                  style: TextStyle(color: appMuted, fontSize: 14),
                 ),
                 const SizedBox(height: 16),
                 dayField('Día de corte (opcional)', closing),

@@ -32,7 +32,7 @@ class BudgetSummary extends StatelessWidget {
         children: [
           Text(
             label,
-            style: TextStyle(color: Colors.white.withAlpha(200), fontSize: 12),
+            style: TextStyle(color: Colors.white.withAlpha(200), fontSize: 14),
           ),
           const SizedBox(height: 6),
           FittedBox(
@@ -88,7 +88,7 @@ class BudgetSummary extends StatelessWidget {
                   currency,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 11,
+                    fontSize: 14,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -100,7 +100,7 @@ class BudgetSummary extends StatelessWidget {
             remaining < 0 ? 'EXCESO NETO' : 'DISPONIBLE NETO',
             style: TextStyle(
               color: Colors.white.withAlpha(200),
-              fontSize: 11,
+              fontSize: 14,
               letterSpacing: 1.3,
             ),
           ),
@@ -133,7 +133,7 @@ class BudgetSummary extends StatelessWidget {
             selected.isEmpty
                 ? 'Sin presupuestos en esta moneda'
                 : '${selected.length} presupuestos · $exceeded excedidos',
-            style: TextStyle(color: Colors.white.withAlpha(220), fontSize: 12),
+            style: TextStyle(color: Colors.white.withAlpha(220), fontSize: 14),
           ),
         ],
       ),
@@ -171,7 +171,7 @@ class BudgetSummary extends StatelessWidget {
           child: Text(
             'Incluye los presupuestos visibles y el gasto de cada uno en su período. '
             'El disponible neto puede coexistir con categorías excedidas.',
-            style: TextStyle(color: appMuted, fontSize: 12, height: 1.5),
+            style: TextStyle(color: appMuted, fontSize: 14, height: 1.5),
           ),
         ),
       ],

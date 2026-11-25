@@ -105,7 +105,7 @@ class _CategoryFormDialogState extends State<CategoryFormDialog> {
                             const SizedBox(height: 4),
                             Text(
                               type == 'income' ? 'Ingreso' : 'Gasto',
-                              style: TextStyle(color: color, fontSize: 12),
+                              style: TextStyle(color: color, fontSize: 14),
                             ),
                           ],
                         ),
@@ -160,7 +160,7 @@ class _CategoryFormDialogState extends State<CategoryFormDialog> {
                     padding: EdgeInsets.only(top: 8),
                     child: Text(
                       'El tipo se conserva para mantener la clasificación del historial.',
-                      style: TextStyle(color: appMuted, fontSize: 12),
+                      style: TextStyle(color: appMuted, fontSize: 14),
                     ),
                   ),
                 const SizedBox(height: 22),

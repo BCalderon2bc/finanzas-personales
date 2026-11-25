@@ -33,7 +33,7 @@ List<Map<String, dynamic>> debtPaymentExpenses(
     expenses.add({
       'id': payment['id'],
       'transaction_type': 'expense',
-      'amount': total / 100,
+      'amount': total / moneyScale,
       'currency': payment['currency'],
       'transaction_date': payment['payment_date'],
       'created_at': payment['created_at'],

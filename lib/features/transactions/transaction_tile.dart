@@ -116,7 +116,7 @@ class TransactionTile extends StatelessWidget {
                       const SizedBox(width: 12),
                       Flexible(
                         child: Text(
-                          '$sign${formatMoneyCents(cents, currency)}',
+                          '$sign${formatRecordMoneyCents(cents, currency)}',
                           textAlign: TextAlign.end,
                           style: theme.textTheme.titleMedium?.copyWith(
                             color: color,

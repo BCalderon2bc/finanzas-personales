@@ -58,7 +58,8 @@ class _DebtPaymentDialogState extends State<DebtPaymentDialog> {
   }
 
   int cents(TextEditingController controller) =>
-      (double.parse(controller.text.trim().replaceAll(',', '.')) * 100).round();
+      (double.parse(controller.text.trim().replaceAll(',', '.')) * moneyScale)
+          .round();
 
   Widget amountField(
     String label,
@@ -76,9 +77,9 @@ class _DebtPaymentDialogState extends State<DebtPaymentDialog> {
         final amount = double.tryParse(text.replaceAll(',', '.'));
         if (amount == null || !amount.isFinite || amount < 0)
           return 'Introduce un monto válido';
-        if (!RegExp(r'^\d+([.,]\d{1,2})?$').hasMatch(text))
-          return 'Usa máximo dos decimales, sin separadores de miles';
-        if (capital && (amount * 100).round() > widget.remainingCents)
+        if (!RegExp(r'^\d+([.,]\d{1,6})?$').hasMatch(text))
+          return 'Usa máximo seis decimales, sin separadores de miles';
+        if (capital && (amount * moneyScale).round() > widget.remainingCents)
           return 'Supera el capital pendiente';
         return null;
       },
@@ -106,10 +107,10 @@ class _DebtPaymentDialogState extends State<DebtPaymentDialog> {
     }
     Navigator.pop(context, <String, dynamic>{
       ..._receipt.fields,
-      'principal_amount': capital / 100,
-      'interest_amount': interests / 100,
-      'insurance_amount': insured / 100,
-      'fee_amount': fees / 100,
+      'principal_amount': capital / moneyScale,
+      'interest_amount': interests / moneyScale,
+      'insurance_amount': insured / moneyScale,
+      'fee_amount': fees / moneyScale,
       'payment_date': DateTime(
         date.year,
         date.month,
@@ -154,7 +155,7 @@ class _DebtPaymentDialogState extends State<DebtPaymentDialog> {
                           value: '${row['id']}',
                           child: Text(
                             "${shortStatementDate(row['transaction_date'])} · "
-                            "${formatMoneyCents(moneyCents(row['amount']), widget.currency)} · "
+                            "${formatRecordMoneyCents(moneyCents(row['amount']), widget.currency)} · "
                             "${row['description'] ?? 'Gasto'}",
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -214,7 +215,7 @@ class _DebtPaymentDialogState extends State<DebtPaymentDialog> {
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Text(
-                    'Total del abono: ${formatMoneyCents([principal, interest, insurance, fee].fold<int>(0, (total, c) => total + ((double.tryParse(c.text.replaceAll(',', '.')) ?? 0) * 100).round()), widget.currency)}',
+                    'Total del abono: ${formatMoneyCents([principal, interest, insurance, fee].fold<int>(0, (total, c) => total + ((double.tryParse(c.text.replaceAll(',', '.')) ?? 0) * moneyScale).round()), widget.currency)}',
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),

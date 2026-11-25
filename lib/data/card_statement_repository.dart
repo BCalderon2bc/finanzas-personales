@@ -5,17 +5,15 @@ export 'card_statement_logic.dart';
 Future<List<Map<String, dynamic>>> statementRows(
   String table,
   String columns,
-  String userId,
-) async {
+  String userId, {
+  String? cardId,
+}) async {
   final rows = <Map<String, dynamic>>[];
   final order = table == 'credit_card_statement_payments' ? 'payment_id' : 'id';
   for (var offset = 0; ; offset += 500) {
-    final result = await supabase
-        .from(table)
-        .select(columns)
-        .eq('user_id', userId)
-        .order(order)
-        .range(offset, offset + 499);
+    var query = supabase.from(table).select(columns).eq('user_id', userId);
+    if (cardId != null) query = query.eq('credit_card_id', cardId);
+    final result = await query.order(order).range(offset, offset + 499);
     final page = List<Map<String, dynamic>>.from(result);
     rows.addAll(page);
     if (page.length < 500) {

@@ -87,7 +87,7 @@ class MovementTotalsPanel extends StatelessWidget {
             padding: EdgeInsets.only(top: 8),
             child: Text(
               'Importes originales por moneda de cada registro. Los gastos incluyen intereses y cargos de abonos. Transferencias, capital y pagos de tarjeta se muestran aparte. Los totales usan todos los filtros de esta lista.',
-              style: TextStyle(fontSize: 12),
+              style: TextStyle(fontSize: 14),
             ),
           ),
       ],

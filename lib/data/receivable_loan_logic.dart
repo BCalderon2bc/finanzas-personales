@@ -135,7 +135,7 @@ List<Map<String, dynamic>> receivableAccountMovements(
           ..['payment_total'] =
               (moneyCents(payment['principal_amount']) +
                   moneyCents(payment['interest_amount'])) /
-              100,
+              moneyScale,
       );
     }
   }
