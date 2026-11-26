@@ -24,7 +24,7 @@ Future<ObligationData> loadObligationData() async {
     ),
     statementRows(
       'credit_card_transactions',
-      'id,credit_card_id,transaction_type,amount,currency,transaction_date,charge_kind,cash_advance_fee,is_voided,is_receivable_funding',
+      'id,credit_card_id,transaction_type,amount,currency,transaction_date,is_voided,is_receivable_funding',
       uid,
     ),
     statementRows(

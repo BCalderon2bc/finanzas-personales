@@ -3,81 +3,6 @@ import 'package:flutter/material.dart';
 import '../../utils/money.dart';
 import '../../core/app_theme.dart' show primaryColor;
 
-
-enum ChartGrouping { days, weeks, months, years }
-
-String chartGroupingLabel(ChartGrouping value) => switch (value) {
-  ChartGrouping.days => 'Días',
-  ChartGrouping.weeks => 'Semanas',
-  ChartGrouping.months => 'Meses',
-  ChartGrouping.years => 'Años',
-};
-
-class ChartGroupingSelector extends StatelessWidget {
-  const ChartGroupingSelector({super.key, required this.value, required this.onChanged});
-  final ChartGrouping value;
-  final ValueChanged<ChartGrouping> onChanged;
-  @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      if (constraints.maxWidth < 360) {
-        return DropdownButtonFormField<ChartGrouping>(
-          value: value,
-          decoration: const InputDecoration(labelText: 'Agrupar por', border: OutlineInputBorder(), isDense: true),
-          items: ChartGrouping.values.map((v) => DropdownMenuItem(value: v, child: Text(chartGroupingLabel(v)))).toList(),
-          onChanged: (next) { if (next != null) onChanged(next); },
-        );
-      }
-      return SegmentedButton<ChartGrouping>(
-        segments: ChartGrouping.values.map((v) => ButtonSegment(value: v, label: Text(chartGroupingLabel(v)))).toList(),
-        selected: {value}, showSelectedIcon: false,
-        onSelectionChanged: (selection) => onChanged(selection.first),
-      );
-    },
-  );
-}
-
-List<({String label, int cents})> buildChartBuckets(
-  DateTime start, DateTime end, ChartGrouping grouping,
-  int Function(DateTime start, DateTime end) total,
-) {
-  final result = <({String label, int cents})>[];
-  DateTime cursor;
-  switch (grouping) {
-    case ChartGrouping.days: cursor = DateUtils.dateOnly(start); break;
-    case ChartGrouping.weeks:
-      final day = DateUtils.dateOnly(start);
-      cursor = day.subtract(Duration(days: day.weekday - DateTime.monday)); break;
-    case ChartGrouping.months: cursor = DateTime(start.year, start.month); break;
-    case ChartGrouping.years: cursor = DateTime(start.year); break;
-  }
-  while (!cursor.isAfter(end)) {
-    late DateTime bucketEnd;
-    late DateTime next;
-    late String label;
-    switch (grouping) {
-      case ChartGrouping.days:
-        bucketEnd = cursor; next = cursor.add(const Duration(days: 1));
-        label = '${cursor.day}/${cursor.month}'; break;
-      case ChartGrouping.weeks:
-        bucketEnd = cursor.add(const Duration(days: 6)); next = cursor.add(const Duration(days: 7));
-        label = '${cursor.day}/${cursor.month}'; break;
-      case ChartGrouping.months:
-        bucketEnd = DateTime(cursor.year, cursor.month + 1, 0); next = DateTime(cursor.year, cursor.month + 1);
-        const names = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-        label = names[cursor.month - 1]; break;
-      case ChartGrouping.years:
-        bucketEnd = DateTime(cursor.year, 12, 31); next = DateTime(cursor.year + 1);
-        label = '${cursor.year}'; break;
-    }
-    final from = cursor.isBefore(start) ? start : cursor;
-    final to = bucketEnd.isAfter(end) ? end : bucketEnd;
-    result.add((label: label, cents: total(from, to)));
-    cursor = next;
-  }
-  return result;
-}
-
 const incomeColor = Color(0xFF277354);
 const expenseColor = Color(0xFFB14838);
 List<Color> get categoryColors => [
@@ -281,49 +206,6 @@ class MonthlyBarChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final nonEmpty = values.any((value) => value.cents != 0);
-    final positiveValues = values.where((value) => value.cents > 0).toList();
-    final peak = positiveValues.isEmpty
-        ? null
-        : positiveValues.reduce((a, b) => a.cents >= b.cents ? a : b);
-    final latest = values.isEmpty ? null : values.last;
-    final average = values.isEmpty
-        ? 0
-        : (values.fold<int>(0, (sum, value) => sum + value.cents) /
-                  values.length)
-              .round();
-    final theme = Theme.of(context);
-
-    Widget metric(String label, String value, {String? caption}) =>
-        ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 125, maxWidth: 220),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest.withAlpha(110),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: theme.dividerColor.withAlpha(100)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(label, style: theme.textTheme.labelSmall),
-                const SizedBox(height: 3),
-                Text(
-                  value,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                if (caption != null) ...[
-                  const SizedBox(height: 2),
-                  Text(caption, style: theme.textTheme.bodySmall),
-                ],
-              ],
-            ),
-          ),
-        );
-
     return Card(
       margin: EdgeInsets.zero,
       child: Padding(
@@ -331,98 +213,30 @@ class MonthlyBarChart extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 4,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      if (detail != null) ...[
-                        const SizedBox(height: 3),
-                        Text(detail!, style: theme.textTheme.bodySmall),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                metric(
-                  'Último período',
-                  latest == null
-                      ? '—'
-                      : formatMoneyCents(latest.cents, currency),
-                  caption: latest?.label,
-                ),
-                metric(
-                  'Promedio por período',
-                  formatMoneyCents(average, currency),
-                  caption: 'En el período seleccionado',
-                ),
-                metric(
-                  'Mayor valor',
-                  peak == null
-                      ? formatMoneyCents(0, currency)
-                      : formatMoneyCents(peak.cents, currency),
-                  caption: peak == null ? 'Sin actividad' : 'En ${peak.label}',
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            if (detail != null) ...[
+              const SizedBox(height: 3),
+              Text(detail!, style: Theme.of(context).textTheme.bodySmall),
+            ],
+            const SizedBox(height: 14),
             if (!nonEmpty)
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 28),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withAlpha(70),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  children: [
-                    Icon(Icons.bar_chart_rounded,
-                        size: 30, color: theme.colorScheme.onSurfaceVariant),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'No hay datos para mostrar en este período.',
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      'Prueba seleccionando otro rango de fechas.',
-                      style: theme.textTheme.bodySmall,
-                    ),
-                  ],
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 30),
+                child: Text(
+                  'No hay datos para mostrar en este período.',
+                  textAlign: TextAlign.center,
                 ),
               )
             else
               SizedBox(
-                height: 250,
+                height: 230,
                 child: CustomPaint(
                   painter: _MonthlyBarsPainter(
                     values: values,
                     currency: currency,
                     color: color,
-                    textColor: theme.colorScheme.onSurfaceVariant,
-                    gridColor: theme.dividerColor,
+                    textColor: Theme.of(context).colorScheme.onSurfaceVariant,
+                    gridColor: Theme.of(context).dividerColor,
                   ),
                   child: const SizedBox.expand(),
                 ),
@@ -432,7 +246,6 @@ class MonthlyBarChart extends StatelessWidget {
       ),
     );
   }
-
 }
 
 class _MonthlyBarsPainter extends CustomPainter {
@@ -449,16 +262,11 @@ class _MonthlyBarsPainter extends CustomPainter {
   final Color color, textColor, gridColor;
 
   String compact(int cents) {
-    // Mostrar centavos: redondear a dos decimales sin perder precisión.
-    final rounded = (cents.abs() + 5000) ~/ 10000;
-    final whole = (rounded ~/ 100).toString();
-    final fraction = (rounded % 100).toString().padLeft(2, '0');
-    final grouped = whole.replaceAllMapped(
-      RegExp(r'\B(?=(\d{3})+(?!\d))'),
-      (_) => ',',
-    );
+    final amount = cents.abs() / 100;
     final symbol = currency == 'USD' ? r'$' : r'C$';
-    return '$symbol$grouped.$fraction';
+    if (amount >= 1000000) return '$symbol${(amount / 1000000).toStringAsFixed(1)} M';
+    if (amount >= 1000) return '$symbol${(amount / 1000).toStringAsFixed(0)} mil';
+    return '$symbol${amount.toStringAsFixed(0)}';
   }
 
   void drawText(Canvas canvas, String value, Offset offset, TextStyle style,
@@ -475,7 +283,7 @@ class _MonthlyBarsPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (values.isEmpty) return;
-    const left = 70.0, right = 8.0, top = 18.0, bottom = 34.0;
+    const left = 48.0, right = 8.0, top = 18.0, bottom = 34.0;
     final chartWidth = math.max(1.0, size.width - left - right);
     final chartHeight = math.max(1.0, size.height - top - bottom);
     final maxValue = values.fold<int>(1, (m, v) => math.max(m, v.cents.abs()));
@@ -508,12 +316,6 @@ class _MonthlyBarsPainter extends CustomPainter {
         4,
         Paint()..color = color.withAlpha(225),
       );
-      final valueText = compact(value.cents);
-      final valuePainter = TextPainter(
-        text: TextSpan(text: valueText, style: TextStyle(color: textColor, fontSize: 9, fontWeight: FontWeight.w700)),
-        textDirection: TextDirection.ltr, maxLines: 1, ellipsis: '…',
-      )..layout(maxWidth: math.max(24, slot - 2));
-      valuePainter.paint(canvas, Offset(x + barWidth / 2 - valuePainter.width / 2, math.max(0, y - 15)));
       final label = value.label;
       final labelStyle = TextStyle(color: textColor, fontSize: 9);
       final labelPainter = TextPainter(

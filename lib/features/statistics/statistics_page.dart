@@ -34,7 +34,6 @@ class StatisticsPage extends StatefulWidget {
 class _StatisticsPageState extends State<StatisticsPage> {
   late DateTimeRange range;
   String currency = 'NIO';
-  ChartGrouping chartGrouping = ChartGrouping.months;
   _StatisticsView view = _StatisticsView.summary;
   ExchangeRate? rate;
   ObligationData? obligations;
@@ -194,19 +193,6 @@ class _StatisticsPageState extends State<StatisticsPage> {
                     'No se pudieron cargar los movimientos de tarjeta.',
                   ),
                 ),
-            ],
-            if (!loading && !failed && rate != null) ...[
-              const SizedBox(height: 24),
-              Text(
-                'Evolución de ingresos, gastos y tarjetas',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 10),
-              ChartGroupingSelector(value: chartGrouping, onChanged: (value) => setState(() => chartGrouping = value)),
-              const SizedBox(height: 12),
-              ...monthlyIncomeExpenseCharts(rate!),
               ...monthlyCardCharts(rate!),
             ],
           ],
@@ -288,6 +274,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
     );
     if (view == _StatisticsView.expenses) {
       return [
+        ...monthlyIncomeExpenseCharts(exchangeRate),
         if (summary.expenseCategories.isEmpty)
           panel(
             'Sin gastos por categoría',
@@ -353,6 +340,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
       ),
     );
     return [
+      ...monthlyIncomeExpenseCharts(exchangeRate),
       if (summary.movementCount == 0 && previous.movementCount == 0)
         panel(
           'Sin ingresos o gastos en este período',
@@ -459,9 +447,28 @@ class _StatisticsPageState extends State<StatisticsPage> {
     ];
   }
 
-  List<({String label, int cents})> _chartBuckets(
+  List<({String label, int cents})> _months(
     int Function(DateTime start, DateTime end) total,
-  ) => buildChartBuckets(range.start, range.end, chartGrouping, total);
+  ) {
+    final result = <({String label, int cents})>[];
+    var month = DateTime(range.start.year, range.start.month);
+    final last = DateTime(range.end.year, range.end.month);
+    const labels = [
+      'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+      'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
+    ];
+    while (!month.isAfter(last)) {
+      final monthEnd = DateTime(month.year, month.month + 1, 0);
+      final start = range.start.isAfter(month) ? range.start : month;
+      final end = range.end.isBefore(monthEnd) ? range.end : monthEnd;
+      result.add((
+        label: labels[month.month - 1],
+        cents: total(start, end),
+      ));
+      month = DateTime(month.year, month.month + 1);
+    }
+    return result;
+  }
 
   List<Widget> monthlyIncomeExpenseCharts(ExchangeRate exchangeRate) {
     int total(DateTime start, DateTime end, {required bool income}) {
@@ -478,17 +485,17 @@ class _StatisticsPageState extends State<StatisticsPage> {
 
     return [
       MonthlyBarChart(
-        title: 'Ingresos',
-        detail: 'Total de ingresos en cada intervalo seleccionado.',
-        values: _chartBuckets((start, end) => total(start, end, income: true)),
+        title: 'Ingresos por mes',
+        detail: 'Evolución mensual de los ingresos registrados',
+        values: _months((start, end) => total(start, end, income: true)),
         currency: currency,
         color: const Color(0xFF277354),
       ),
       const SizedBox(height: 12),
       MonthlyBarChart(
-        title: 'Gastos',
-        detail: 'Total de gastos en cada intervalo, descontando las devoluciones.',
-        values: _chartBuckets((start, end) => total(start, end, income: false)),
+        title: 'Gastos por mes',
+        detail: 'Gasto neto mensual, descontando devoluciones',
+        values: _months((start, end) => total(start, end, income: false)),
         currency: currency,
         color: const Color(0xFFB14838),
       ),
@@ -543,17 +550,17 @@ class _StatisticsPageState extends State<StatisticsPage> {
 
     return [
       MonthlyBarChart(
-        title: 'Consumo de tarjetas',
-        detail: 'Compras + intereses + cargos − devoluciones en cada intervalo.',
-        values: _chartBuckets(consumption),
+        title: 'Consumo mensual de tarjetas',
+        detail: 'Compras, intereses y cargos menos devoluciones',
+        values: _months(consumption),
         currency: currency,
         color: primaryColor,
       ),
       const SizedBox(height: 12),
       MonthlyBarChart(
         title: 'Deuda pendiente de tarjetas',
-        detail: 'Deuda total pendiente al cierre de cada intervalo, incluidos saldos iniciales y movimientos.',
-        values: _chartBuckets(outstanding),
+        detail: 'Saldo acumulado al cierre de cada mes, incluyendo el saldo inicial',
+        values: _months(outstanding),
         currency: currency,
         color: const Color(0xFF7554A3),
       ),
