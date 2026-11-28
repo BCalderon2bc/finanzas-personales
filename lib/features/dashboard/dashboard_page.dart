@@ -14,6 +14,7 @@ import 'dashboard_header.dart';
 import 'dashboard_conversion.dart';
 import '../auth/change_name_page.dart' show fetchProfileName;
 import '../accounts/accounts_page.dart';
+import '../accounts/account_cashflow_bar_chart.dart';
 import '../transactions/transactions_page.dart';
 import '../categories/categories_page.dart';
 import '../budgets/budgets_page.dart';
@@ -21,6 +22,7 @@ import '../debts/debts_page.dart';
 import '../debts/debt_payments_page.dart';
 import '../credit_cards/credit_cards_page.dart';
 import '../credit_cards/credit_card_movements_page.dart';
+import '../credit_cards/credit_card_expenses_bar_chart.dart';
 import '../reports/monthly_expenses_page.dart';
 import '../receivable_loans/receivable_loans_page.dart';
 import '../receivable_loans/receivable_loans_dashboard.dart';
@@ -92,7 +94,7 @@ class _DashboardPageState extends State<DashboardPage> {
         loadDashboardOverview(selectedPeriod.start, until: selectedPeriod.end),
         readSettings(),
         loadIncomeExpenseData().then<List<ExportMovement>?>(
-          (value) => value.movements,
+              (value) => value.movements,
           onError: (Object _) => null,
         ),
       ]);
@@ -152,13 +154,13 @@ class _DashboardPageState extends State<DashboardPage> {
     setState(() {
       period = from
           ? DashboardPeriod(
-              selected,
-              selected.isAfter(period.end) ? selected : period.end,
-            )
+        selected,
+        selected.isAfter(period.end) ? selected : period.end,
+      )
           : DashboardPeriod(
-              selected.isBefore(period.start) ? selected : period.start,
-              selected,
-            );
+        selected.isBefore(period.start) ? selected : period.start,
+        selected,
+      );
     });
     await loadData();
   }
@@ -319,10 +321,10 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
         floatingActionButton: showBackToTop && !compact
             ? FloatingActionButton.small(
-                tooltip: 'Volver arriba',
-                onPressed: backToTop,
-                child: const Icon(Icons.keyboard_arrow_up_rounded),
-              )
+          tooltip: 'Volver arriba',
+          onPressed: backToTop,
+          child: const Icon(Icons.keyboard_arrow_up_rounded),
+        )
             : null,
         body: SafeArea(
           top: false,
@@ -355,7 +357,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           onCurrent: () {
                             final now = DateTime.now();
                             setState(
-                              () => period = DashboardPeriod.forMonth(now),
+                                  () => period = DashboardPeriod.forMonth(now),
                             );
                             loadData();
                           },
@@ -446,7 +448,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             onDebt: (debt) => pushPage(
                               DebtsPage(
                                 initialSearch:
-                                    debt['description']?.toString() ?? '',
+                                debt['description']?.toString() ?? '',
                               ),
                             ),
                           ),
@@ -460,10 +462,10 @@ class _DashboardPageState extends State<DashboardPage> {
                           trailingChart: current == null
                               ? null
                               : CreditCardSpendingChart(
-                                  spending: current.cardSpending,
-                                  currency: currency,
-                                  exchangeRate: rate,
-                                ),
+                            spending: current.cardSpending,
+                            currency: currency,
+                            exchangeRate: rate,
+                          ),
                         ),
                       ],
                       if (!loading &&
@@ -485,13 +487,26 @@ class _DashboardPageState extends State<DashboardPage> {
                             },
                           ),
                         ),
+                        const SizedBox(height: 16),
+                        AccountCashflowBarChart(
+                          accounts: current.accounts,
+                          transactions: current.transactions,
+                          generalExchangeRate: rate,
+                        ),
+                        const SizedBox(height: 16),
+                        CreditCardExpensesBarChart(
+                          cards: current.creditCards,
+                          movements: current.creditCardTransactions,
+                          generalExchangeRate: rate,
+                          initialCurrency: 'USD',
+                        ),
                         const SizedBox(height: 14),
                         Text(
                           'Actualizado a las '
-                          '${current.loadedAt.hour.toString().padLeft(2, '0')}:'
-                          '${current.loadedAt.minute.toString().padLeft(2, '0')} · '
-                          '${presented.currencies[currency]!.movements} '
-                          'movimientos en el rango',
+                              '${current.loadedAt.hour.toString().padLeft(2, '0')}:'
+                              '${current.loadedAt.minute.toString().padLeft(2, '0')} · '
+                              '${presented.currencies[currency]!.movements} '
+                              'movimientos en el rango',
                           style: TextStyle(color: appMuted, fontSize: 14),
                         ),
                         const SizedBox(height: 28),

@@ -3,10 +3,10 @@ import 'dashboard_overview.dart';
 
 /// Crea una vista equivalente. Nunca modifica los registros ni el original.
 DashboardOverview convertDashboard(
-  DashboardOverview source,
-  String target,
-  ExchangeRate rate,
-) {
+    DashboardOverview source,
+    String target,
+    ExchangeRate rate,
+    ) {
   final result = DashboardOverview(
     source.month,
     period: source.period,
@@ -18,6 +18,9 @@ DashboardOverview convertDashboard(
   }
   result.categoryNames.addAll(source.categoryNames);
   result.categoryStyles.addAll(source.categoryStyles);
+  result.cardSpending = source.cardSpending;
+  result.creditCards = source.creditCards;
+  result.creditCardTransactions = source.creditCardTransactions;
 
   for (final entry in source.currencies.entries) {
     final c = entry.value;
@@ -83,7 +86,7 @@ DashboardOverview convertDashboard(
   // No convertir los eventos al filtro global ni agregar "Original:" al detalle.
   result.events.addAll(source.events);
   result.accounts.sort(
-    (a, b) => (b['balance_cents'] as int).compareTo(a['balance_cents'] as int),
+        (a, b) => (b['balance_cents'] as int).compareTo(a['balance_cents'] as int),
   );
   return result;
 }

@@ -4,6 +4,8 @@ import '../credit_cards/credit_card_balances.dart';
 import 'dashboard_period.dart';
 export 'dashboard_period.dart';
 
+typedef DashboardRecord = Map<String, dynamic>;
+
 enum DashboardTarget {
   accounts,
   transactions,
@@ -43,17 +45,17 @@ class DashboardCurrency {
 
 class DashboardEvent {
   const DashboardEvent(
-    this.id,
-    this.date,
-    this.title,
-    this.detail,
-    this.currency,
-    this.cents,
-    this.flow,
-    this.target, [
-    this.entityId,
-    this.categoryId,
-  ]);
+      this.id,
+      this.date,
+      this.title,
+      this.detail,
+      this.currency,
+      this.cents,
+      this.flow,
+      this.target, [
+        this.entityId,
+        this.categoryId,
+      ]);
 
   final String id;
   final DateTime date;
@@ -69,8 +71,8 @@ class DashboardEvent {
 
 class DashboardOverview {
   DashboardOverview(this.month, {DashboardPeriod? period, DateTime? loadedAt})
-    : period = period ?? DashboardPeriod.forMonth(month),
-      loadedAt = loadedAt ?? DateTime.now();
+      : period = period ?? DashboardPeriod.forMonth(month),
+        loadedAt = loadedAt ?? DateTime.now();
 
   final DateTime month;
   final DateTime loadedAt;
@@ -79,13 +81,16 @@ class DashboardOverview {
   final currencies = {'NIO': DashboardCurrency(), 'USD': DashboardCurrency()};
 
   final categoryNames = <String, String>{};
-  final categoryStyles = <String, Map<String, dynamic>>{};
+  final categoryStyles = <String, DashboardRecord>{};
   List<CardSpending> cardSpending = const [];
+  List<DashboardRecord> transactions = const [];
+  List<DashboardRecord> creditCards = const [];
+  List<DashboardRecord> creditCardTransactions = const [];
   final Map<String, List<TotalPart>> totalParts = {};
 
   String rateNote = '';
-  final accounts = <Map<String, dynamic>>[];
-  final budgets = <Map<String, dynamic>>[];
+  final accounts = <DashboardRecord>[];
+  final budgets = <DashboardRecord>[];
   final events = <DashboardEvent>[];
 }
 

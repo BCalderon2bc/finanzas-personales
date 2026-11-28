@@ -17,10 +17,10 @@ DateTime _dashboardDate(dynamic value) {
 }
 
 DashboardOverview buildDashboardOverview(
-  DashboardPeriod period, {
-  required List<List<Map<String, dynamic>>> rows,
-  required DateTime today,
-}) {
+    DashboardPeriod period, {
+      required List<List<DashboardRecord>> rows,
+      required DateTime today,
+    }) {
   final accounts = rows[0];
   final transactions = rows[1];
   final debts = rows[4];
@@ -47,6 +47,9 @@ DashboardOverview buildDashboardOverview(
     DateTime(period.start.year, period.start.month),
     period: period,
   );
+  data.transactions = transactions;
+  data.creditCards = cards;
+  data.creditCardTransactions = cardTransactions;
   data.cardSpending = cardSpendingForPeriod(
     cards: cards,
     movements: cardTransactions,
@@ -354,7 +357,7 @@ DashboardOverview buildDashboardOverview(
 
     final pending =
         moneyCents(debt['original_amount']) -
-        (principalPaid[debt['id'].toString()] ?? 0);
+            (principalPaid[debt['id'].toString()] ?? 0);
 
     if (pending < 0) {
       throw StateError('Hay una deuda con abonos superiores a su capital.');
@@ -401,14 +404,14 @@ DashboardOverview buildDashboardOverview(
     data.budgets.add({
       ...budget,
       'name':
-          '${data.categoryNames[budget['category_id'].toString()] ?? 'Categoría no disponible'} · ${isoDay(start)} a ${isoDay(end)}',
+      '${data.categoryNames[budget['category_id'].toString()] ?? 'Categoría no disponible'} · ${isoDay(start)} a ${isoDay(end)}',
       'limit_cents': limit,
       'spent_cents': spent,
     });
   }
 
   data.accounts.sort(
-    (a, b) => (b['balance_cents'] as int).compareTo(a['balance_cents'] as int),
+        (a, b) => (b['balance_cents'] as int).compareTo(a['balance_cents'] as int),
   );
 
   data.events.sort((a, b) {

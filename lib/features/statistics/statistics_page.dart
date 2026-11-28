@@ -1,7 +1,9 @@
+import '../accounts/account_cashflow_bar_chart.dart';
 import '../reports/consolidated_expenses_panel.dart';
+import '../../core/supabase_client.dart';
 import '../../data/card_spending.dart';
-import '../credit_cards/credit_card_balances.dart'
-    show cardBalance;
+import '../../data/transaction_repository.dart';
+import '../credit_cards/credit_card_expenses_bar_chart.dart';
 import '../dashboard/dashboard_financial_health.dart'
     show CreditCardSpendingChart;
 import '../../widgets/collapsible_filters.dart';
@@ -20,7 +22,6 @@ import 'obligation_repository.dart';
 import 'obligation_statistics.dart';
 import 'statistics_charts.dart';
 import 'statistics_summary.dart';
-import '../../core/app_theme.dart' show primaryColor;
 
 enum _StatisticsView { summary, expenses, debts }
 
@@ -38,6 +39,8 @@ class _StatisticsPageState extends State<StatisticsPage> {
   ExchangeRate? rate;
   ObligationData? obligations;
   List<ExportMovement> movements = [];
+  List<AccountDataRecord> accounts = [];
+  List<AccountDataRecord> accountTransactions = [];
   Map<String, String> categories = {};
   bool loading = true;
   bool failed = false;
@@ -51,6 +54,25 @@ class _StatisticsPageState extends State<StatisticsPage> {
     load();
   }
 
+  Future<(List<AccountDataRecord>, List<AccountDataRecord>)>
+  _loadAccountCashflowData() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) {
+      return (const <AccountDataRecord>[], const <AccountDataRecord>[]);
+    }
+
+    final (accountsRes, txs) = await (
+    supabase
+        .from('accounts')
+        .select('id, name, account_type, currency, opening_balance, is_active')
+        .eq('user_id', user.id)
+        .order('id'),
+    loadUserTransactions(user.id),
+    ).wait;
+
+    return (List<AccountDataRecord>.from(accountsRes), txs);
+  }
+
   Future<void> load() async {
     final id = ++request;
     setState(() {
@@ -58,19 +80,27 @@ class _StatisticsPageState extends State<StatisticsPage> {
       failed = false;
     });
     try {
-      final (result, settings, obligationData) = await (
-        loadIncomeExpenseData(),
-        loadFinancialSettings(),
-        loadObligationData().then<ObligationData?>(
-          (data) => data,
-          onError: (Object _) => null,
-        ),
+      final (result, settings, obligationData, accountData) = await (
+      loadIncomeExpenseData(),
+      loadFinancialSettings(),
+      loadObligationData().then<ObligationData?>(
+            (data) => data,
+        onError: (Object _) => null,
+      ),
+      _loadAccountCashflowData().then<
+          (List<AccountDataRecord>, List<AccountDataRecord>)?
+      >(
+            (data) => data,
+        onError: (Object _) => null,
+      ),
       ).wait;
       if (!mounted || id != request) return;
       setState(() {
         movements = result.movements;
         rate = settings?.rate;
         obligations = obligationData;
+        accounts = accountData?.$1 ?? const [];
+        accountTransactions = accountData?.$2 ?? const [];
         categories = {
           for (final category in result.categories)
             '${category['id']}': '${category['name']}',
@@ -153,20 +183,20 @@ class _StatisticsPageState extends State<StatisticsPage> {
                 ),
               )
             else if (rate == null)
-              panel(
-                'Configura la tasa de cambio',
-                const Text(
-                  'Guarda la tasa en Configuraciones y vuelve a abrir Estadísticas.',
-                ),
-              )
-            else ...[
-              Text('Tasa configurada: \$ 1 = C\$ ${rate!.decimal}'),
-              const SizedBox(height: 12),
-              if (view == _StatisticsView.debts)
-                obligationPanels(rate!)
-              else
-                ...statistics(rate!),
-            ],
+                panel(
+                  'Configura la tasa de cambio',
+                  const Text(
+                    'Guarda la tasa en Configuraciones y vuelve a abrir Estadísticas.',
+                  ),
+                )
+              else ...[
+                  Text('Tasa configurada: \$ 1 = C\$ ${rate!.decimal}'),
+                  const SizedBox(height: 12),
+                  if (view == _StatisticsView.debts)
+                    obligationPanels(rate!)
+                  else
+                    ...statistics(rate!),
+                ],
             if (!loading && !failed && view != _StatisticsView.debts) ...[
               ConsolidatedExpensesPanel(
                 movements: movements,
@@ -175,7 +205,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
                 end: range.end,
               ),
               const SizedBox(height: 12),
-              if (obligations case final data?)
+              if (obligations case final data?) ...[
                 CreditCardSpendingChart(
                   spending: cardSpendingForPeriod(
                     cards: data.cards,
@@ -185,15 +215,32 @@ class _StatisticsPageState extends State<StatisticsPage> {
                   ),
                   currency: currency,
                   exchangeRate: rate,
-                )
-              else
+                ),
+                const SizedBox(height: 12),
+              ] else ...[
                 panel(
                   'Gasto por tarjeta',
                   const Text(
                     'No se pudieron cargar los movimientos de tarjeta.',
                   ),
                 ),
-              ...monthlyCardCharts(rate!),
+                const SizedBox(height: 12),
+              ],
+              AccountCashflowBarChart(
+                accounts: accounts,
+                transactions: accountTransactions,
+                generalExchangeRate: rate,
+              ),
+              const SizedBox(height: 12),
+              if (obligations case final data?) ...[
+                CreditCardExpensesBarChart(
+                  cards: data.cards,
+                  movements: data.cardMovements,
+                  generalExchangeRate: rate,
+                  initialCurrency: 'USD',
+                ),
+                const SizedBox(height: 12),
+              ],
             ],
           ],
         ),
@@ -274,7 +321,6 @@ class _StatisticsPageState extends State<StatisticsPage> {
     );
     if (view == _StatisticsView.expenses) {
       return [
-        ...monthlyIncomeExpenseCharts(exchangeRate),
         if (summary.expenseCategories.isEmpty)
           panel(
             'Sin gastos por categoría',
@@ -302,6 +348,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
               detail: 'Hasta ocho categorías por gasto antes de devoluciones.',
             ),
           ]),
+        const SizedBox(height: 12),
       ];
     }
     final first = DateTime.utc(
@@ -340,7 +387,6 @@ class _StatisticsPageState extends State<StatisticsPage> {
       ),
     );
     return [
-      ...monthlyIncomeExpenseCharts(exchangeRate),
       if (summary.movementCount == 0 && previous.movementCount == 0)
         panel(
           'Sin ingresos o gastos en este período',
@@ -392,14 +438,14 @@ class _StatisticsPageState extends State<StatisticsPage> {
               rows: [
                 (label: 'Ingresos', cents: summary.income, color: incomeColor),
                 (
-                  label: 'Gastos antes de devoluciones',
-                  cents: summary.grossExpenses,
-                  color: expenseColor,
+                label: 'Gastos antes de devoluciones',
+                cents: summary.grossExpenses,
+                color: expenseColor,
                 ),
                 (
-                  label: 'Devoluciones',
-                  cents: summary.refunds,
-                  color: categoryColors[0],
+                label: 'Devoluciones',
+                cents: summary.refunds,
+                color: categoryColors[0],
                 ),
               ],
             ),
@@ -418,7 +464,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
               ],
             ),
             detail:
-                'Anterior: ${isoDay(previousStart)} a ${isoDay(previousEnd)} · ${summary.dayCount} días.',
+            'Anterior: ${isoDay(previousStart)} a ${isoDay(previousEnd)} · ${summary.dayCount} días.',
           ),
           panel(
             'Actividad del período',
@@ -444,126 +490,6 @@ class _StatisticsPageState extends State<StatisticsPage> {
             ),
         ]),
       ],
-    ];
-  }
-
-  List<({String label, int cents})> _months(
-    int Function(DateTime start, DateTime end) total,
-  ) {
-    final result = <({String label, int cents})>[];
-    var month = DateTime(range.start.year, range.start.month);
-    final last = DateTime(range.end.year, range.end.month);
-    const labels = [
-      'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
-      'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
-    ];
-    while (!month.isAfter(last)) {
-      final monthEnd = DateTime(month.year, month.month + 1, 0);
-      final start = range.start.isAfter(month) ? range.start : month;
-      final end = range.end.isBefore(monthEnd) ? range.end : monthEnd;
-      result.add((
-        label: labels[month.month - 1],
-        cents: total(start, end),
-      ));
-      month = DateTime(month.year, month.month + 1);
-    }
-    return result;
-  }
-
-  List<Widget> monthlyIncomeExpenseCharts(ExchangeRate exchangeRate) {
-    int total(DateTime start, DateTime end, {required bool income}) {
-      var cents = 0;
-      for (final movement in movements) {
-        final day = DateUtils.dateOnly(movement.date);
-        if (day.isBefore(start) || day.isAfter(end)) continue;
-        final amount = income ? movement.income : movement.expense;
-        if (amount == 0) continue;
-        cents += exchangeRate.convert(amount, movement.currency, currency);
-      }
-      return cents;
-    }
-
-    return [
-      MonthlyBarChart(
-        title: 'Ingresos por mes',
-        detail: 'Evolución mensual de los ingresos registrados',
-        values: _months((start, end) => total(start, end, income: true)),
-        currency: currency,
-        color: const Color(0xFF277354),
-      ),
-      const SizedBox(height: 12),
-      MonthlyBarChart(
-        title: 'Gastos por mes',
-        detail: 'Gasto neto mensual, descontando devoluciones',
-        values: _months((start, end) => total(start, end, income: false)),
-        currency: currency,
-        color: const Color(0xFFB14838),
-      ),
-      const SizedBox(height: 12),
-    ];
-  }
-
-  List<Widget> monthlyCardCharts(ExchangeRate exchangeRate) {
-    final data = obligations;
-    if (data == null) return const [];
-
-    int consumption(DateTime start, DateTime end) {
-      var total = 0;
-      for (final movement in data.cardMovements) {
-        final date = DateTime.tryParse('${movement['transaction_date']}')
-            ?.toLocal();
-        if (date == null) continue;
-        final day = DateUtils.dateOnly(date);
-        if (day.isBefore(start) || day.isAfter(end)) continue;
-        final amount = cardSpendingCents(movement);
-        if (amount == 0) continue;
-        total += exchangeRate.convert(
-          amount,
-          '${movement['currency']}',
-          currency,
-        );
-      }
-      return total;
-    }
-
-    int outstanding(DateTime start, DateTime end) {
-      if (end.isBefore(start)) return 0;
-      var total = 0;
-      final transactions = data.cardMovements.where((movement) {
-        final date = DateTime.tryParse('${movement['transaction_date']}')
-            ?.toLocal();
-        return date != null && !DateUtils.dateOnly(date).isAfter(end);
-      }).toList();
-      for (final card in data.cards) {
-        for (final sourceCurrency in const ['NIO', 'USD']) {
-          final balance = cardBalance(card, transactions, sourceCurrency);
-          if (balance == null || balance <= 0) continue;
-          total += exchangeRate.convert(
-          balance,
-          sourceCurrency,
-          currency,
-        );
-        }
-      }
-      return total;
-    }
-
-    return [
-      MonthlyBarChart(
-        title: 'Consumo mensual de tarjetas',
-        detail: 'Compras, intereses y cargos menos devoluciones',
-        values: _months(consumption),
-        currency: currency,
-        color: primaryColor,
-      ),
-      const SizedBox(height: 12),
-      MonthlyBarChart(
-        title: 'Deuda pendiente de tarjetas',
-        detail: 'Saldo acumulado al cierre de cada mes, incluyendo el saldo inicial',
-        values: _months(outstanding),
-        currency: currency,
-        color: const Color(0xFF7554A3),
-      ),
       const SizedBox(height: 12),
     ];
   }
@@ -700,9 +626,9 @@ class _StatisticsPageState extends State<StatisticsPage> {
                 rows: [
                   for (final row in section.activity)
                     (
-                      label: row.key,
-                      cents: row.value,
-                      color: categoryColors[0],
+                    label: row.key,
+                    cents: row.value,
+                    color: categoryColors[0],
                     ),
                 ],
               ),
